@@ -1,0 +1,28 @@
+def randint(minvalue, maxvalue):
+
+  if minvalue > maxvalue:
+    # mimic random's failure behaviour
+    raise ValueError, "empty range for randrange()"
+
+  if maxvalue == minvalue:
+    return maxvalue
+
+  randomrange = maxvalue - minvalue
+
+  # get a small random number
+  randomnumber = int(randomfloat() * 2**32)
+
+  # We're going to generate the number 32 bits at a time...
+  while randomrange > 2**32:
+    # add random bits to the bottom...
+    randomnumber = (randomnumber << 32) + int(randomfloat() * 2**32)
+    # shift the range
+    randomrange = randomrange >> 32
+
+  # BUG: doing mod here isn't perfect.   If there are 32 bits to make random,
+  # and the range isn't a power of 2, some numbers will be slightly more likely
+  # than others...   I could detect and retry I guess...
+  retvalue = minvalue + (randomnumber % (maxvalue - minvalue + 1))
+  assert(minvalue<=retvalue<=maxvalue)
+  return retvalue
+

@@ -1,0 +1,246 @@
+""" 
+Author: Justin Cappos
+
+Module: Routines that interact with a node manager to perform actions on
+        nodes.   A simple front end can be added to make this a functional
+        experiment manager.
+
+Start date: September 7th 2008
+
+The design goals of this version are to be secure, simple, and reliable (in 
+that order).   
+
+"""
+
+# for signing the data we send to the node manager
+include signeddata.repy
+
+# session wrapper (breaks the stream into messages)
+# an abstracted "itemized data communication" in a separate API
+include session.repy
+
+
+# The idea is that this module returns "node manager handles".   A handle
+# may be used to communicate with a node manager and issue commands.   If the
+# caller wants to have a set of node managers with the same state, this can
+# be done by something like:
+#
+#
+# myid =    # some unique, non-repeating value
+# nmhandles = []
+# for nm in nodemanagers:
+#   nmhandles.append(nmclient_createhandle(nm, sequenceid = myid))
+#
+# 
+# def do_action(action):
+#   for nmhandle in nmhandles:
+#     nmclient_doaction(nmhandle, ... )
+#
+#
+# The above code snippet will ensure that none of the nmhandles perform the
+# actions called in do_action() out of order.   A node that "misses" an action
+# (perhaps due to a network or node failure) will not perform later actions 
+# unless the sequenceid is reset.
+#
+# Note that the above calls to nmclient_createhandle and nmclient_doaction 
+# should really be wrapped in try except blocks for NMClientExceptions
+
+
+
+# Thrown when a failure occurs when trying to communicate with a node
+class NMClientException(Exception):
+  pass
+
+# This holds all of the client handles.   A client handle is merely a 
+# string that is the key to this dict.   All of the information is stored in
+# the dictionary value (a dict with keys for IP, port, sessionID, timestamp,
+# identity, expirationtime, public key, private key, and vesselID).   
+nmclient_handledict = {}
+
+# BUG: How do I do this and have it be portable across repy <-> python?
+# needed when assigning new handles to prevent race conditions...
+nmclient_handledictlock = getlock()
+
+
+
+# Note: I open a new connection for every request.   Is this really what I want
+# to do?   It seemed easiest but likely has performance implications
+
+# Sends data to a node (opens the connection, writes the 
+# communication header, sends all the data, receives the result, and returns
+# the result)...
+def nmclient_rawcommunicate(nmhandle, *args):
+
+  try:
+    thisconnobject = openconn(nmclient_handledict[nmhandle]['IP'], nmclient_handledict[nmhandle]['port']) 
+  except Exception, e:
+    raise NMClientException, str(e)
+
+  # always close the connobject
+  try:
+
+    # send the args separated by '|' chars (as is expected by the node manager)
+    session_sendmessage(thisconnobject, '|'.join(args))
+    return session_recvmessage(thisconnobject)
+  finally:
+    thisconnobject.close()
+
+
+
+
+# Sends data to a node (opens the connection, writes the 
+# communication header, sends all the data, receives the result, and returns
+# the result)...
+def nmclient_signedcommunicate(nmhandle, *args):
+
+  # need to check lots of the nmhandle settings...
+
+  if nmclient_handledict[nmhandle]['timestamp'] == True:
+    # set the time based upon the current time...
+    timestamp = time_gettime()
+  elif not nmclient_handledict[nmhandle]['timestamp']:
+    # we're false, so set to None
+    timestamp = None
+  else:
+    # For some reason, the caller wanted a specific time...
+    timestamp = nmclient_handledict[nmhandle]['timestamp']
+
+  if nmclient_handledict[nmhandle]['publickey']:
+    publickey = nmclient_handledict[nmhandle]['publickey']
+  else:
+    raise NMClientException, "Must have public key for signed communication"
+
+  if nmclient_handledict[nmhandle]['privatekey']:
+    privatekey = nmclient_handledict[nmhandle]['privatekey']
+  else:
+    raise NMClientException, "Must have private key for signed communication"
+
+  # use this blindly (None or a value are both okay)
+  sequenceid = nmclient_handledict[nmhandle]['sequenceid']
+
+  if nmclient_handledict[nmhandle]['expiration']:
+    if timestamp == None:
+      # highly dubious.   However, it's technically valid, so let's allow it.
+      expirationtime = nmclient_handledict[nmhandle]['expiration']
+    else:
+      expirationtime = timestamp + nmclient_handledict[nmhandle]['expiration']
+
+  else:
+    # they don't want this to expire
+    expirationtime = nmclient_handledict[nmhandle]['expiration']
+
+
+  # use this blindly (None or a value are both okay)
+  identity = nmclient_handledict[nmhandle]['identity']
+
+
+  # build the data to send.   Ideally we'd do: datatosend = '|'.join(args)
+  # we can't do this because some args may be non-strings...
+  datatosend = args[0]
+  for arg in args[1:]:
+    datatosend = datatosend + '|' + str(arg)
+    
+
+  try:
+    thisconnobject = openconn(nmclient_handledict[nmhandle]['IP'], nmclient_handledict[nmhandle]['port']) 
+  except Exception, e:
+    raise NMClientException, str(e)
+
+  # always close the connobject afterwards...
+  try:
+    try:
+      signeddata = signeddata_signdata(datatosend, privatekey, publickey, timestamp, expirationtime, sequenceid, identity)
+    except ValueError, e:
+      raise NMClientException, str(e)
+    session_sendmessage(thisconnobject, signeddata)
+    message = session_recvmessage(thisconnobject)
+    return message
+  finally:
+    thisconnobject.close()
+
+
+
+
+# Create a new handle, the IP, port must be provided but others are optional.
+# The default is to have no sequenceID, timestamps on, expiration time of 1 
+# hour, and the program should set and use the identity of the node.   The 
+# public key, private key, and vesselids are left uninitialized unless 
+# specified elsewhere.   Regardless, the keys and vesselid are not used to 
+# create the handle and so are merely transfered to the created handle.
+def nmclient_createhandle(nmIP, nmport, sequenceid = None, timestamp=True, identity = True, expirationtime = 60*60, publickey = None, privatekey = None, vesselid = None):
+
+  thisentry = {}
+
+  thisentry['IP'] = nmIP
+  thisentry['port'] = nmport
+  thisentry['sequenceid'] = sequenceid
+  thisentry['timestamp'] = timestamp
+  thisentry['expiration'] = expirationtime
+  thisentry['publickey'] = publickey
+  thisentry['privatekey'] = privatekey
+  thisentry['vesselid'] = vesselid
+
+  # I lock to prevent a race when adding handles to the dictionary.   I don't
+  # need a lock when removing because a race is benign (it prevents reuse)
+  nmclient_handledictlock.acquire()
+  try:
+    potentialhandle = randomfloat()
+    while potentialhandle in nmclient_handledict:
+      potentialhandle = randomfloat()
+    nmclient_handledict[potentialhandle] = thisentry
+  finally:
+    nmclient_handledictlock.release()
+    
+
+  # Use GetVessels as a "hello" test (and for identity reasons as shown below)
+  try:
+    response = nmclient_rawcommunicate(potentialhandle, 'GetVessels')
+
+    if 'Success' not in response:
+      raise NMClientException, "Node Manager initialization failed"
+  except (ValueError, NMClientException, KeyError), e:
+    del nmclient_handledict[potentialhandle]
+    raise NMClientException, e
+
+
+  # set up the identity
+  if identity == True:
+    # pull this from the destination (use their public key)...
+    if response.split()[0] != "Header:":
+      raise NMClientException, "Do not understand node manager identity in identification"
+    nmclient_handledict[potentialhandle]['identity'] = response.split()[2]
+
+  else:
+    nmclient_handledict[potentialhandle]['identity'] = identity
+
+  # it worked!
+  return potentialhandle
+
+
+  
+
+# public.   Use these to get / set attributes about the handles...
+def nmclient_get_handle_info(nmhandle):
+  return nmclient_handledict[nmhandle].copy()
+
+
+def nmclient_set_handle_info(nmhandle, dict):
+  nmclient_handledict[nmhandle] = dict
+
+
+def nmclient_rawcommunicatewithvessel(nmhandle, call, *args):
+  vesselid = nmclient_handledict[nmhandle]['vesselid']
+  if not vesselid:
+    raise NMClientException, "Must set vesselid to communicate with a vessel"
+
+  return nmclient_rawcommunicate(nmhandle,call, vesselid,*args)
+  
+
+
+def nmclient_signedcommunicatewithvessel(nmhandle, call, *args):
+  vesselid = nmclient_handledict[nmhandle]['vesselid']
+  if not vesselid:
+    raise NMClientException, "Must set vesselid to communicate with a vessel"
+
+  return nmclient_signedcommunicate(nmhandle,call, vesselid,*args)
+  

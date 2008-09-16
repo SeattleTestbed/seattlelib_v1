@@ -1,0 +1,90 @@
+"""
+   Author: Justin Cappos
+
+   Start Date: 8 August 2008
+
+   Description:
+
+   This module handles getting the time from an external source.   We get the
+   remote time once and then use the offset from the local clock from then on.
+"""
+
+class TimeError(Exception):
+  pass
+
+
+time_query_times = []
+
+# See RFC 2030 (http://www.ietf.org/rfc/rfc2030.txt) for details about NTP
+
+# this unpacks the data from the packet and changes it to a float
+def time_convert_timestamp_to_float(timestamp):
+  integerpart = (ord(timestamp[0])<<24) + (ord(timestamp[1])<<16) + (ord(timestamp[2])<<8) + (ord(timestamp[3]))
+  floatpart = (ord(timestamp[4])<<24) + (ord(timestamp[5])<<16) + (ord(timestamp[6])<<8) + (ord(timestamp[7]))
+  return integerpart + floatpart / float(2**32)
+
+def time_decode_NTP_packet(ip, port, mess, ch):
+  time_settime(time_convert_timestamp_to_float(mess[40:48]))
+  stopcomm(ch)
+
+
+# sets a remote time as the current time
+#BUG: Do I need to compensate for the time taken to contact the time server
+def time_settime(currenttime):
+  time_query_times.append((getruntime(), currenttime))
+
+
+def time_updatetime(localport):
+  try:
+    ip = getmyip()
+  except Exception, e:
+    raise TimeError, str(e)
+
+  timeservers = ["time-a.nist.gov", "time-b.nist.gov", "time-a.timefreq.bldrdoc.gov", "time-b.timefreq.bldrdoc.gov", "time-c.timefreq.bldrdoc.gov", "utcnist.colorado.edu", "time.nist.gov", "time-nw.nist.gov", "nist1.symmetricom.com", "nist1-dc.WiTime.net", "nist1-ny.WiTime.net", "nist1-sj.WiTime.net", "nist1.aol-ca.symmetricom.com", "nist1.aol-va.symmetricom.com", "nist1.columbiacountyga.gov", "nist.expertsmi.com", "nist.netservicesgroup.com"]
+
+  startlen = len(time_query_times)
+  listenhandle = recvmess(ip,localport, time_decode_NTP_packet)
+
+  # try three times...
+  for junkattempts in range(3):
+    # choose a random time server
+    servername = timeservers[int(randomfloat()*len(timeservers))]
+
+    # this sends a request, version 3 in "client mode"
+    ntp_request_string = chr(27)+chr(0)*47
+    try: 
+      sendmess(servername,123, ntp_request_string, ip, localport) # 123 is the NTP port
+    except Exception:
+      # most likely a lookup error...
+      continue
+
+    # wait for 5 seconds for a response before retrying
+    for junkiterations in range(10):
+      sleep(.5)
+
+      if startlen < len(time_query_times):
+        # If we've had a response, we're done!
+        stopcomm(listenhandle)
+        return
+    
+    
+  # Failure, tried 3 servers for at least 15 seconds total...
+  stopcomm(listenhandle)
+  raise TimeError
+
+
+def time_gettime():
+  if time_query_times == []:
+    raise TimeError
+
+  # otherwise use the most recent data...
+  latest_update = time_query_times[-1]
+
+  # first item is the getruntime(), second is NTP time...
+  elapsedtimesinceupdate = getruntime() - latest_update[0]
+
+  return latest_update[1] + elapsedtimesinceupdate
+
+# in case you want to change to time since the 1970 (as is common)
+time_seconds_from_1900_to_1970 = 2208988800
+
