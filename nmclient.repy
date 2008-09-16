@@ -194,10 +194,8 @@ def nmclient_createhandle(nmIP, nmport, sequenceid = None, timestamp=True, ident
 
   # Use GetVessels as a "hello" test (and for identity reasons as shown below)
   try:
-    response = nmclient_rawcommunicate(potentialhandle, 'GetVessels')
+    response = nmclient_rawsay(potentialhandle, 'GetVessels')
 
-    if 'Success' not in response:
-      raise NMClientException, "Node Manager initialization failed"
   except (ValueError, NMClientException, KeyError), e:
     del nmclient_handledict[potentialhandle]
     raise NMClientException, e
@@ -205,10 +203,14 @@ def nmclient_createhandle(nmIP, nmport, sequenceid = None, timestamp=True, ident
 
   # set up the identity
   if identity == True:
-    # pull this from the destination (use their public key)...
-    if response.split()[0] != "Header:":
+    for line in response.split('\n'):
+      if line.startswith('Nodekey: '):
+        # get everything after the Nodekey as the identity
+        nmclient_handledict[potentialhandle]['identity'] = line[len('Nodekey: '):]
+        break
+        
+    else:
       raise NMClientException, "Do not understand node manager identity in identification"
-    nmclient_handledict[potentialhandle]['identity'] = response.split()[2]
 
   else:
     nmclient_handledict[potentialhandle]['identity'] = identity
@@ -228,19 +230,94 @@ def nmclient_set_handle_info(nmhandle, dict):
   nmclient_handledict[nmhandle] = dict
 
 
-def nmclient_rawcommunicatewithvessel(nmhandle, call, *args):
+  
+
+# Public:  Use this for non-signed operations...
+def nmclient_rawsay(nmhandle, *args):
+  fullresponse = nmclient_rawcommunicate(nmhandle, *args)
+
+  try:
+    (response, status) = fullresponse.rsplit('\n',1)
+  except KeyError:
+    raise NMClientException, "Communication error '"+fullresponse+"'"
+
+  if status == 'Success':
+    return response
+  elif status == 'Error':
+    raise NMClientException, "Node Manager error '"+response+"'"
+  elif status == 'Warning':
+    raise NMClientException, "Node Manager warning '"+response+"'"
+  else:
+    raise NMClientException, "Unknown status '"+fullresponse+"'"
+  
+
+
+
+# Public:  Use this for signed operations...
+def nmclient_signedsay(nmhandle, *args):
+  fullresponse = nmclient_signedcommunicate(nmhandle, *args)
+
+  try:
+    (response, status) = fullresponse.rsplit('\n',1)
+  except KeyError:
+    raise NMClientException, "Communication error '"+fullresponse+"'"
+
+  if status == 'Success':
+    return response
+  elif status == 'Error':
+    raise NMClientException, "Node Manager error '"+response+"'"
+  elif status == 'Warning':
+    raise NMClientException, "Node Manager warning '"+response+"'"
+  else:
+    raise NMClientException, "Unknown status '"+fullresponse+"'"
+  
+
+
+# public, use this to do raw communication with a vessel
+def nmclient_rawsaytovessel(nmhandle, call, *args):
   vesselid = nmclient_handledict[nmhandle]['vesselid']
   if not vesselid:
     raise NMClientException, "Must set vesselid to communicate with a vessel"
 
-  return nmclient_rawcommunicate(nmhandle,call, vesselid,*args)
+  return nmclient_rawsay(nmhandle,call, vesselid,*args)
   
 
 
-def nmclient_signedcommunicatewithvessel(nmhandle, call, *args):
+# public, use this to do a signed communication with a vessel
+def nmclient_signedsaytovessel(nmhandle, call, *args):
   vesselid = nmclient_handledict[nmhandle]['vesselid']
   if not vesselid:
     raise NMClientException, "Must set vesselid to communicate with a vessel"
 
-  return nmclient_signedcommunicate(nmhandle,call, vesselid,*args)
-  
+  return nmclient_signedsay(nmhandle,call, vesselid,*args)
+
+
+# public, lists the vessels that the provided key owns or can use
+def nmclient_listaccessiblevessels(nmhandle, publickey):
+
+  response = nmclient_rawsay(nmhandle, 'GetVessels')
+
+  # these will be filled with relevant vessel names...
+  ownervessels = []
+  uservessels = []
+
+  # here we loop through the response and set the dicts as appropriate
+  lastvesselname = None
+  for line in response.split('\n'):
+    if line.startswith('Name: '):
+      lastvesselname = line[len('Name: '):]
+
+    if line.startswith('OwnerKey: '):
+      thiskeystring = line[len('OwnerKey: '):]
+      thiskey = rsa_string_to_publickey(thiskeystring)
+      if thiskey == publickey:
+        ownervessels.append(lastvesselname)
+
+    if line.startswith('UserKey: '):
+      thiskeystring = line[len('UserKey: '):]
+      thiskey = rsa_string_to_publickey(thiskeystring)
+      if thiskey == publickey:
+        uservessels.append(lastvesselname)
+
+
+  return (ownervessels, uservessels)
