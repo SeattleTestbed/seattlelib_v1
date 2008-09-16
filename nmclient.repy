@@ -295,29 +295,88 @@ def nmclient_signedsaytovessel(nmhandle, call, *args):
 # public, lists the vessels that the provided key owns or can use
 def nmclient_listaccessiblevessels(nmhandle, publickey):
 
-  response = nmclient_rawsay(nmhandle, 'GetVessels')
+  vesselinfo = nmclient_getvesseldict(nmhandle)
 
   # these will be filled with relevant vessel names...
   ownervessels = []
   uservessels = []
 
-  # here we loop through the response and set the dicts as appropriate
-  lastvesselname = None
-  for line in response.split('\n'):
-    if line.startswith('Name: '):
-      lastvesselname = line[len('Name: '):]
+  for vesselname in vesselinfo['vessels']:
+    if publickey == vesselinfo['vessels'][vesselname]['ownerkey']:
+      ownervessels.append(vesselname)
 
-    if line.startswith('OwnerKey: '):
-      thiskeystring = line[len('OwnerKey: '):]
-      thiskey = rsa_string_to_publickey(thiskeystring)
-      if thiskey == publickey:
-        ownervessels.append(lastvesselname)
-
-    if line.startswith('UserKey: '):
-      thiskeystring = line[len('UserKey: '):]
-      thiskey = rsa_string_to_publickey(thiskeystring)
-      if thiskey == publickey:
-        uservessels.append(lastvesselname)
+    if 'userkeys' in vesselinfo['vessels'][vesselname] and publickey in vesselinfo['vessels'][vesselname]['userkeys']:
+      uservessels.append(vesselname)
 
 
   return (ownervessels, uservessels)
+
+
+
+#public, parse a node manager's vessel information and return it to the user...
+def nmclient_getvesseldict(nmhandle):
+
+  response = nmclient_rawsay(nmhandle, 'GetVessels')
+
+  retdict = {}
+  retdict['vessels'] = {}
+
+  # here we loop through the response and set the dicts as appropriate
+  lastvesselname = None
+  for line in response.split('\n'):
+    if not line:
+      # empty line.   Let's allow it...
+      pass
+    elif line.startswith('Version: '):
+      retdict['version'] = line[len('Version: '):]
+    elif line.startswith('Nodename: '):
+      retdict['nodename'] = line[len('Nodename: '):]
+    elif line.startswith('Nodekey: '):
+      retdict['nodekey'] = rsa_string_to_publickey(line[len('Nodekey: '):])
+ 
+    # start of a vessel
+    elif line.startswith('Name: '):
+      # if there is a previous vessel write it to the dict...
+      if lastvesselname:
+        retdict['vessels'][lastvesselname] = thisvessel
+
+      thisvessel = {}
+      lastvesselname = line[len('Name: '):]
+
+    elif line.startswith('OwnerKey: '):
+      thiskeystring = line[len('OwnerKey: '):]
+      thiskey = rsa_string_to_publickey(thiskeystring)
+      thisvessel['ownerkey'] = thiskey
+
+    elif line.startswith('OwnerInfo: '):
+      thisownerstring = line[len('OwnerInfo: '):]
+      thisvessel['ownerinfo'] = thisownerstring
+
+    elif line.startswith('Status: '):
+      thisstatus = line[len('Status: '):]
+      thisvessel['status'] = thisstatus
+
+    elif line.startswith('Advertise: '):
+      thisadvertise = line[len('Advertise: '):]
+      if thisadvertise == 'True':
+        thisvessel['advertise'] = True
+      elif thisadvertise == 'False':
+        thisvessel['advertise'] = False
+      else:
+        raise NMClientException, "Unknown advertise type '"+thisadvertise+"'"
+
+    elif line.startswith('UserKey: '):
+      thiskeystring = line[len('UserKey: '):]
+      thiskey = rsa_string_to_publickey(thiskeystring)
+      if 'userkeys' not in thisvessel:
+        thisvessel['userkeys'] = []
+
+      thisvessel['userkeys'].append(thiskey)
+
+    else:
+      raise NMClientException, "Unknown line in GetVessels response '"+line+"'"
+
+
+  if lastvesselname:
+    retdict['vessels'][lastvesselname] = thisvessel
+  return retdict
