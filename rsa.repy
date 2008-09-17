@@ -133,6 +133,12 @@ def rsa_randomized_primality_testing(n, k):
 
     t = int(math_ceil(k / math_log(1/q, 2)))
     for junk in range(t+1):
+        # JAC: Sometimes we get a ValueError here because the range is empty 
+        # (i.e. we are doing randint(1,1) or randint (1,0), etc.).   I'll check
+        # and return False in this case and declare 1 and 2 composite (since 
+        # they make horrible p or q in RSA).
+        if n-1 < 2:
+          return False
         x = randint(1, n-1)
         if rsa_jacobi_witness(x, n): return False
     
