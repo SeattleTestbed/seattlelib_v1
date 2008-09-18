@@ -182,12 +182,6 @@ def signeddata_issignedcorrectly(data, publickey=None):
     return False
   
 
-
-def signeddata_string_to_timestamp(rawtimestamp):
-  if rawtimestamp == 'None':
-    return None
-  return float(rawtimestamp)
-
 def signeddata_string_to_destination(destination):
   if destination == 'None':
     return None
@@ -195,6 +189,13 @@ def signeddata_string_to_destination(destination):
 
 def signeddata_destination_to_string(destination):
   return str(destination)
+
+
+def signeddata_string_to_timestamp(rawtimestamp):
+  if rawtimestamp == 'None':
+    return None
+  return float(rawtimestamp)
+
 
 def signeddata_timestamp_to_string(timestamp):
   return str(timestamp)
@@ -311,7 +312,8 @@ def signeddata_destined_for_me(destination):
 def signeddata_split(data):
   originaldata, rawpublickey, rawtimestamp, rawexpiration, rawsequenceno,rawdestination, junksignature = data.rsplit('!',6)
   
-  return originaldata, rsa_string_to_publickey(rawpublickey), signeddata_string_to_timestamp(rawtimestamp), signeddata_string_to_expiration(rawexpiration), signeddata_string_to_sequencenumber(rawsequenceno), signeddata_string_to_destination(rawdestination)
+  # strip the '\n' off of the original data...
+  return originaldata[:-1], rsa_string_to_publickey(rawpublickey), signeddata_string_to_timestamp(rawtimestamp), signeddata_string_to_expiration(rawexpiration), signeddata_string_to_sequencenumber(rawsequenceno), signeddata_string_to_destination(rawdestination)
 
 
 
