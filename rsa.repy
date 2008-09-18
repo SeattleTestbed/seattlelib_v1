@@ -42,6 +42,12 @@ def rsa_bytes2int(bytes):
     if not (type(bytes) is list or type(bytes) is str):
         raise TypeError("You must pass a string or a list")
 
+    # there is a bug here that strings with leading \000 have the leading char
+    # stripped away.   I need to fix that.  To fix it, I prepend \001 to 
+    # everything I process.   I also have to ensure I'm passed a small enough
+    # chunk that it all still fits (fix for that where I'm called).
+    bytes = '\001' + bytes
+
     # Convert byte stream to integer
     integer = 0
     for byte in bytes:
@@ -70,7 +76,14 @@ def rsa_int2bytes(number):
         string = "%s%s" % (chr(number & 0xFF), string)
         number /= 256
     
-    return string
+    if string[0] != '\001':
+        print string
+        for char in string:
+          print ord(char),
+        print
+        raise TypeError("Invalid RSA data")
+ 
+    return string[1:]
 
 def rsa_fast_exponentiation(a, p, n):
     """Calculates r = a^p mod n
@@ -339,7 +352,9 @@ def rsa_chopstring(message, key, n, funcref):
 
     msglen = len(message)
     nbits = int(math_floor(math_log(n, 2)))
-    nbytes = int(nbits / 8)
+    # JAC: subtract a byte because we're going to add an extra char on the front
+    # to properly handle leading \000 bytes
+    nbytes = int(nbits / 8)-1
     blocks = int(msglen / nbytes)
 
     if msglen % nbytes > 0:
