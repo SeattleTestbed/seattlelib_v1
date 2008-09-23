@@ -160,6 +160,21 @@ def nmclient_signedcommunicate(nmhandle, *args):
 
 
 
+def nmclient_safelygethandle():
+  # I lock to prevent a race when adding handles to the dictionary.   I don't
+  # need a lock when removing because a race is benign (it prevents reuse)
+  nmclient_handledictlock.acquire()
+  try:
+    potentialhandle = randomfloat()
+    while potentialhandle in nmclient_handledict:
+      potentialhandle = randomfloat()
+    return potentialhandle
+  finally:
+    nmclient_handledictlock.release()
+
+
+
+
 
 # Create a new handle, the IP, port must be provided but others are optional.
 # The default is to have no sequenceID, timestamps on, expiration time of 1 
@@ -180,24 +195,17 @@ def nmclient_createhandle(nmIP, nmport, sequenceid = None, timestamp=True, ident
   thisentry['privatekey'] = privatekey
   thisentry['vesselid'] = vesselid
 
-  # I lock to prevent a race when adding handles to the dictionary.   I don't
-  # need a lock when removing because a race is benign (it prevents reuse)
-  nmclient_handledictlock.acquire()
-  try:
-    potentialhandle = randomfloat()
-    while potentialhandle in nmclient_handledict:
-      potentialhandle = randomfloat()
-    nmclient_handledict[potentialhandle] = thisentry
-  finally:
-    nmclient_handledictlock.release()
     
+  newhandle = nmclient_safelygethandle()
+
+  nmclient_handledict[newhandle] = thisentry
 
   # Use GetVessels as a "hello" test (and for identity reasons as shown below)
   try:
-    response = nmclient_rawsay(potentialhandle, 'GetVessels')
+    response = nmclient_rawsay(newhandle, 'GetVessels')
 
   except (ValueError, NMClientException, KeyError), e:
-    del nmclient_handledict[potentialhandle]
+    del nmclient_handledict[newhandle]
     raise NMClientException, e
 
 
@@ -206,18 +214,24 @@ def nmclient_createhandle(nmIP, nmport, sequenceid = None, timestamp=True, ident
     for line in response.split('\n'):
       if line.startswith('Nodekey: '):
         # get everything after the Nodekey as the identity
-        nmclient_handledict[potentialhandle]['identity'] = line[len('Nodekey: '):]
+        nmclient_handledict[newhandle]['identity'] = line[len('Nodekey: '):]
         break
         
     else:
       raise NMClientException, "Do not understand node manager identity in identification"
 
   else:
-    nmclient_handledict[potentialhandle]['identity'] = identity
+    nmclient_handledict[newhandle]['identity'] = identity
 
   # it worked!
-  return potentialhandle
+  return newhandle
 
+
+
+def nmclient_duplicatehandle(nmhandle):
+  newhandle = nmclient_safelygethandle()
+  nmclient_handledict[newhandle] = nmclient_handledict[nmhandle].copy()
+  return newhandle
 
   
 
