@@ -77,10 +77,6 @@ def rsa_int2bytes(number):
         number /= 256
     
     if string[0] != '\001':
-        print string
-        for char in string:
-          print ord(char),
-        print
         raise TypeError("Invalid RSA data")
  
     return string[1:]
