@@ -52,9 +52,14 @@ def session_recvmessage(socketobj):
   if messagesize < 0:
     raise ValueError, "Bad message size"
 
-  data =  socketobj.recv(messagesize)
-  return data
+  data = ''
+  while len(data) < messagesize:
+    chunk =  socketobj.recv(messagesize-len(data))
+    if chunk == '': 
+      raise SessionEOF, "Connection Closed"
+    data = data + chunk
 
+  return data
 
 # a private helper function
 def session_sendhelper(socketobj,data):
