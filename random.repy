@@ -1,4 +1,10 @@
-def randint(minvalue, maxvalue):
+""" Random routines (similar to random in Python)
+Author: Justin Cappos
+
+
+"""
+
+def random_randint(minvalue, maxvalue):
 
   if minvalue > maxvalue:
     # mimic random's failure behaviour
@@ -26,3 +32,18 @@ def randint(minvalue, maxvalue):
   assert(minvalue<=retvalue<=maxvalue)
   return retvalue
 
+
+def random_sample(population, k):
+  newpopulation = population[:]
+  if len(population) < k:
+    raise ValueError, "sample larger than population"
+
+  retlist = []
+  populationsize = len(population)-1
+
+  for num in range(k):
+    pos = random_randint(0,populationsize-num)
+    retlist.append(newpopulation[pos])
+    del newpopulation[pos]
+
+  return retlist

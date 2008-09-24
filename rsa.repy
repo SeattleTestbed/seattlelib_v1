@@ -12,7 +12,7 @@ All of the base64 encoding, pickling, and zlib encoding has been removed
 # NOTE: Python's modulo can return negative numbers. We compensate for
 # this behaviour using the abs() function
 
-include randint.repy
+include random.repy
 
 include math.repy
 
@@ -98,7 +98,7 @@ def rsa_fermat_little_theorem(p):
     """Returns 1 if p may be prime, and something else if p definitely
     is not prime"""
 
-    a = randint(1, p-1)
+    a = random_randint(1, p-1)
     return rsa_fast_exponentiation(a, p-1, p)
 
 def rsa_jacobi(a, b):
@@ -148,7 +148,7 @@ def rsa_randomized_primality_testing(n, k):
         # they make horrible p or q in RSA).
         if n-1 < 2:
           return False
-        x = randint(1, n-1)
+        x = random_randint(1, n-1)
         if rsa_jacobi_witness(x, n): return False
     
     return True
@@ -191,7 +191,7 @@ def rsa_getprime(nbits):
 
     while True:
 #        integer = read_random_int(nbits)
-        integer = randint(1,2**nbits)
+        integer = random_randint(1,2**nbits)
 
         # Make sure it's odd
         integer |= 1

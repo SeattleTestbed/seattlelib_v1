@@ -9,6 +9,11 @@
    remote time once and then use the offset from the local clock from then on.
 """
 
+
+# Use for random sampling...
+include random.repy
+
+
 class TimeError(Exception):
   pass
 
@@ -45,32 +50,33 @@ def time_updatetime(localport):
   startlen = len(time_query_times)
   listenhandle = recvmess(ip,localport, time_decode_NTP_packet)
 
-  # try three times...
-  for junkattempts in range(3):
-    # choose a random time server
-    servername = timeservers[int(randomfloat()*len(timeservers))]
+  # always close the handle before returning...
+  try: 
+    # try five random servers times...
+    for servername in random_sample(timeservers,5):
 
-    # this sends a request, version 3 in "client mode"
-    ntp_request_string = chr(27)+chr(0)*47
-    try: 
-      sendmess(servername,123, ntp_request_string, ip, localport) # 123 is the NTP port
-    except Exception:
-      # most likely a lookup error...
-      continue
+      # this sends a request, version 3 in "client mode"
+      ntp_request_string = chr(27)+chr(0)*47
+      try: 
+        sendmess(servername,123, ntp_request_string, ip, localport) # 123 is the NTP port
+      except Exception:
+        # most likely a lookup error...
+        continue
 
-    # wait for 5 seconds for a response before retrying
-    for junkiterations in range(10):
-      sleep(.5)
+      # wait for 5 seconds for a response before retrying
+      for junkiterations in range(10):
+        sleep(.5)
 
-      if startlen < len(time_query_times):
-        # If we've had a response, we're done!
-        stopcomm(listenhandle)
-        return
+        if startlen < len(time_query_times):
+          # If we've had a response, we're done!
+          return
     
     
-  # Failure, tried 3 servers for at least 15 seconds total...
-  stopcomm(listenhandle)
-  raise TimeError
+  finally:
+    stopcomm(listenhandle)
+
+  # Failure, tried servers without luck...
+  raise TimeError, "Time Server update failed.  Perhaps retry later..."
 
 
 def time_gettime():
