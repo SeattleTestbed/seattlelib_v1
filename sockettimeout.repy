@@ -1,0 +1,33 @@
+class SocketTimeout(Exception):
+  pass
+
+
+# private function...
+def sockettimeout_clobbersocket(sockobj,mylock):
+  # if I can acquire the lock without blocking, then close the socket to abort
+  if mylock.acquire(False):
+    sockobj.close()
+
+# if it fails to finish within the timeout, I close the socket and raise a
+# SocketTimeout exception...
+def sockettimeout_recv_or_close(sockobj, amount, timeout):
+  # A lock I'll use for this attempt
+  mylock = getlock()
+  timerhandle = settimer(timeout,clobbersocket, (sockobj, mylock))
+  try:
+    retdata = sockobj.recv(amount)
+  except Exception, e:
+    # if it's not the timeout, reraise...
+    if mylock.acquire(False):
+      raise
+    raise SocketTimeout
+    
+  # I acquired the lock, I should stop the timer because I succeeded...
+  if mylock.acquire(False):
+    # even if this isn't in time, the lock prevents a race condition 
+    # this is merely an optimization to prevent the timer from ever firing...
+    canceltimer(timerhandle)
+    return retdata
+  else:
+    raise SocketTimeout
+
