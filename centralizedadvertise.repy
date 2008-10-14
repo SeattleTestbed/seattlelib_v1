@@ -1,0 +1,45 @@
+""" 
+Author: Justin Cappos
+
+Start Date: July 8, 2008
+
+Description:
+Advertisements to a central server (similar to openDHT)
+
+
+"""
+
+include session.repy
+servername = "satya.cs.washington.edu"
+serverport = 10101
+
+def centralizedadvertise_announce(key, value, ttlval):
+
+  sockobj = openconn(servername,serverport)
+  try:
+    session_sendmessage(sockobj, "PUT|"+str(key)+"|"+str(value)+"|"+str(ttlval))
+    response = session_recvmessage(sockobj)
+    if response != 'OK':
+      raise Exception, "Centralized announce failed '"+response+"'"
+  finally:
+    sockobj.close()
+  
+  return True
+      
+
+
+
+def centralizedadvertise_lookup(key, maxvals=100):
+  sockobj = openconn(servername,serverport)
+  try:
+    session_sendmessage(sockobj, "GET|"+str(key)+"|"+str(maxvals))
+    recvdata = session_recvmessage(sockobj)
+    # worked
+    if recvdata.endswith('OK'):
+      return recvdata[:-len('OK')].split(',')
+    raise Exception, "Centralized lookup failed"
+  finally:
+    sockobj.close()
+      
+
+
