@@ -233,6 +233,13 @@ def nmclient_duplicatehandle(nmhandle):
   nmclient_handledict[newhandle] = nmclient_handledict[nmhandle].copy()
   return newhandle
 
+# public.   Use this to clean up a handle
+def nmclient_destroyhandle(nmhandle):
+  try:
+    del nmclient_handledict[nmhandle]
+  except KeyError:
+    return False
+  return True
   
 
 # public.   Use these to get / set attributes about the handles...
