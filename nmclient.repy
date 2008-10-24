@@ -362,6 +362,10 @@ def nmclient_getvesseldict(nmhandle):
         retdict['vessels'][lastvesselname] = thisvessel
 
       thisvessel = {}
+      # NOTE:I'm changing this so that userkeys will always exist even if there
+      # are no user keys (in this case it has an empty list).   I think this is
+      # the right functionality.
+      thisvessel['userkeys'] = []
       lastvesselname = line[len('Name: '):]
 
     elif line.startswith('OwnerKey: '):
@@ -389,8 +393,6 @@ def nmclient_getvesseldict(nmhandle):
     elif line.startswith('UserKey: '):
       thiskeystring = line[len('UserKey: '):]
       thiskey = rsa_string_to_publickey(thiskeystring)
-      if 'userkeys' not in thisvessel:
-        thisvessel['userkeys'] = []
 
       thisvessel['userkeys'].append(thiskey)
 
