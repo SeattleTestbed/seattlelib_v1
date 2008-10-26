@@ -172,8 +172,14 @@ def signeddata_issignedcorrectly(data, publickey=None):
 
   publickey = rsa_string_to_publickey(rawpublickey)
 
-  # extract the hash from the signature
-  signedhash = rsa_verify(signature, publickey)
+  try: 
+    # extract the hash from the signature
+    signedhash = rsa_verify(signature, publickey)
+  except TypeError, e:
+    if 'RSA' not in str(e):
+      raise
+    # Bad signature or public key
+    return False
 
   # Does the hash match the signed data?
   if signedhash == sha_hash(thesigneddata):
