@@ -1,0 +1,134 @@
+""" 
+Author: Justin Cappos
+
+Module: A simple library that provides a unique ID for each call
+
+Start date: November 11th, 2008
+
+This is a really, really simple module, only broken out to avoid duplicating 
+functionality.
+
+NOTE: This will give unique ids PER FILE.   If you have multiple python 
+modules that include this, they will have the potential to generate the
+same ID.
+
+"""
+
+# This is a list to prevent using part of the user's mycontext dict
+uniqueid_idlist = [0]
+uniqueid_idlock = getlock()
+
+def uniqueid_getid():
+  """
+   <Purpose>
+      Return a unique ID in a threadsafe way
+
+   <Arguments>
+      None
+
+   <Exceptions>
+      None
+
+   <Side Effects>
+      None.
+
+   <Returns>
+      The ID (an integer)
+  """
+
+  uniqueid_idlock.acquire()
+
+  # I'm using a list because I need a global, but don't want to use the 
+  # programmer's dict
+  myid = uniqueid_idlist[0]
+  uniqueid_idlist[0] = uniqueid_idlist[0] + 1
+
+  uniqueid_idlock.release()
+
+  return myid
+
+
+def listops_union(list_a,list_b):
+  """
+   <Purpose>
+      Return a list that has all of the items in list_a or in list_b.   
+      Duplicates are removed from the output list
+
+   <Arguments>
+      list_a, list_b:
+        The lists to operate on
+
+   <Exceptions>
+      TypeError if list_a or list_b is not a list.
+
+   <Side Effects>
+      None.
+
+   <Returns>
+      A list containing list_a union list_b
+  """
+
+  retlist = list_a[:]
+  for item in list_b: 
+    if item not in list_a:
+      retlist.append(item)
+
+  # ensure that a duplicated item in list_a is only listed once
+  return listops_uniq(retlist)
+
+
+def listops_intersect(list_a,list_b):
+  """
+   <Purpose>
+      Return a list that has all of the items in both list_a and list_b.   
+      Duplicates are removed from the output list
+
+   <Arguments>
+      list_a, list_b:
+        The lists to operate on
+
+   <Exceptions>
+      TypeError if list_a or list_b is not a list.
+
+   <Side Effects>
+      None.
+
+   <Returns>
+      A list containing list_a intersect list_b
+  """
+
+  retlist = []
+  for item in list_a:
+    if item in list_b:
+      retlist.append(item)
+
+  # ensure that a duplicated item in list_a is only listed once
+  return listops_uniq(retlist)
+      
+
+def listops_uniq(list_a):
+  """
+   <Purpose>
+      Return a list that has no duplicate items
+
+   <Arguments>
+      list_a
+        The list to operate on
+
+   <Exceptions>
+      TypeError if list_a is not a list.
+
+   <Side Effects>
+      None.
+
+   <Returns>
+      A list containing the unique items in list_a
+  """
+  retlist = []
+  for item in list_a:
+    if item not in retlist:
+      retlist.append(item)
+
+  return retlist
+
+

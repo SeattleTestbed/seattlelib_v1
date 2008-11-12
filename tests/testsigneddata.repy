@@ -1,0 +1,62 @@
+include rsa.py
+include time.py
+include signeddata.py
+
+if callfunc == 'initialize':
+
+  # set up time for expiration times...
+  time_updatetime(12345)
+  print time_gettime()
+
+  # get keys
+  keys = rsa_gen_pubpriv_keys(100)
+
+  # get some signed data
+  mydata = "asdfjklalsdfjkasdlflasdkfjalsdfjasdflk"*100
+  mysigneddata = signeddata_signdata(mydata,keys[1],keys[0])
+  # a simple attempt, is the data signed right
+  assert(signeddata_issignedcorrectly(mysigneddata))
+  # does the key match?
+  assert(signeddata_issignedcorrectly(mysigneddata, keys[0]))
+  # If I add data to the beginning, it should fail...
+  assert(signeddata_issignedcorrectly('a'+mysigneddata, keys[0]) == False)
+  print signeddata_split(mysigneddata)[1:]
+
+
+  mydata = "asdfjklalsdfjkasdlflasdkfjalsdfjasdflk"*100
+  mysigneddata = signeddata_signdata(mydata,keys[1],keys[0])
+  assert(signeddata_issignedcorrectly(mysigneddata))
+  assert(signeddata_issignedcorrectly(mysigneddata, keys[0]))
+  assert(signeddata_issignedcorrectly('a'+mysigneddata, keys[0]) == False)
+  print signeddata_split(mysigneddata)[1:]
+
+
+  # let's create an existing piece of signed data to compare against for timestamps and expiration times...
+  olddata = "asdfjklalsdfjkasdlflasdkfjalsdfjasdflk"
+  oldsigneddata = signeddata_signdata(olddata,keys[1],keys[0],1,time_gettime()+1000)
+
+  newsigneddata = signeddata_signdata(olddata,keys[1],keys[0],2,time_gettime()+1000)
+  # must be true because only can't check expiration could be wrong and that
+  # would have been an exception earlier
+  print signeddata_shouldtrust(oldsigneddata, newsigneddata)
+  assert(signeddata_shouldtrust(oldsigneddata, newsigneddata)[0] == True)
+
+  # same timestamp
+  sametssigneddata = signeddata_signdata(olddata,keys[1],keys[0],1,time_gettime()+1000)
+  # must be none because timestamps are the same.
+  print signeddata_shouldtrust(oldsigneddata, sametssigneddata)
+  assert(signeddata_shouldtrust(oldsigneddata, sametssigneddata)[0] == None)
+
+  # older timestamp
+  oldertimestampsigneddata = signeddata_signdata(olddata,keys[1],keys[0],0,time_gettime()+1000)
+  # must be false because of the timestamp
+  print signeddata_shouldtrust(oldsigneddata, oldertimestampsigneddata)
+  assert(signeddata_shouldtrust(oldsigneddata, oldertimestampsigneddata)[0] == False)
+
+  # expired...
+  expiredsigneddata = signeddata_signdata(olddata,keys[1],keys[0],2,time_gettime()-1000)
+  # must be false because of the expiration time
+  print signeddata_shouldtrust(oldsigneddata, expiredsigneddata)
+  assert(signeddata_shouldtrust(oldsigneddata, expiredsigneddata)[0] == False)
+
+
