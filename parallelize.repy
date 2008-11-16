@@ -254,13 +254,11 @@ def parallelize_initfunction(targetlist, callerfunc,concurrentevents=5, *extrafu
       # If I'm out of resources, stop
       # remove this worker (they didn't start)
       parallelize_info_dict[parallelizehandle]['runninglist'].remove(workercount)
+      if not parallelize_info_dict[parallelizehandle]['runninglist']:
+        parallelize_closefunction(parallelizehandle)
+        raise Exception, "No events available!"
       break
   
-  # if we couldn't start a worker, then raise an exception...
-  if workercount == 0:
-    parallelize_closefunction(parallelizehandle)
-    raise Exception, "No events available!"
-
   return parallelizehandle
     
 
