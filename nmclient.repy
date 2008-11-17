@@ -82,6 +82,8 @@ def nmclient_rawcommunicate(nmhandle, *args):
     # send the args separated by '|' chars (as is expected by the node manager)
     session_sendmessage(thisconnobject, '|'.join(args))
     return session_recvmessage(thisconnobject)
+  except Exception, e:
+    raise NMClientException, str(e)
   finally:
     thisconnobject.close()
 
@@ -152,8 +154,12 @@ def nmclient_signedcommunicate(nmhandle, *args):
       signeddata = signeddata_signdata(datatosend, privatekey, publickey, timestamp, expirationtime, sequenceid, identity)
     except ValueError, e:
       raise NMClientException, str(e)
-    session_sendmessage(thisconnobject, signeddata)
-    message = session_recvmessage(thisconnobject)
+
+    try:
+      session_sendmessage(thisconnobject, signeddata)
+      message = session_recvmessage(thisconnobject)
+    except Exception, e:
+      raise NMClientException, str(e)
     return message
   finally:
     thisconnobject.close()
