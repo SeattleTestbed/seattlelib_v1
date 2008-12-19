@@ -263,20 +263,27 @@ def signeddata_iscurrent(expiretime):
 
 
 def signeddata_has_good_sequence_transition(oldsequence, newsequence):
+  # oldsequence and newsequence are strings, not pairs. rsplit needs to be used to separate the sequence name from teh sequence number.
+  oldsequencename,st_oldsequenceno = oldsequence.rsplit(':',1)
+  newsequencename,st_newsequenceno = newsequence.rsplit(':',1)
+  oldsequenceno = int(st_oldsequenceno)
+  newsequenceno = int(st_newsequenceno)
+  
   # None is always allowed by any prior sequence
   if newsequence == None:
     return True
 
   if oldsequence == None: 
     # is this the start of a sequence when there was none prior?
-    if newsequence[1] == 0:
+    if newsequenceno == 0:
       return True
     return False
 
+  
   # They are from the same sequence
-  if oldsequence[0] == newsequence[0]:
+  if oldsequencename == newsequencename:
     # and this must be the next number to be valid
-    if oldsequence[1] + 1 == newsequence[1]:
+    if oldsequenceno + 1 == newsequenceno:
       return True
     return False
 
@@ -284,7 +291,7 @@ def signeddata_has_good_sequence_transition(oldsequence, newsequence):
     # Different sequences
  
     # is this the start of a new sequence?
-    if newsequence[1] == 0:
+    if newsequenceno == 0:
       return True
 
     # otherwise this isn't good
