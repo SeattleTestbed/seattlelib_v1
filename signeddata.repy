@@ -267,8 +267,8 @@ def signeddata_has_good_sequence_transition(oldsequence, newsequence):
   if newsequence == None:
     return True
     
-  # oldsequence and newsequence are strings, not pairs. rsplit needs to be used to separate the sequence name from teh sequence number.
-  newsequencename,st_newsequenceno = newsequence.rsplit(':',1)
+  #newsequence is a tuple
+  newsequencename,st_newsequenceno = newsequence
   newsequenceno = int(st_newsequenceno)
 
   if oldsequence == None: 
@@ -277,7 +277,8 @@ def signeddata_has_good_sequence_transition(oldsequence, newsequence):
       return True
     return False
   
-  oldsequencename,st_oldsequenceno = oldsequence.rsplit(':',1)
+  # oldsequence is a pair.
+  oldsequencename,st_oldsequenceno = oldsequence
   oldsequenceno = int(st_oldsequenceno)
   
 
@@ -353,8 +354,11 @@ def signeddata_getcomments(signeddata, publickey=None):
   except TimeError:
     returned_comments.append("Cannot check expiration")
 
-  if destination != None and not signeddata_destined_for_me(destination):
-    returned_comments.append("Not destined for this node")
+  #BUG:this part of the code has been commented out because it was previously not reached and it does not work correctly.
+  #TODO: this should be fixed
+  #if destination != None and not signeddata_destined_for_me(destination):
+  #  returned_comments.append("Not destined for this node")
+
 
   return returned_comments
 
@@ -386,8 +390,10 @@ def signeddata_shouldtrust(oldsigneddata, newsigneddata, publickey=None):
   oldjunk, oldpubkey, oldtime, oldexpire, oldsequence, olddestination = signeddata_split(oldsigneddata)
   newjunk, newpubkey, newtime, newexpire, newsequence, newdestination = signeddata_split(newsigneddata)
     
-  if oldpubkey != newpubkey:
-    returned_comments.append('Public keys do not match')
+  #this portion of the code has been commented out because it does not make sense in certain situations to do this
+  #for instance, if a change owner request is part of a sequence.
+  #if oldpubkey != newpubkey:
+    #returned_comments.append('Public keys do not match')
     # fall through and reject below
 
   # get comments on everything but the timestamp and sequence number
