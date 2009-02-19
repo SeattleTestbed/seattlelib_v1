@@ -386,32 +386,33 @@ def signeddata_shouldtrust(oldsigneddata, newsigneddata, publickey=None):
     returned_comments.append("Bad signature")
     return False, returned_comments
     
-  # extract information about the signatures
-  oldjunk, oldpubkey, oldtime, oldexpire, oldsequence, olddestination = signeddata_split(oldsigneddata)
+  # extract information about the current signature
   newjunk, newpubkey, newtime, newexpire, newsequence, newdestination = signeddata_split(newsigneddata)
-    
-  #this portion of the code has been commented out because it does not make sense in certain situations to do this
-  #for instance, if a change owner request is part of a sequence.
-  #if oldpubkey != newpubkey:
-    #returned_comments.append('Public keys do not match')
-    # fall through and reject below
-
+  
   # get comments on everything but the timestamp and sequence number
   returned_comments = returned_comments + signeddata_getcomments(newsigneddata, publickey)
   
-  # check the sequence number data...
-  if not signeddata_has_good_sequence_transition(oldsequence, newsequence):
-    returned_comments.append('Invalid sequence transition')
+  #BUG FIX: only if the oldmetadata is not set to None, we want to split it and verify it
+  if oldsigneddata != None :
+    oldjunk, oldpubkey, oldtime, oldexpire, oldsequence, olddestination = signeddata_split(oldsigneddata)
+  
 
-  # check the timestamps...  
-  if (newtime == None and oldtime != None) or oldtime == None or oldtime > newtime:
-    # if the timestamps are reversed (None is the earliest possible)
-    returned_comments.append('Timestamps out of order')
-  elif oldtime != None and newtime != None and oldtime == newtime:
-    # the timestamps are equal but not none...
-    returned_comments.append('Timestamps match')
-  else:   # So they either must both be None or oldtime < newtime
-    assert((newtime == oldtime == None) or oldtime < newtime)
+    # get comments on everything but the timestamp and sequence number
+    returned_comments = returned_comments + signeddata_getcomments(newsigneddata, publickey)
+  
+    # check the sequence number data...
+    if not signeddata_has_good_sequence_transition(oldsequence, newsequence):
+      returned_comments.append('Invalid sequence transition')
+
+    # check the timestamps...  
+    if (newtime == None and oldtime != None) or oldtime == None or oldtime > newtime:
+      # if the timestamps are reversed (None is the earliest possible)
+      returned_comments.append('Timestamps out of order')
+    elif oldtime != None and newtime != None and oldtime == newtime:
+      # the timestamps are equal but not none...
+      returned_comments.append('Timestamps match')
+    else:   # So they either must both be None or oldtime < newtime
+      assert((newtime == oldtime == None) or oldtime < newtime)
   
 
   # let's see what happened...
