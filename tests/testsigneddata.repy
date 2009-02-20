@@ -1,6 +1,6 @@
-include rsa.py
-include time.py
-include signeddata.py
+include rsa.repy
+include time.repy
+include signeddata.repy
 
 if callfunc == 'initialize':
 
@@ -60,3 +60,23 @@ if callfunc == 'initialize':
   assert(signeddata_shouldtrust(oldsigneddata, expiredsigneddata)[0] == False)
 
 
+  #destination checking
+  signeddata_set_identity("myid42")
+  print "checking if signeddata_destined_for_me works as expected"
+  #check that if packet is not destined for me we detect it
+  assert(not signeddata_destined_for_me("notmyid"))
+  assert(not signeddata_destined_for_me("notmyid1:notmyid2"))
+  
+  #check that if packet is destined for me we return true
+  assert(signeddata_destined_for_me("myid42"))
+  assert(signeddata_destined_for_me("notmyid1:myid42"))
+  
+  print "finished checking if signeddata_destined_for_me works as expected"
+  
+  #verify what destination sign data writes to the data
+  mynewsigneddata = signeddata_signdata(mydata,keys[1],keys[0])
+  newjunk, newpubkey, newtime, newexpire, newsequence, newdestination = signeddata_split(mynewsigneddata)
+  print "destination: " + str(newdestination)
+  
+  #verify the destination set by default is none
+  assert(newdestination==None)

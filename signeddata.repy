@@ -354,10 +354,9 @@ def signeddata_getcomments(signeddata, publickey=None):
   except TimeError:
     returned_comments.append("Cannot check expiration")
 
-  #BUG:this part of the code has been commented out because it was previously not reached and it does not work correctly.
-  #TODO: this should be fixed
-  #if destination != None and not signeddata_destined_for_me(destination):
-  #  returned_comments.append("Not destined for this node")
+  #BUG FIX: destination checking has been re-enabled since teh issue with identities not being stored correctly has been fixed
+  if destination != None and not signeddata_destined_for_me(destination):
+    returned_comments.append("Not destined for this node")
 
 
   return returned_comments
