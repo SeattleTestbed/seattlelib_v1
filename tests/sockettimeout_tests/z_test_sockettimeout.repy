@@ -1,0 +1,7 @@
+include sockettimeout.repy
+
+def main():
+  fail
+
+if callfunc == 'initialize':
+  main()
