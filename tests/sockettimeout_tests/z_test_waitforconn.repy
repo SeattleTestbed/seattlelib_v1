@@ -1,14 +1,34 @@
 """
 <Description>
+  Same as Repy waitforconn
   
 <Date>
   Sun Mar  1 10:27:35 PST 2009
 """
-
 include sockettimeout.repy
 
+IP = 'sfadf'
+PORT = 1332
+IP_2 = 'sfadfafasdf'
+PORT_2 = 13323
+
+def test_waitforconn():
+  timeout_waitforconn(IP, PORT, callback_one)
+
+#########################
+def callback_one(ip, port, tsock, ch, lh):
+  assert ip == IP_2
+  assert port == PORT_2
+  assert tsock.local_address == (IP, PORT)  
+  assert tsock.remote_address == (IP_2, PORT_2)
+  assert tsock.callback == callback_one
+
+class TimeoutSocket(TimeoutSocket):
+  def _waitforconn(self):
+    self._callback(IP_2, PORT_2, None, None, None)
+
 def main():
-  fail
+  test_waitforconn()
 
 if callfunc == 'initialize':
   main()
