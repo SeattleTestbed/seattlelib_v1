@@ -1,5 +1,72 @@
-class SocketTimeout(Exception):
-  pass
+"""
+<Description>
+  A socket that doesn't hang.   Closes after a given timeout.
+
+<Usage>
+  Same as Repy Sockets:
+    openconn(desthost, destport, localip=None, localport=None, timeout = 5)
+    waitforconn(localip, localport, function)
+    stopcomm(sockobj)
+
+  Object:
+    sockobj.send(data)
+    sockobj.recv(bytes)
+
+<Date>
+  Sun Mar  1 10:27:35 PST 2009
+
+<Example>
+  # hello world
+  include sockettimer.repy
+
+  def callback(ip, port, sockobj, commhandle, listenhandle):
+    hw_message =sockobj.recv(1047)
+    stopcomm(sockobj)
+    stopcomm(listenhandle)
+    print hw_message # => "hello world!"
+  
+  def server():
+    sockobj = waitforconn(getmyip(), 12345, callback)
+
+  def client():
+    sockobj = openconn(getmyip(), 12345)
+    sockobj.send("hello world!")
+
+  def main():
+    server()
+    client()
+    exitall()
+
+  if callfunc == 'initialize':
+    main() 
+"""
+
+class TimeoutError(Exception):
+  """The socket timed out before receiving a response"""
+
+def openconn(desthost, destport, localip=None, localport=None, timeout = 5): pass
+
+def waitforconn(localip, localport, function): pass
+
+def stopcomm(sockobj): pass
+
+
+class TimeoutSocket():
+  """
+  <Purpose>
+    Provide an socket object like the Repy usual one.
+
+  <Side Effects>
+    Uses a getlock() to watch for a timeout
+  """
+
+  def __init__(self):
+    self.lock = getlock()
+
+  def recv(self, maxLen): pass
+
+  def send(self, data): pass
+
 
 
 # private function...
