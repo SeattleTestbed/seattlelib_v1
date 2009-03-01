@@ -7,8 +7,25 @@
 
 include sockettimeout.repy
 
+IP = "323dfas"
+PORT = 23
+ANS = 4
+MESS = "hi"
+
+def test_send():
+  tsock = TimeoutSocket()
+  tsock.sockobj = FakeSocket()
+  assert tsock.send(MESS) == ANS
+
+
+############################
+class FakeSocket:
+  def send(self, data):
+    assert data == MESS
+    return ANS
+
 def main():
-  fail
+  test_send()
 
 if callfunc == 'initialize':
   main()

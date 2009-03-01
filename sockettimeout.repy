@@ -1,7 +1,7 @@
 """
 <Description>
   A socket that recv's messages always.   Raises TimeoutError after a given timeout.
-  If actually recv's a message, the returns the message and continues.
+  If actually recv's a message, returns the message and continues.
 
 <Usage>
   Text-replacable for Repy Sockets:
@@ -168,7 +168,8 @@ class TimeoutSocket:
 
   def recv(self, maxLen, timeout): pass
 
-  def send(self, data): pass
+  def send(self, data):
+    return self.sockobj.send(data)
 
   def close(self): pass
 
@@ -193,6 +194,7 @@ class TimeoutSocket:
     return self.listencommhandle
 
   def _callback(self, ip, port, sockobj, ch, lh):
+    """Pass on through to user callback"""
     self.sockobj = sockobj
     self.listencommhandle = lh # same as the 1st from wait for comm, right?
     self.commhandle = ch # should we care?
