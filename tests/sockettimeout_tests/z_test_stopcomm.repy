@@ -1,5 +1,6 @@
 """
 <Description>
+  Same as stopcomm Repy
   
 <Date>
   Sun Mar  1 10:27:35 PST 2009
@@ -7,8 +8,27 @@
 
 include sockettimeout.repy
 
+def test_stopcomm():
+  tsock = TimeoutSocket()
+  tsock.sockobj = True
+  tsock.listencommhandle = True
+  tsock.commhandle = True
+  tsock.callback = True
+  tsock.local_address = True
+  tsock.remote_address = True
+  
+  timeout_stopcomm(tsock)
+
+  assert not tsock.sockobj
+  assert not tsock.listencommhandle
+  assert not tsock.commhandle
+  assert not tsock.callback
+  assert not tsock.local_address
+  assert not tsock.remote_address
+
 def main():
-  fail
+  test_stopcomm()
+
 
 if callfunc == 'initialize':
   main()

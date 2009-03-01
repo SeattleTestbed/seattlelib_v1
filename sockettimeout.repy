@@ -87,7 +87,8 @@ def timeout_waitforconn(localip, localport, function):
   tsock.setcallback(function)
   return tsock.listen()
 
-def timeout_stopcomm(sockobj): pass
+def timeout_stopcomm(sockobj):
+  sockobj.close()
 
 class TimeoutSocket:
   """
@@ -107,14 +108,17 @@ class TimeoutSocket:
     """ Constructor for socket """
     self.lock = getlock() # general lock
     self.timeout_lock = getlock() # special lock for Timeout condition
-   
+    self.timeout = 5 # seconds to wait
+
+    # user vars   
     self.local_address = None # ip, port
     self.remote_address = None # ip, port
-    self.timeout = 5 # seconds to wait
+    self.callback = None # the user's function to call
+
+    # repy socket vars
     self.sockobj = None #  the Repy socket
     self.commhandle = None # the current comm
     self.listencommhandle = None # the listener comm
-    self.callback = None # the user's function to call
 
   ################
   # Mutator methods
@@ -205,7 +209,18 @@ class TimeoutSocket:
     """
     return self.sockobj.send(data)
 
-  def close(self): pass
+  def close(self):
+    self.local_address = None # ip, port
+    self.remote_address = None # ip, port
+    self.callback = None # the user's function to call
+
+    stopcomm(self.sockobj)
+    self.sockobj = None #  the Repy socket
+    stopcomm(self.commhandle)
+    self.commhandle = None # the current comm
+    stopcomm(self.listencommhandle)
+    self.listencommhandle = None # the listener comm
+
 
   ########################
   # Private
