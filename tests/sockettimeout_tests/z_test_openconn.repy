@@ -1,14 +1,30 @@
 """
 <Description>
-  
+  Should act just like regular Repy socket.
+
 <Date>
   Sun Mar  1 10:27:35 PST 2009
 """
-
 include sockettimeout.repy
 
+def test_openconn():
+  sockobj = timeout_openconn('127.0.0.1', 12345)
+
+def test_openconn_args():
+  sockobj = timeout_openconn('127.0.0.1', 12345, '127.0.0.1', 12345, 10)
+
+def test_openconn_timeout():
+  try:
+    timeout_openconn('127.0.0.1', 12345, '127.0.0.1', 12345, 10)
+  except:
+    raise
+  else:
+    raise Exception("should have raised")
+
 def main():
-  fail
+  test_openconn()
+  test_openconn_args()
+  test_openconn_timeout()
 
 if callfunc == 'initialize':
   main()

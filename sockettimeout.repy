@@ -4,9 +4,9 @@
 
 <Usage>
   Same as Repy Sockets:
-    openconn(desthost, destport, localip=None, localport=None, timeout = 5)
-    waitforconn(localip, localport, function)
-    stopcomm(sockobj)
+    timeout_openconn(desthost, destport, localip=None, localport=None, timeout = 5)
+    timeout_waitforconn(localip, localport, function)
+    timeout_stopcomm(sockobj)
 
   Object:
     sockobj.send(data)
@@ -21,15 +21,15 @@
 
   def callback(ip, port, sockobj, commhandle, listenhandle):
     hw_message =sockobj.recv(1047)
-    stopcomm(sockobj)
-    stopcomm(listenhandle)
+    timeout_stopcomm(sockobj)
+    timeout_stopcomm(listenhandle)
     print hw_message # => "hello world!"
   
   def server():
-    sockobj = waitforconn(getmyip(), 12345, callback)
+    sockobj = timeout_waitforconn(getmyip(), 12345, callback)
 
   def client():
-    sockobj = openconn(getmyip(), 12345)
+    sockobj = timeout_openconn(getmyip(), 12345)
     sockobj.send("hello world!")
 
   def main():
@@ -44,11 +44,11 @@
 class TimeoutError(Exception):
   """The socket timed out before receiving a response"""
 
-def openconn(desthost, destport, localip=None, localport=None, timeout = 5): pass
+def timeout_openconn(desthost, destport, localip=None, localport=None, timeout = 5): pass
 
-def waitforconn(localip, localport, function): pass
+def timeout_waitforconn(localip, localport, function): pass
 
-def stopcomm(sockobj): pass
+def timeout_stopcomm(sockobj): pass
 
 
 class TimeoutSocket():
@@ -63,7 +63,7 @@ class TimeoutSocket():
   def __init__(self):
     self.lock = getlock()
 
-  def recv(self, maxLen): pass
+  def recv(self, maxLen, timeout): pass
 
   def send(self, data): pass
 
