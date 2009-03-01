@@ -44,14 +44,20 @@
 class TimeoutError(Exception):
   """The socket timed out before receiving a response"""
 
-def timeout_openconn(desthost, destport, localip=None, localport=None, timeout = 5): pass
+
+def timeout_openconn(desthost, destport, localip=None, localport=None, timeout = 5):
+  tsock = TimeoutSocket()
+  tsock.settimeout(timeout)
+  if localip and localport:
+    tsock.bind((localip, localport))
+  tsock.connect((desthost, destport))
+  return tsock
 
 def timeout_waitforconn(localip, localport, function): pass
 
 def timeout_stopcomm(sockobj): pass
 
-
-class TimeoutSocket():
+class TimeoutSocket:
   """
   <Purpose>
     Provide an socket object like the Repy usual one.
@@ -61,12 +67,55 @@ class TimeoutSocket():
   """
 
   def __init__(self):
+    """ Constructor for socket """
     self.lock = getlock()
+    self.local_address = None # ip, port
+    self.remote_address = None # ip, port
+    self.timeout = 5 # seconds
+
+  def settimeout(self, value):
+    """ Setter for timeout"""
+    self.timeout = value
+
+  def bind(self, local_address = None):
+    """
+    <Purpose>
+      Set local address
+
+    <Args>
+      Tuple of (ip, port) local.
+    """
+    self.local_address = local_address
+
+  def connect(self, remote_address):
+    """
+    <Purpose>
+      Connect to peer.
+
+    <Args>
+      Tuple of (ip, port) remote.
+   
+    <Side Effects>
+      Calls Repy openconn.
+    """
+    self.remote_address = remote_address
+    self._openconn()
+
+  def _openconn(self):
+    """Handle current state variables and call Repy openconn"""
+
+    destip, destport = self.remote_address
+    if self.local_address:
+      srcip, srcport = self.local_address
+      self.conn = openconn(destip, destport, srcip, srcport, self.timeout)
+    else:
+      self.conn = openconn(destip, destport)
 
   def recv(self, maxLen, timeout): pass
 
   def send(self, data): pass
 
+  def close(self): pass
 
 
 # private function...
