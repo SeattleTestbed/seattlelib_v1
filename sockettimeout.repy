@@ -166,9 +166,43 @@ class TimeoutSocket:
     self.remote_address = remote_address
     self._openconn()
 
-  def recv(self, maxLen, timeout): pass
+  def recv(self, maxLen, timeout=None):
+    """
+    <Purpose>
+      If it fails to finish within the timeout, I close the socket and raise a
+      TimeoutError exception. I.e. if there's no message, we call it an error
+      and raise it.
+      
+    <Arguments>
+      maxLen - bytes to recv
+      timeout - time to wait before checking to see if 
+
+    <Exception>
+      Raises TimeoutError exception if the recv times out
+      without receiving a message.
+
+    <Side Effects>
+      Closes the connection if times out.
+
+    <Returns>
+      The message.
+    """
+    return self.sockobj.recv
 
   def send(self, data):
+    """
+    <Purpose>
+      Just like normal Repy socket.  Sends messages.
+      
+    <Arguments>
+      data - the string message
+
+    <Exception>
+      Same as Repy socket.
+ 
+    <Returns>
+      The bytes sent.
+    """
     return self.sockobj.send(data)
 
   def close(self): pass

@@ -1,5 +1,6 @@
 """
 <Description>
+  Make sure send like normal Repy socket.
   
 <Date>
   Sun Mar  1 10:27:35 PST 2009
@@ -16,7 +17,6 @@ def test_send():
   tsock = TimeoutSocket()
   tsock.sockobj = FakeSocket()
   assert tsock.send(MESS) == ANS
-
 
 ############################
 class FakeSocket:

@@ -1,14 +1,28 @@
 """
 <Description>
+  Tests if the recv acts like regular socket usually and
+  has special feature of timeout.
   
 <Date>
   Sun Mar  1 10:27:35 PST 2009
 """
-
 include sockettimeout.repy
 
+ANS = 23
+
+def test_recv():
+  tsock = TimeoutSocket()
+  tsock.sockobj = FakeSocket()
+  tsock.recv(33)
+
+#######################
+class FakeSocket:
+  def recv(self, len):
+    return ANS
+
+
 def main():
-  fail
+  test_recv()
 
 if callfunc == 'initialize':
   main()
