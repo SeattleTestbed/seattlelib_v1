@@ -191,7 +191,7 @@ class TimeoutSocket:
     <Returns>
       The message.
     """
-    return self.sockobj.recv
+    return self.sockobj.recv(maxLen)
 
   def send(self, data):
     """
