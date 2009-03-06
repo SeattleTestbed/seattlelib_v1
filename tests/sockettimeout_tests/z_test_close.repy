@@ -8,16 +8,16 @@
 
 include sockettimeout.repy
 
-def test_stopcomm():
+def test_close():
   tsock = TimeoutSocket()
-  tsock.sockobj = True
+  tsock.sockobj = FakeSocket()
   tsock.listencommhandle = True
   tsock.commhandle = True
   tsock.callback = True
   tsock.local_address = True
   tsock.remote_address = True
   
-  timeout_stopcomm(tsock)
+  tsock.close()
 
   assert not tsock.sockobj
   assert not tsock.listencommhandle
@@ -26,9 +26,13 @@ def test_stopcomm():
   assert not tsock.local_address
   assert not tsock.remote_address
 
-def main():
-  test_stopcomm()
+##############################
 
+class FakeSocket:
+  def close(self): pass
+
+def main():
+  test_close()
 
 if callfunc == 'initialize':
   main()

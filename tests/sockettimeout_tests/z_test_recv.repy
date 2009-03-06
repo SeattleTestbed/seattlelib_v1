@@ -15,14 +15,70 @@ def test_recv():
   tsock.sockobj = FakeSocket()
   tsock.recv(33)
 
+def test_recv_timed_out():
+  tsock = TimedoutSocket()
+  tsock.settimeout(.01)
+  tsock.sockobj = FakeSocket()
+  try:
+    tsock.recv(33)
+  except SocketTimeoutError:
+    assert not tsock.sockobj # closed??
+  else:
+    raise Exception("should have timed out")
+
+def test_recv_error():
+  tsock = ErrorySocket()
+  tsock.settimeout(1)
+  try:
+    tsock.recv(33)
+  except ErroryError:
+    pass
+  else:
+    raise Exception("should have timed out")
+
+def test_recv_error_and_timeout():
+  tsock = ErrorySocket()
+  tsock.sockobj = FakeSocket()
+  tsock.settimeout(.01)
+  try:
+    tsock.recv(33)
+  except SocketTimeoutError:
+    pass
+  else:
+    raise Exception("should have timed out")
+   
+
 #######################
+
+
 class FakeSocket:
+  """Repy TCP dummy"""
   def recv(self, len):
     return ANS
 
+  def close(self): pass
+
+##################
+# Timeout Sockets
+################
+class TimedoutSocket(TimeoutSocket):
+  def _recv(self, len):
+    sleep(.2)
+    return ANS
+
+class ErroryError(Exception): 
+  """Test exception"""
+
+class ErrorySocket(TimeoutSocket):
+  def _recv(self, len):
+    sleep(.2) # maybe timeout as well
+    raise ErroryError("no dice")
 
 def main():
   test_recv()
+  test_recv_timed_out()
+  test_recv_error()
+  test_recv_error_and_timeout()
 
 if callfunc == 'initialize':
   main()
