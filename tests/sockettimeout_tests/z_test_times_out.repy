@@ -11,9 +11,15 @@ MESSAGE = "hello world!"
 HUGE = 100
 
 def mycallback(ip, port, sockobj, commhandle, listenhandle):
-  hw_message = sockobj.recv(HUGE)
-  assert hw_message == MESSAGE
-  timeout_stopcomm(sockobj)
+  sockobj.settimeout(0)
+
+  try:
+    hw_message = sockobj.recv(HUGE)
+  except SocketTimeoutError:
+    pass
+  else: 
+    sockobj.close()
+    raise Exception("should have timed out")
   
 def server():
   sockobj = timeout_waitforconn(getmyip(), 12345, mycallback)
@@ -25,6 +31,7 @@ def client():
 def main():
   server()
   client()
+  sleep(.1)
   exitall()
 
 if callfunc == 'initialize':
