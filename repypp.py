@@ -101,6 +101,10 @@ def processfiledata(stringlist):
         # nothing to do.   I don't include data inside the included section
         continue
     
+  #Append a newline to outdata to ensure included files end 
+  #with an unindented blank line
+  outdata.append("\n")
+    
   return (includelist, outdata)
   
 
