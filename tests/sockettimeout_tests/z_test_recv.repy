@@ -15,6 +15,13 @@ def test_recv():
   tsock.sockobj = FakeSocket()
   tsock.recv(33)
 
+def test_recv_twice():
+  tsock = TimeoutSocket()
+  tsock.sockobj = FakeSocket()
+  tsock.recv(33)
+  tsock.recv(33)
+
+
 def test_recv_timed_out():
   tsock = TimedoutSocket()
   tsock.settimeout(.01)
@@ -76,6 +83,7 @@ class ErrorySocket(TimeoutSocket):
 
 def main():
   test_recv()
+  test_recv_twice()
   test_recv_timed_out()
   test_recv_error()
   test_recv_error_and_timeout()

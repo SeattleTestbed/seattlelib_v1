@@ -280,6 +280,7 @@ class TimeoutSocket:
       # even if this isn't in time, the lock prevents a race condition 
       # this is merely an optimization to prevent the timer from ever firing...
       canceltimer(timerhandle)
+      self.timeout_lock.release() # Alper's bug 3/10/09
       return retdata
     else:
       raise SocketTimeoutError
