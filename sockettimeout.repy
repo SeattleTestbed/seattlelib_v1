@@ -215,7 +215,8 @@ class TimeoutSocket:
     self.remote_address = None # ip, port
     self.callback = None # the user's function to call
 
-    self.sockobj.close()
+    if self.sockobj:
+      self.sockobj.close()
     self.sockobj = None #  the Repy socket
     stopcomm(self.commhandle)
     self.commhandle = None # the current comm

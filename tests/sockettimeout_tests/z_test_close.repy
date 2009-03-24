@@ -26,6 +26,25 @@ def test_close():
   assert not tsock.local_address
   assert not tsock.remote_address
 
+def test_close_twice():
+  tsock = TimeoutSocket()
+  tsock.sockobj = FakeSocket()
+  tsock.listencommhandle = True
+  tsock.commhandle = True
+  tsock.callback = True
+  tsock.local_address = True
+  tsock.remote_address = True
+  
+  tsock.close()
+  tsock.close()
+
+  assert not tsock.sockobj
+  assert not tsock.listencommhandle
+  assert not tsock.commhandle
+  assert not tsock.callback
+  assert not tsock.local_address
+  assert not tsock.remote_address
+
 ##############################
 
 class FakeSocket:
@@ -33,6 +52,7 @@ class FakeSocket:
 
 def main():
   test_close()
+  test_close_twice()
 
 if callfunc == 'initialize':
   main()
