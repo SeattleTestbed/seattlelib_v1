@@ -10,18 +10,22 @@ Advertisements to a central server (similar to openDHT)
 """
 
 include session.repy
+# I'll use socket timeout to prevent hanging when it takes a long time...
+include sockettimeout.repy
 servername = "satya.cs.washington.edu"
 serverport = 10101
 
 def centralizedadvertise_announce(key, value, ttlval):
 
-  sockobj = openconn(servername,serverport)
+  sockobj = timeout_openconn(servername,serverport, timeout=10)
   try:
     session_sendmessage(sockobj, "PUT|"+str(key)+"|"+str(value)+"|"+str(ttlval))
     response = session_recvmessage(sockobj)
     if response != 'OK':
       raise Exception, "Centralized announce failed '"+response+"'"
   finally:
+    # BUG: This raises an error right now if the call times out ( #260 )
+    # This isn't a big problem, but it is the "wrong" exception
     sockobj.close()
   
   return True
@@ -30,7 +34,7 @@ def centralizedadvertise_announce(key, value, ttlval):
 
 
 def centralizedadvertise_lookup(key, maxvals=100):
-  sockobj = openconn(servername,serverport)
+  sockobj = timeout_openconn(servername,serverport, timeout=10)
   try:
     session_sendmessage(sockobj, "GET|"+str(key)+"|"+str(maxvals))
     recvdata = session_recvmessage(sockobj)
@@ -39,6 +43,8 @@ def centralizedadvertise_lookup(key, maxvals=100):
       return recvdata[:-len('OK')].split(',')
     raise Exception, "Centralized lookup failed"
   finally:
+    # BUG: This raises an error right now if the call times out ( #260 )
+    # This isn't a big problem, but it is the "wrong" exception
     sockobj.close()
       
 
