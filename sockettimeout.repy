@@ -1,8 +1,15 @@
 """
 <Description>
-  A socket that guarentees the receipt of a message.   Raises TimeoutError if it does not
-  receive any message before a given timeout.
-  If actually receives the message, returns the message and continues.
+  Puts back in Python's non-blocking functionality.
+
+  send():
+    Raises SocketTimeout Error if the send call lasts
+    longer than the set timeout.
+
+  recv():
+    Guarentees the receipt of a message.   Raises SocketTimeoutError if it does not
+    receive any message before a given timeout.
+    If actually receives the message, returns the message and continues.
 
 <Usage>
   Text-replacable for Repy Sockets:
@@ -10,6 +17,7 @@
     timeout_waitforconn(localip, localport, function)
 
   Object:
+    sockobj.settimeout(seconds)
     sockobj.send(data)
     sockobj.recv(bytes)
     sockobj.close()
@@ -111,6 +119,7 @@ class TimeoutSocket:
 #    self.lock = getlock() # general lock BUG: Do we need to lock everything?
     self.timeout_lock = getlock() # special lock for Timeout condition
     self.timeout = 5 # seconds to wait
+    self.bytes_sent = None # used to check if send() timed out
 
     # user vars   
     self.local_address = None # ip, port
@@ -121,6 +130,7 @@ class TimeoutSocket:
     self.sockobj = None #  the Repy socket
     self.commhandle = None # the current comm
     self.listencommhandle = None # the listener comm
+
 
   ################
   # Mutator methods
@@ -208,7 +218,7 @@ class TimeoutSocket:
     <Returns>
       The bytes sent.
     """
-    return self._send(data)
+    return self._send_or_close(data)
 
   def close(self):
     self.local_address = None # ip, port
@@ -264,6 +274,45 @@ class TimeoutSocket:
   def _recv(self, maxLen):
     """Recv data of length maxLen"""
     return self.sockobj.recv(maxLen)
+
+  def _send_and_release(self, data):
+    """Send data then release the timeout lock"""
+    self.bytes_sent = self._send(data)
+ 
+    self._quietly_release() # release the lock
+ 
+  def _quietly_release(self):
+    """Release the timeout lock and ignore if already released"""
+    try:
+      self.timeout_lock.release()
+    except:
+      pass
+   
+  def _send_or_close(self, data):
+    """Raise the Timeout Error if no receipt.  Keep track by timeout_lock."""
+
+    # acquire the lock, when it's release we'll carry on
+    self.timeout_lock.acquire()
+
+    # fork off a lock that'll release the lock at the timeout
+    timerhandle = settimer(self.timeout, self._quietly_release, ())
+
+    # fork off a send call so we can raise the exception in the main thread
+    # the send call will also release our lock
+    settimer(0, self._send_and_release, (data,))
+
+    # block until either the timeout or _send finishes
+    self.timeout_lock.acquire()
+    self.timeout_lock.release()
+
+    if self.bytes_sent: # send finished
+      canceltimer(timerhandle)
+      retdata = self.bytes_sent
+      self.bytes_sent = None
+      return retdata
+    else: # it timed out
+      self.close()
+      raise SocketTimeoutError
 
   def _recv_or_close(self, amount):
     """Raise the Timeout Error if no receipt.  Keep track by timeout_lock."""

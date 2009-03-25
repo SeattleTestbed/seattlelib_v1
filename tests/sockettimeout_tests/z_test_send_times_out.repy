@@ -7,26 +7,22 @@
 # hello world
 include sockettimeout.repy
 
-MESSAGE = "hello world!"
-HUGE = 100
+MESSAGE = 1000000 * "a" # 1 MB of data to fill buffer and block
 
 def mycallback(ip, port, sockobj, commhandle, listenhandle):
-  sockobj.settimeout(0)
-
-  try:
-    hw_message = sockobj.recv(HUGE)
-  except SocketTimeoutError:
-    pass
-  else: 
-    sockobj.close()
-    raise Exception("should have timed out")
+  pass # don't recv at all
   
 def server():
   sockobj = timeout_waitforconn(getmyip(), 12345, mycallback)
 
 def client():
   sockobj = timeout_openconn(getmyip(), 12345)
-  assert sockobj.send(MESSAGE) == len(MESSAGE)
+  try: 
+    sockobj.send(MESSAGE) 
+  except SocketTimeoutError:
+    pass
+  else:
+    raise Exception("should have raised timeout")
 
 def main():
   server()
