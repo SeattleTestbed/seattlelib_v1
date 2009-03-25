@@ -75,7 +75,7 @@ nmclient_handledictlock = getlock()
 def nmclient_rawcommunicate(nmhandle, *args):
 
   try:
-    thisconnobject = timeout_openconn(nmclient_handledict[nmhandle]['IP'], nmclient_handledict[nmhandle]['port']) 
+    thisconnobject = timeout_openconn(nmclient_handledict[nmhandle]['IP'], nmclient_handledict[nmhandle]['port'],timeout=10) 
   except Exception, e:
     raise NMClientException, str(e)
 
@@ -147,7 +147,7 @@ def nmclient_signedcommunicate(nmhandle, *args):
     
 
   try:
-    thisconnobject = timeout_openconn(nmclient_handledict[nmhandle]['IP'], nmclient_handledict[nmhandle]['port']) 
+    thisconnobject = timeout_openconn(nmclient_handledict[nmhandle]['IP'], nmclient_handledict[nmhandle]['port'], timeout=10)
   except Exception, e:
     raise NMClientException, str(e)
 
