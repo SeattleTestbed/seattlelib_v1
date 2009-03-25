@@ -20,6 +20,9 @@ include signeddata.repy
 include session.repy
 
 
+# makes connections time out
+include sockettimeout.repy
+
 # The idea is that this module returns "node manager handles".   A handle
 # may be used to communicate with a node manager and issue commands.   If the
 # caller wants to have a set of node managers with the same state, this can
@@ -72,7 +75,7 @@ nmclient_handledictlock = getlock()
 def nmclient_rawcommunicate(nmhandle, *args):
 
   try:
-    thisconnobject = openconn(nmclient_handledict[nmhandle]['IP'], nmclient_handledict[nmhandle]['port']) 
+    thisconnobject = timeout_openconn(nmclient_handledict[nmhandle]['IP'], nmclient_handledict[nmhandle]['port']) 
   except Exception, e:
     raise NMClientException, str(e)
 
@@ -144,7 +147,7 @@ def nmclient_signedcommunicate(nmhandle, *args):
     
 
   try:
-    thisconnobject = openconn(nmclient_handledict[nmhandle]['IP'], nmclient_handledict[nmhandle]['port']) 
+    thisconnobject = timeout_openconn(nmclient_handledict[nmhandle]['IP'], nmclient_handledict[nmhandle]['port']) 
   except Exception, e:
     raise NMClientException, str(e)
 
