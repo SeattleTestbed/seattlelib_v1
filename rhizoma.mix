@@ -1,0 +1,241 @@
+"""
+  <Author>
+    richard@jordan.ham-radio-op.net
+ 
+  <Purpose>
+    Deploy/manage/monitor daemons on seattle vessels.
+   
+    I find your uservessels from GENI.  If you don't have any, 
+    I'll allocate 5 LAN nodes for you.
+
+    Then I may either:
+      case(command):
+        status: output the status of your vessels
+        start: upload and run your daemon to those vessels
+        stop: kill your daemon on all vessels
+        log: output the log of all your vessels
+
+    Please have ready your:
+      * keyname.public/.private key pair
+      * daemon script
+              
+  <Usage>
+    python rhizoma.py keyname <status | start filename_to_run.repy [args] | stop | log>
+"""
+
+# TODO convert to Repy
+from repyportability import *
+
+# python core
+import sys
+
+# from autograder; thanks Alper!
+import nm_remote_api
+
+# Repy
+include centralizedadvertise.repy
+include rsa.repy
+
+######################
+# nm remote API changes
+#######################
+# i want to change the way the nm_remote_api module works a little
+# without editing the actual file in case I'd mess somebody else up
+# but I don't want to duplicate nm_remote_api.
+#
+# Some of these changes may be temporary or could be integrated in the future.
+
+def infinitely_run_target(longname, filename, filedata, argstring, timeout=240):
+    """
+    <Purpose>
+      Uploads and starts the filename Repy script running on the given longname node.
+    
+    <Differences>
+      While the original nm_remote_api function times out, this function allows the 
+      script to run forever.
+    """
+
+    # smart argstring check:
+    if filename.find("/") != -1:
+        error_msg = "Please pass in the filename without any directory/hierarchy information (passed in '%s')" % filename
+        return (False, error_msg)
+
+    argparts = argstring.partition(" ")
+    if argparts[0] != filename:
+        # attempt to fix
+        if argparts[2] != "":
+            argstring = filename + " " + argparts[2].strip()
+        else:
+            argstring = filename
+
+    nm_remote_api.check_is_initialized()
+
+    vesselname = nm_remote_api.vesselinfo[longname]['vesselname']
+    try:
+        nm_remote_api.nmclient_signedsay(nm_remote_api.vesselinfo[longname]['handle'], "AddFileToVessel", 
+                           vesselname, filename, filedata)
+    except nm_remote_api.NMClientException, e:
+        return (False, str(e))
+    
+    #print "Successfully added ", filename, " to vessel"
+    
+    try:
+        nm_remote_api.nmclient_signedsay(nm_remote_api.vesselinfo[longname]['handle'], "StartVessel", 
+                           vesselname, argstring)
+    except nm_remote_api.NMClientException, e:
+        return (False, str(e))
+    
+    # CHANGE: April 08, 2009  RJ 
+    return (True, "No checking for termination")
+
+
+def uservessels_add_node_by_hostname(host, port=nm_remote_api.DEFAULT_NODEMANAGER_PORT):
+    """
+    <Purpose>
+      Attempts to find a running Seattle instance at the host specified, 
+      connect to it, and add meta-information about the instance and its 
+      available vessels to the internal dictionary (vesselinfo).
+
+      See documentation in nm_remote_api.mix for more.
+ 
+    <Differences>
+      Uses uservessels instead of owner vessels.
+   
+    <Note>
+      This function does no checking of whether the uservessels
+      are allocated through GENI.  You may get vessels that you don't
+      have access to.  Please lookup with centralizedadvertise.repy first
+      to find your vessels.
+    """
+
+    nm_remote_api.check_is_initialized(check_vesselinfo=False)
+        
+    # get information about the node's vessels
+    thishandle = nm_remote_api.nmclient_createhandle(host, port, privatekey = nm_remote_api.key['private'], 
+                                       publickey = nm_remote_api.key['public'])
+    ownervessels, uservessels = nm_remote_api.nmclient_listaccessiblevessels(thishandle, 
+                                                               nm_remote_api.key['public'])
+    
+    new_vessel_list = []
+    
+    # CHANGE: April 08, 2009  RJ 
+    # we should add anything we can access (we only care about uservessels)
+    for vesselname in uservessels:
+      longname = host+":"+str(port)+":"+vesselname
+      if longname not in nm_remote_api.vesselinfo:
+        # set the vesselname
+        # NOTE: we leak handles (no cleanup of thishandle).   
+        # I think we don't care...
+        newhandle = nm_remote_api.nmclient_duplicatehandle(thishandle)
+        handleinfo = nm_remote_api.nmclient_get_handle_info(newhandle)
+        handleinfo['vesselname'] = vesselname
+        nm_remote_api.nmclient_set_handle_info(newhandle, handleinfo)
+        
+        nm_remote_api.add_vessel(longname, newhandle)
+        new_vessel_list.append(longname)
+        
+    # tell the user what we did...
+    if len(new_vessel_list) == 0:
+        print "Could not add any targets."
+    else:
+        print "Added targets: "+", ".join(new_vessel_list)
+
+    return new_vessel_list
+
+
+# override functions
+nm_remote_api.run_target = infinitely_run_target # let process run forever
+nm_remote_api.add_node_by_hostname = uservessels_add_node_by_hostname # use uservessels instead of ownervessels
+
+#############
+# Helpers
+###############
+
+def usage():
+  print "Usage: python rhizoma.py keyname <status | start file_to_run.repy [args] | stop | log>"
+  sys.exit(1)
+
+def get_uservessels(keyname):
+  """Return the given user's GENI vessels"""
+
+  # check with advertiser
+  key_public = rsa_file_to_publickey(keyname + ".publickey")
+  raw_hosts = centralizedadvertise_lookup(key_public)
+
+  hosts = []
+
+  # strip off the port
+  for raw_host in raw_hosts:
+    host, port = raw_host.split(':')
+    hosts += [host]
+
+  return hosts
+
+#############
+# Main
+###########
+def main():
+  # must give exactly one argument
+  if not len(sys.argv) >= 3:
+    usage()
+
+  my_name = sys.argv.pop(0) # this script's name
+
+  keyname = sys.argv.pop(0)
+
+  # Do we have any vessels?
+  hosts = get_uservessels(keyname)
+
+  # acquire the vessels
+  print "Acquiring vessels..."
+  success, info = nm_remote_api.initialize(hosts, keyname)
+  if not success:
+    print "Could not acquire hosts"
+    sys.exit(2)
+  print
+
+  # everything is ready to go
+  # what was the arg?
+  cmd = sys.argv.pop(0)
+
+  if cmd == 'status':
+    print "Checking the status of vessels..."
+    for lname in info:
+      nm_remote_api.is_vessel_finished(lname)
+
+  elif cmd == 'start' and len(sys.argv) > 0:
+    # get file name
+    filename = sys.argv.pop(0)
+  
+    # any args?
+    argstring = filename
+    while len(sys.argv) > 0:
+      argstring += " " + sys.argv.pop(0)
+
+    # read in the file and run it
+    print "Starting " + str(filename) + " on all vessels..."
+    FILE = open(filename)
+    filedata = FILE.read()
+    FILE.close()
+    dic = nm_remote_api.run_on_targets(info, filename, filedata, argstring, 10)
+
+    # result?
+    print dic
+
+  elif cmd == 'stop':
+    print "Stopping " + str(filename) + " on all vessels..."
+    for longname in info:
+      nm_remote_api.stop_target(longname)
+
+  elif cmd == 'log':
+    print "Showing the logs of vessels..."
+    for lname in info:
+      print nm_remote_api.showlog_vessel(lname)
+
+  else:
+    usage()
+
+
+if __name__ == '__main__':
+  main()
+  sys.exit(0)
