@@ -3,38 +3,51 @@
     richard@jordan.ham-radio-op.net
  
   <Purpose>
-    Deploy/manage/monitor daemons on seattle vessels.
-   
-    I find your uservessels from GENI.  If you don't have any, 
-    I'll allocate 5 LAN nodes for you.
+    I do all kinds of remote interactions with GENI.  I can deploy
+    scripts, acquire vessels, release vessels, run code, stop code,
+    and check logs and statuses.
 
-    Then I may either:
+    Specificatlly, I may either:
       case(command):
         status: output the status of your vessels
         start: upload and run your daemon to those vessels
         stop: kill your daemon on all vessels
         log: output the log of all your vessels
+        acquire: go to GENI and get more resources
+        release: get rid of resources
 
     Please have ready your:
       * keyname.public/.private key pair
       * daemon script
-              
+
+    I may prompt for your GENI password.  Don't worry, 
+    you can trust me.
+
   <Usage>
-    python rhizoma.py keyname <status | start filename_to_run.repy [args] | stop | log>
+    python rhizoma.py keyname command [args]
+              
 """
 
-# TODO convert to Repy
+# TODO: convert to Repy?
 from repyportability import *
 
 # python core
-import sys
+import getpass
+import re
+import sys # switch to repy
+import socket # switch to repy
 
 # from autograder; thanks Alper!
 import nm_remote_api
 
-# Repy
+# seattle libs
 include centralizedadvertise.repy
 include rsa.repy
+
+# it's the bizarrest thing; beraber works but 
+# satya.cs refuses to accept a socket connection
+# So for now I'll override the default in centralizedadvertise.repy
+servername = "beraber.cs.washington.edu"
 
 ######################
 # nm remote API changes
@@ -62,11 +75,11 @@ def infinitely_run_target(longname, filename, filedata, argstring, timeout=240):
 
     argparts = argstring.partition(" ")
     if argparts[0] != filename:
-        # attempt to fix
-        if argparts[2] != "":
-            argstring = filename + " " + argparts[2].strip()
-        else:
-            argstring = filename
+      # attempt to fix
+      if argparts[2] != "":
+        argstring = filename + " " + argparts[2].strip()
+      else:
+        argstring = filename
 
     nm_remote_api.check_is_initialized()
 
@@ -152,7 +165,24 @@ nm_remote_api.add_node_by_hostname = uservessels_add_node_by_hostname # use user
 ###############
 
 def usage():
-  print "Usage: python rhizoma.py keyname <status | start file_to_run.repy [args] | stop | log>"
+  print """Usage: python rhizoma.py keyname command [args]
+ 
+  keyname is your username for GENI
+  command is either:
+    acquire [num_vessels <LAN | WAN | Random>] - allocate number, type new vessels through GENI
+    log - output the logs of all vessels
+    release - unallocate vessels through GENI
+    status - show the status of all vessels
+    start file_to_run.repy [args] - start a script on all vessels
+    stop - stop all scripts running on all vessels
+
+  Example usage:
+    python rhizoma.py richard acquire # default is 1 LAN vessel
+    python rhizoma.py richard start hello.repy # run the script
+    python rhizoma.py richard status # check status
+    python rhizoma.py richard stop #  kill it
+    python rhizoma.py richard release # give up the vessel
+  """
   sys.exit(1)
 
 def get_uservessels(keyname):
@@ -162,6 +192,10 @@ def get_uservessels(keyname):
   key_public = rsa_file_to_publickey(keyname + ".publickey")
   raw_hosts = centralizedadvertise_lookup(key_public)
 
+  # BUG in centralizedadvertise.  Should return [].
+  if raw_hosts == ['']:
+    raw_hosts = []
+
   hosts = []
 
   # strip off the port
@@ -170,6 +204,213 @@ def get_uservessels(keyname):
     hosts += [host]
 
   return hosts
+
+
+def geni_logon(ss, keyname, password):
+  """
+  <Purpose>
+    Use HTTP to logon to GENI.
+  
+  <Args>
+    ss - ssl socket connected to GENI
+    keyname - username of the GENI accoutn
+    password - user's GENI password
+
+  <Return>
+    The sessionid of the logged on user.
+  """
+  
+  # GET the test cookie by hitting the home page
+  message = """GET /geni/accounts/login HTTP/1.1 \r
+Host: seattlegeni.cs.washington.edu\r
+Accept: */*\r\n\r\n"""
+  ss.write(message)
+
+
+  # see the result
+  data = ""
+  for x in range(0,6):
+    data += ss.read()
+
+
+  # parse out the cookie
+  m = re.search(r".*sessionid=([^;]+);.*", data)
+  ms = m.groups()
+  sessionid = list(ms).pop()
+
+
+  # POST to the login with test cookie
+  postdata = "username=" + keyname + "&password=" + password + "&next=&jsenabled=true"
+  message = """POST /geni/accounts/login HTTP/1.1 \r
+Host: seattlegeni.cs.washington.edu\r
+Accept: */*\r
+Cookie: sessionid=""" + sessionid + """\r
+Content-Type: application/x-www-form-urlencoded\r
+Content-Length: """ + str(len(postdata)) + "\r\n\r\n" + postdata + "\r\n\r\n"
+  ss.write(message)
+
+
+  # see the result
+  data = ""
+  data += ss.read() # here
+#  print repr(data)
+
+  
+  # parse the real cookie
+  m = re.search(r".*sessionid=([^;]+);.*", data)
+  if not m:
+    print
+    print "Could not log on to GENI.  Was your password right, " + keyname + "?"
+    print
+    sys.exit(4)
+
+  ms = m.groups()
+  sessionid = list(ms).pop()
+  
+  return sessionid
+
+def request_vessels(ss, sessionid, num =1, env = 1):
+  """
+  <Purpose>
+    Use HTTP to get some vessels.
+
+  <Args>
+    ss - ssl socket 
+    sessionid - geni session for the user
+    num - number of vessels to acquire
+    env - the type either LAN, WAN, or Random
+
+  <Pre condition>
+    ss is connected to GENI
+    session is valid (result of calling geni_logon)
+
+  <Return>
+    None # maybe new vessels? would be nice
+  """
+  # POST to acquire resources
+  postdata = "num=" + str(num) + "&env=" + str(env)
+  message = """POST /geni/control/get_resources HTTP/1.1 \r
+Host: seattlegeni.cs.washington.edu\r
+Accept: */*\r
+Cookie: sessionid=""" + sessionid + """\r
+Content-Type: application/x-www-form-urlencoded\r
+Content-Length: """ + str(len(postdata)) + "\r\n\r\n" + postdata + "\r\n"
+  ss.write(message)
+#  print message
+
+  # see the result
+  data = ""
+  for x in range(0,6):
+    data += ss.read()
+#  print repr(data)
+
+
+def acquire_uservessels(keyname, num=1, env=1):
+  """
+  <Purpose>
+    The user, keyname, wants some more vessels.  We'll
+    do it for her.
+  
+    Let's login to GENI and them ask for some.
+
+  <Args>
+    keyname - the username of the GENI account
+    num - number of vessels to acquire
+    env - the type either LAN, WAN, or Random
+
+  <Side Effects>
+    Prompts the user for their GENI password.
+  """
+ 
+  # the GENI site
+  HOST = 'seattlegeni.cs.washington.edu'
+  PORT = 443 # ssl
+
+  # set up a secure socket 
+  s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+  s.connect((HOST, PORT))
+  ss = socket.ssl(s)
+
+  # login to GENI
+  password = getpass.getpass("I'll get them for you, " + keyname + ".\nPlease enter your GENI password: ")
+  sessionid = geni_logon(ss, keyname, password)
+
+  # acquire them
+  request_vessels(ss, sessionid, num , env)
+
+  # clean up
+  del ss
+  s.close()
+
+def return_vessels(ss, sessionid):
+  """
+  <Purpose>
+    Use HTTP to get rid of all my vessels.
+
+  <Args>
+    ss - ssl socket 
+    sessionid - geni session for the user
+
+  <Pre condition>
+    ss is connected to GENI
+    session is valid (result of calling geni_logon)
+
+  <Return>
+    None
+  """
+  # POST to acquire resources
+  postdata = ""
+  message = """POST /geni/control/del_all_resource HTTP/1.1 \r
+Host: seattlegeni.cs.washington.edu\r
+Accept: */*\r
+Cookie: sessionid=""" + sessionid + """\r
+Content-Type: application/x-www-form-urlencoded\r
+Content-Length: """ + str(len(postdata)) + "\r\n\r\n" + postdata + "\r\n"
+  ss.write(message)
+  # print message
+
+  # see the result
+  data = ""
+  for x in range(0,6):
+    data += ss.read()
+  #print repr(data)  
+
+
+def release_uservessels(keyname):
+  """
+  <Purpose>
+    The user, keyname, wants to get rid of all her vessels.  
+    We'll do it for her.
+  
+    Let's login to GENI and them hit the del page.
+
+  <Args>
+    keyname - the username of the GENI account
+
+  <Side Effects>
+    Prompts the user for their GENI password.
+  """
+ 
+  # the GENI site
+  HOST = 'seattlegeni.cs.washington.edu'
+  PORT = 443 # ssl
+
+  # set up a secure socket 
+  s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+  s.connect((HOST, PORT))
+  ss = socket.ssl(s)
+
+  # login to GENI
+  password = getpass.getpass("I'll release the vessels for you, " + keyname + ".\nPlease enter your GENI password: ")
+  sessionid = geni_logon(ss, keyname, password)
+
+  # release them
+  return_vessels(ss, sessionid)
+
+  # clean up
+  del ss
+  s.close()
+
 
 #############
 # Main
@@ -181,22 +422,67 @@ def main():
 
   my_name = sys.argv.pop(0) # this script's name
 
-  keyname = sys.argv.pop(0)
+  keyname = sys.argv.pop(0) # aka username
 
   # Do we have any vessels?
   hosts = get_uservessels(keyname)
-
-  # acquire the vessels
-  print "Acquiring vessels..."
-  success, info = nm_remote_api.initialize(hosts, keyname)
-  if not success:
-    print "Could not acquire hosts"
-    sys.exit(2)
+  print "Found: ", hosts
   print
+
 
   # everything is ready to go
   # what was the arg?
   cmd = sys.argv.pop(0)
+
+  
+  if cmd == 'acquire':
+    # defaults
+    num = 1
+    env = 1
+
+    # optionals overwrite
+    if len(sys.argv):
+      num = sys.argv.pop(0)
+    if len(sys.argv):
+      env = sys.argv.pop(0)
+      if env == "LAN":
+        env = 1
+      elif env == "WAN":
+        env = 2
+      elif env == "Random":
+	env = 3
+      else:
+	print "Bad Environment: must be one of LAN, WAN, or Random"
+	print
+        usage()
+
+    # go to GENI and do it
+    acquire_uservessels(keyname, num ,env)
+
+    # Try again the advertise server and show the result
+    hosts = get_uservessels(keyname)
+    print "User Vessels: " + str(hosts)
+ 
+    # return early
+    sys.exit(0)
+  elif cmd == 'release':
+    print "Releasing all vessels..."
+    release_uservessels(keyname)
+    print "Changes may take a few minutes to propagate"    
+
+    # return early
+    sys.exit(0)
+ 
+  else:
+    # use the vessels we have
+    print "Initializing vessels..."
+    success, info = nm_remote_api.initialize(hosts, keyname)
+    if not success:
+      print info
+      print "Could not acquire hosts.  Please wait a little and try again.  Or acquire some vessels."
+      sys.exit(2)
+    print
+
 
   if cmd == 'status':
     print "Checking the status of vessels..."
