@@ -166,7 +166,6 @@ nm_remote_api.add_node_by_hostname = uservessels_add_node_by_hostname # use user
 
 def usage():
   print """Usage: python rhizoma.py keyname command [args]
- 
   keyname is your username for GENI
   command is either:
     acquire [num_vessels <LAN | WAN | Random>] - allocate number, type new vessels through GENI
@@ -182,6 +181,13 @@ def usage():
     python rhizoma.py richard status # check status
     python rhizoma.py richard stop #  kill it
     python rhizoma.py richard release # give up the vessel
+
+  Requirements:
+    Please put your keyname.publickey and keyname.privatekey
+    in your current directory.  All commands require your keys.
+
+    If you want to start a script, the script must also be in
+    your current directory.
   """
   sys.exit(1)
 
