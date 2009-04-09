@@ -155,10 +155,55 @@ def uservessels_add_node_by_hostname(host, port=nm_remote_api.DEFAULT_NODEMANAGE
 
     return new_vessel_list
 
+def desperate_initialize(host_list, keyname):
+    """
+    <Purpose>
+      Initializes the state of the module, attempts to connect to each instance
+      of Seattle on the given nodes.
+
+      See nm_remote_api for more documentation.
+
+    <Diffences>
+      Thinks that any vessels found is a success.  Even if we get less than
+      we asked for, we'll take it.
+    """
+    
+    summary = ""
+
+    # check if any state has been initialized
+    if not nm_remote_api.key == {} or not nm_remote_api.vesselinfo == {}:
+        summary += "Initialized state still exists, tear_down() first."
+        return (False, summary)
+    
+    # attempt to read in authentication keys
+    nm_remote_api.key['public'] = rsa_file_to_publickey(keyname + ".publickey")
+    nm_remote_api.key['private'] = rsa_file_to_privatekey(keyname + ".privatekey")
+
+    # critical for nmclient to work, attempt to get the current time on port
+    nm_remote_api.time_updatetime(34933)
+    
+    # attempt to contact and store state, append vessel longnames to list
+    acquired_vessels = []
+    for host in host_list:
+        try:
+            new_vessels = nm_remote_api.add_node_by_hostname(host)
+        except nm_remote_api.NMClientException, e:
+            summary += " " + str(e)
+        else:
+            acquired_vessels.extend(new_vessels)
+            
+    # CHANGE RJ 4/8/09
+    # if we get anything, we'll take it
+    if len(acquired_vessels) == 0:
+        return (False, summary)
+    else:
+        return (True, acquired_vessels)
+
 
 # override functions
 nm_remote_api.run_target = infinitely_run_target # let process run forever
 nm_remote_api.add_node_by_hostname = uservessels_add_node_by_hostname # use uservessels instead of ownervessels
+nm_remote_api.initialize = desperate_initialize # take any found vessels as success
 
 #############
 # Helpers
