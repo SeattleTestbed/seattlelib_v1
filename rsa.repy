@@ -539,18 +539,18 @@ def rsa_matching_keys(privatekey, publickey):
     True, if they can be used. False otherwise.
   """
   # We will attempt to encrypt then decrypt and check that the message matches
-  testMessage = "A quick brown fox."
+  testmessage = "A quick brown fox."
   
   # Encrypt with the public key
-  encrypted = rsa_encrypt(testMessage, publickey)
+  encryptedmessage = rsa_encrypt(testmessage, publickey)
 
   # Decrypt with the private key
   try:
-    decrypted = rsa_decrypt(encrypted, privatekey)
-  except:
+    decryptedmessage = rsa_decrypt(encryptedmessage, privatekey)
+  except TypeError:
     # If there was an exception, assume the keys are to blame
     return False
     
   # Test for a match
-  return (testMessage == decrypted)
+  return (testmessage == decryptedmessage)
 
