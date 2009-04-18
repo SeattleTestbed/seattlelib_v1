@@ -525,5 +525,31 @@ def rsa_file_to_publickey(filename):
   return rsa_string_to_publickey(publickeystring)
 
 
+def rsa_matching_keys(private, public):
+  """
+  <Purpose>
+    Determines if a pair of public and private keys match and allow for encryption/decryption.
+  
+  <Arguments>
+    private: The private key
+    public:  The public key
+  
+  <Returns>
+    True, if they can be used. False otherwise.
+  """
+  # We will attempt to encrypt then decrypt and check that the message matches
+  testMessage = "A quick brown fox."
+  
+  # Encrypt with the public key
+  encrypted = rsa_encrypt(testMessage, public)
 
+  # Decrypt with the private key
+  try:
+    decrypted = rsa_decrypt(encrypted, private)
+  except:
+    # If there was an exception, assume the keys are to blame
+    return False
+    
+  # Test for a match
+  return (testMessage == decrypted)
 
