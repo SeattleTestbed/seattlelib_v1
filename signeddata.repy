@@ -108,18 +108,8 @@ def signeddata_is_valid_destination(destination):
   
 
 
-
+#applies a signature to a given message (parameter data) and returns the signed message
 def signeddata_signdata(data, privatekey, publickey, timestamp=None, expiration=None, sequenceno=None,destination=None):
-
-# NOTE: This takes waaaay too long.   I'm going to do something simpler...
-#  if not rsa_is_valid_privatekey(privatekey):
-#    raise ValueError, "Invalid Private Key"
-  if not privatekey:
-    raise ValueError, "Invalid Private Key"
-    
-
-  if not rsa_is_valid_publickey(publickey):
-    raise ValueError, "Invalid Public Key"
 
   if not signeddata_is_valid_timestamp(timestamp):
     raise ValueError, "Invalid Timestamp"
@@ -141,18 +131,35 @@ def signeddata_signdata(data, privatekey, publickey, timestamp=None, expiration=
   totaldata = totaldata+"!"+signeddata_sequencenumber_to_string(sequenceno)
   totaldata = totaldata+"!"+signeddata_destination_to_string(destination)
   
+  #generate the signature
+  signature = signeddata_create_signature(totaldata, privatekey, publickey)
+  
+  totaldata = totaldata+"!"+ signature
+
+  return totaldata
+
+#creates a signature for the given data string and returns it
+def signeddata_create_signature(data, privatekey, publickey):
+
+  # NOTE: This takes waaaay too long.   I'm going to do something simpler...
+  #  if not rsa_is_valid_privatekey(privatekey):
+  #    raise ValueError, "Invalid Private Key"
+  if not privatekey:
+    raise ValueError, "Invalid Private Key"
+      
+  if not rsa_is_valid_publickey(publickey):
+    raise ValueError, "Invalid Public Key"
+    
   # Time to get the hash...
   shahashobj = sha()
-  shahashobj.update(totaldata)
+  shahashobj.update(data)
   hashdata = shahashobj.digest()
 
 
   # ...and sign it
   signature = rsa_sign(hashdata, privatekey)
-
-  totaldata = totaldata+"!"+str(signature)
-
-  return totaldata
+  
+  return str(signature)
 
 
 # return [original data, signature]
