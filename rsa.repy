@@ -525,15 +525,16 @@ def rsa_file_to_publickey(filename):
   return rsa_string_to_publickey(publickeystring)
 
 
-def rsa_matching_keys(private, public):
+def rsa_matching_keys(privatekey, publickey):
   """
   <Purpose>
     Determines if a pair of public and private keys match and allow for encryption/decryption.
   
   <Arguments>
-    private: The private key
-    public:  The public key
-  
+    privatekey: The private key*
+    publickey:  The public key*
+    
+    * The dictionary structure, not the string or file name
   <Returns>
     True, if they can be used. False otherwise.
   """
@@ -541,11 +542,11 @@ def rsa_matching_keys(private, public):
   testMessage = "A quick brown fox."
   
   # Encrypt with the public key
-  encrypted = rsa_encrypt(testMessage, public)
+  encrypted = rsa_encrypt(testMessage, publickey)
 
   # Decrypt with the private key
   try:
-    decrypted = rsa_decrypt(encrypted, private)
+    decrypted = rsa_decrypt(encrypted, privatekey)
   except:
     # If there was an exception, assume the keys are to blame
     return False
