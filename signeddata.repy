@@ -187,7 +187,11 @@ def signeddata_issignedcorrectly(data, publickey=None):
       raise
     # Bad signature or public key
     return False
-
+  except OverflowError, e:      
+    #bad signature 
+    #this is most likely caused by mismatched public and private keys.
+    return False
+    
   # Does the hash match the signed data?
   if signedhash == sha_hash(thesigneddata):
     return True
