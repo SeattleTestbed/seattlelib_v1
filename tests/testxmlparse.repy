@@ -7,16 +7,12 @@ if callfunc == 'initialize':
   # exception:
 
 
-  excepted = False
-  try:
-    xmlparse_parse("""<methodCall>
+  xmlparse_parse("""
+    <methodCall>
       <methodName>shutdown</methodName>
       <params></params>
-    </methodCall>""")
-  except Exception:
-    excepted = True
-
-  assert(not excepted)
+    </methodCall>
+    """)
 
 
   # Reading attributes should work, accurately:
@@ -161,3 +157,11 @@ if callfunc == 'initialize':
     excepted = True
 
   assert(excepted)
+
+  excepted = False
+  try:
+    parsed = xmlparse_parse("<a></a><a></a>")
+  except xmlparse_XMLParseError:
+    excepted = True
+
+  assert(excepted)    # XML documents have *one* root node, no more.

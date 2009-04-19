@@ -61,7 +61,11 @@ def xmlparse_parse(data):
     data = data[data.find("?>")+2:]
   
   # Well-formed XML Documents have exactly one root node
-  return _xmlparse_parse(data)[0]
+  parsed_elements = _xmlparse_parse(data)
+  if len(parsed_elements) != 1:
+    raise xmlparse_XMLParseError()
+
+  return parsed_elements[0]
 
 
 
@@ -69,6 +73,49 @@ def xmlparse_parse(data):
 def _xmlparse_read_attributes(string):
   # Returns a pair containing the dictionary of attributes and remainder
   # of the string on success; excepts on failure.
+
+  # Q_n corresponds to the state_* constant of the same value. The starting
+  # node is Q_1.
+  #
+  #  [ Done ]
+  #     ^
+  #     |
+  #     | (>, /)
+  #     |
+  #     \--------\ 
+  #              |
+  #        ,-.   | v-----------------------------------\
+  # space (   [ Q_1 ]                                  |
+  #        `->   | ^-----------------------\ (')       |
+  #              |                         |           |
+  #              |                (')      |   <-.     | (")
+  #              | non-space   /------->[ Q_4 ]   )    |
+  #              |             |               `-'     |
+  #  (space)     v     (=)     |             (other)   |
+  #     /-----[ Q_2 ]------>[ Q_3 ]-------->[ Q_5 ]----/
+  #     |      ^   )           |      (")    ^   )
+  #     |       `-'            |              `-'
+  #     |     (other)   (other)|             (other)
+  #     |                      |
+  #     v                      |
+  #[Exception]<----------------/
+
+  # Basically the state machine is used to read a list of attribute-pairs,
+  # terminated by a '/' or '>'. Attribute pairs either look like:
+  #   name='value'
+  # or:
+  #   name="value"
+  # Single-quoted attributes can contain double-quotes, and vice-versa, but
+  # single-quotes in single-quoted attributes must be escaped.
+  # 
+  # To do this we start in Q_1, which consumes input until we arrive at
+  # something that looks like an attribute name. In Q_2 we consume characters
+  # for the attribute name until it looks like the attribute name is finished.
+  # In Q_3 we read a single character to determine what type of quoting is
+  # used for the attribute value. In Q_4 or Q_5, we read the attribute's value
+  # until the string is closed, then go back to Q_1 (saving the attribute name
+  # and value into the dictionary). We decide we are done when we encounter a
+  # '>' or '/' in Q_1.
 
   # Constant states:
   state_EXPECTING_ATTRNAME = 1
@@ -155,6 +202,7 @@ def _xmlparse_node_from_string(string):
     if read_pos >= len(string):
       raise xmlparse_XMLParseError()
 
+    # The tag name is ended with a space or a closing angle-brace.
     if string[read_pos].isspace() or string[read_pos] == ">":
       break
 
@@ -163,8 +211,13 @@ def _xmlparse_node_from_string(string):
   tag = string[0:read_pos]
   string = string[read_pos:]
 
+  # Get the attribute dictionary and remaining string (which will be
+  # "> ... [ inner stuff ] </[tag_name]>" or "/>" for well-formed XML).
   attributes, string = _xmlparse_read_attributes(string)
 
+  # "Empty" elements look like: "<[tag_name] [... maybe attributes] />" and
+  # not "Empty" elements look like:
+  # "<[tag_name] [... maybe attributes]> [inner content] </[tag_name]>".
   empty_element = False
   if string.startswith(">"):
     string = string[1:]
@@ -179,13 +232,19 @@ def _xmlparse_node_from_string(string):
     xmlnode.content = ""
 
   else:
+    # Locate the end-boundary of the inner content of this element.
     ending_tag_position = string.rfind("</")
     if ending_tag_position < 0:
       raise xmlparse_XMLParseError()
 
+    # If this elements starting and closing tag names do not match, this XML
+    # is not well-formed.
     if not string.startswith("</" + tag, ending_tag_position):
       raise xmlparse_XMLParseError()
 
+    # If the inner content starts with another element, this element has
+    # children.  Otherwise, it has content, which is just a string containing
+    # the inner content.
     tag_body = string[:ending_tag_position]
     if tag_body.lstrip().startswith("<"):
       xmlnode.children = _xmlparse_parse(tag_body.lstrip())
@@ -208,6 +267,7 @@ def _xmlparse_find_next_tag(xmldata):
   xmldata = xmldata.lstrip()
   length_difference = original_length - len(xmldata)
 
+  # Seek to another XML tag at the same depth.
   while True:
     if xmldata.startswith("</", read_position) or \
         xmldata.startswith("/>", read_position):
