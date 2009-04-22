@@ -5,20 +5,26 @@
 
    Description:
 
-   This module handles getting the time from an external source.   We get the
-   remote time once and then use the offset from the local clock from then on.
+   This module handles getting the time from an external source.  It gets the
+   remote time once and then uses the offset from the local clock from then on
+   to return the current time.
 
-   To use this module, first call time_updatetime(localport) with a
+   To use this module, first make a call to time_updatetime(localport) with a
    local UDP port that you have permission to send/recv on. This will
-   contact some random subset of NTP servers to get and store the
-   local time.
+   contact some random subset of NTP servers to get and store the local time.
 
-   Then, to get the actual time call time_gettime() which will return
-   the current time (in seconds?). Note that time_gettime() will raise
-   TimeError if no NTP server responded yet. If this fails for you
-   after waiting for a sufficiently long time, then you can call
-   time_updatetime(localport) again to sample time from another random
-   set of NTP servers.
+   Then, to get the actual time, call time_gettime() which will return
+   the current time (in seconds). time_gettime() can be called at any point
+   after having called time_updatetime(localport) since time_gettime() simply
+   calculates how much time has elapsed since the local time was originally 
+   acquired from one of the NTP servers.
+
+   Note that time_gettime() will raise TimeError if no NTP server responded
+   (this is a blocking function, so nothing else will be executed in your
+   program until time_gettime() has completed by either obtaining the time or
+   raising TimeError exception).  If this fails for you, then you can call
+   time_updatetime(localport) again to sample time from another random set of
+   NTP servers.
 """
 
 
