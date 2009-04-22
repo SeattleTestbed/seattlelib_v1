@@ -19,12 +19,10 @@
    calculates how much time has elapsed since the local time was originally 
    acquired from one of the NTP servers.
 
-   Note that time_gettime() will raise TimeError if no NTP server responded
-   (this is a blocking function, so nothing else will be executed in your
-   program until time_gettime() has completed by either obtaining the time or
-   raising TimeError exception).  If this fails for you, then you can call
-   time_updatetime(localport) again to sample time from another random set of
-   NTP servers.
+   Note that time_gettime() will raise TimeError if no NTP server responded or
+   if time_updatetime(localport) was never previously called.  If time_gettime()
+   fails, then time_updatetime(localport) can be called again to sample time
+   from another random set of NTP servers.
 """
 
 
@@ -51,12 +49,26 @@ def time_decode_NTP_packet(ip, port, mess, ch):
   stopcomm(ch)
 
 
-# sets a remote time as the current time
-#BUG: Do I need to compensate for the time taken to contact the time server
+
+
+"""
+   Postconditions: sets a remote time as the current time.
+"""
+
 def time_settime(currenttime):
   time_query_times.append((getruntime(), currenttime))
 
 
+
+"""
+   Preconditions: getmyip() will not fail when called and one of the subset of
+                  NTP servers will respond, otherwise a TimeError exception is
+                  raised.
+   Postconditions: obtains and stores the local time from a subset of NTP
+                   servers.
+"""
+
+#BUG: Do I need to compensate for the time taken to contact the time server?
 def time_updatetime(localport):
   try:
     ip = getmyip()
@@ -96,6 +108,14 @@ def time_updatetime(localport):
   # Failure, tried servers without luck...
   raise TimeError, "Time Server update failed.  Perhaps retry later..."
 
+
+"""
+   Preconditions: time_updatetime(localport) has previously been called and has
+                  not raised an unresolved TimeError exception.
+   Postconditions: returns the current time in seconds by calculating how much
+                   time has elapsed since the local time was obtained from an
+                   NTP server via the time_updatetime(localport) function.
+"""
 
 def time_gettime():
   if time_query_times == []:
