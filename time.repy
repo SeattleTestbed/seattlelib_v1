@@ -50,26 +50,51 @@ def time_decode_NTP_packet(ip, port, mess, ch):
 
 
 
-
-"""
-   Postconditions: sets a remote time as the current time.
-"""
-
 def time_settime(currenttime):
+  """
+   <Purpose>
+    Sets a remote time as the current time.
+
+   <Arguments>
+    currenttime:
+               The remote time to be set as the current time.
+
+   <Exceptions>
+    None.
+
+   <Side Effects>
+    Adjusts the current time.
+
+   <Returns>
+    None.
+  """
+
   time_query_times.append((getruntime(), currenttime))
 
 
 
-"""
-   Preconditions: getmyip() will not fail when called and one of the subset of
-                  NTP servers will respond, otherwise a TimeError exception is
-                  raised.
-   Postconditions: obtains and stores the local time from a subset of NTP
-                   servers.
-"""
-
-#BUG: Do I need to compensate for the time taken to contact the time server?
+#BUG: Do I need to compensate for the time taken to contact the time server?    (#353)
 def time_updatetime(localport):
+  """
+   <Purpose>
+    Obtains and stores the local time from a subset of NTP servers.
+
+   <Arguments>
+    localport:
+             The local port to be used when contacting the NTP server(s).
+
+   <Exceptions>
+    TimeError when getmyip() fails or one of the subset of NTP servers will not
+    respond.
+
+   <Side Effects>
+    time_settime(currenttime) is called as the subprocess of a subprocess, which
+    adjusts the current time.
+
+   <Returns>
+    None.
+  """
+
   try:
     ip = getmyip()
   except Exception, e:
@@ -109,15 +134,28 @@ def time_updatetime(localport):
   raise TimeError, "Time Server update failed.  Perhaps retry later..."
 
 
-"""
-   Preconditions: time_updatetime(localport) has previously been called and has
-                  not raised an unresolved TimeError exception.
-   Postconditions: returns the current time in seconds by calculating how much
-                   time has elapsed since the local time was obtained from an
-                   NTP server via the time_updatetime(localport) function.
-"""
 
 def time_gettime():
+  """
+   <Purpose>
+    Gives the current time in seconds by calculating how much time has elapsed
+    since the local time was obtained from an NTP server via the
+    time_updatetime(localport) function.
+
+   <Arguments>
+    None.
+
+   <Exceptions>
+    TimeError when time_updatetime(localport)has not previously been called or 
+    when time_updatetime(localport) has any unresolved TimeError exceptions.
+
+   <Side Effects>
+    None.
+
+   <Returns>
+    Current time in seconds.
+  """
+
   if time_query_times == []:
     raise TimeError
 
@@ -128,6 +166,8 @@ def time_gettime():
   elapsedtimesinceupdate = getruntime() - latest_update[0]
 
   return latest_update[1] + elapsedtimesinceupdate
+
+
 
 # in case you want to change to time since the 1970 (as is common)
 time_seconds_from_1900_to_1970 = 2208988800
