@@ -1,0 +1,50 @@
+include xmlrpc_server.repy
+
+if callfunc == 'initialize':
+
+  # Simple hardcoded test -- this will probably be easier to write tests for
+  # once the client code is in place.
+
+  def foo(i):
+    return i == 42
+
+  server = xmlrpc_server_SimpleXMLRPCServer(("localhost", 12345))
+  server.register_function(foo)
+  server.serve_nonblocking()
+
+  socket = openconn("localhost", 12345)
+
+  socket.send(\
+      "POST /RPC2 HTTP/1.0\r\n" + \
+      "Host: localhost\r\n" + \
+      "Content-Type: text/xml\r\n" + \
+      "\r\n" + \
+      "<?xml version=\"1.0\"?>" + \
+      "<methodCall>" + \
+      "  <methodName>foo</methodName>" + \
+      "  <params>" + \
+      "    <param>" + \
+      "      <value><i4>42</i4></value>" + \
+      "    </param>" + \
+      "  </params>" + \
+      "</methodCall>")
+
+  res = socket.recv(4096)
+
+  socket.close()
+  server.shutdown()
+
+  assert(res == \
+"""HTTP/1.0 200 OK
+Server: SimpleXMLRPCServer on Repy
+Content-type: text/xml
+Content-length: 135
+
+<?xml version='1.0'?>
+<methodResponse>
+<params>
+<param>
+<value><boolean>1</boolean></value>
+</param>
+</params>
+</methodResponse>""".replace("\n","\r\n"))
