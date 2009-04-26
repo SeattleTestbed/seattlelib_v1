@@ -1,86 +1,5 @@
 include xmlparse.repy
-
-def xmlrpc_server_urlencode(string):
-  """
-  <Purpose>
-    Encode a string such that it can be used safely in a URL or XML
-    document.
-
-  <Arguments>
-    string:
-           The string to urlencode.
-
-  <Exceptions>
-    None.
-
-  <Side Effects>
-    None.
-
-  <Returns>
-    Urlencoded version of the passed string.
-  """
-
-  resultstr = ""
-
-  # We go through each character in the string; if it's not in [0-9a-zA-Z]
-  # we wrap it.
-
-  for char in string:
-    asciicode = ord(char)
-    if (asciicode >= ord("0") and asciicode <= ord("9")) or \
-        (asciicode >= ord("A") and asciicode <= ord("Z")) or \
-        (asciicode >= ord("a") and asciicode <= ord("z")):
-      resultstr += char
-    else:
-      resultstr += "%%%x" % asciicode
-
-  return resultstr
-
-
-
-
-def xmlrpc_server_urldecode(string):
-  """
-  <Purpose>
-    Decode a urlencoded string.
-
-  <Arguments>
-    string:
-           The string to urldecode.
-
-  <Exceptions>
-    None.
-
-  <Side Effects>
-    None.
-
-  <Returns>
-    The decoded string.
-  """
-
-  resultstr = ""
-
-  # We go through the string from end to beginning, looking for wrapped
-  # octets. When one is found we add it (unwrapped) and the following
-  # string to the resultant string, and shorten the original string.
-
-  while True:
-    lastpercentlocation = string.rfind("%")
-    if lastpercentlocation < 0:
-      break
-
-    resultstr = \
-        chr(int(string[lastpercentlocation+1:lastpercentlocation+3], 16)) + \
-        string[lastpercentlocation+3:] + \
-        resultstr
-    string = string[:lastpercentlocation]
-
-  resultstr = string + resultstr
-  return resultstr
-
-
-
-
+include urllib.repy
 
 def _xmlrpc_server_lookup_ip(hostname):
   # Looks up an ip address for a given hostmask.  Throws an exception for
@@ -137,7 +56,7 @@ def _xmlrpc_server_valuenode_to_python(valuenode):
   if valuenode.children is None:
     # The XMLRPC spec says that values without explicit type are assumed
     # to be strings.
-    return xmlrpc_server_urldecode(valuenode.content)
+    return urllib_unquote(valuenode.content)
 
   if len(valuenode.children) != 1:
     raise xmlrpc_server_ClientError()
@@ -148,7 +67,7 @@ def _xmlrpc_server_valuenode_to_python(valuenode):
     if typenode.content is None:
       raise xmlrpc_server_ClientError()
 
-    return xmlrpc_server_urldecode(typenode.content)
+    return urllib_unquote(typenode.content)
 
   elif typenode.tag_name == "boolean":
     if typenode.content is None:
@@ -251,7 +170,7 @@ def _xmlrpc_server_python_to_xmlvalue(pythonval):
   elif type(pythonval) == type(True):
     response += "<boolean>" + str(int(pythonval)) + "</boolean>"
   elif type(pythonval) == type(""):
-    response += "<string>" + xmlrpc_server_urlencode(pythonval) + "</string>"
+    response += "<string>" + urllib_quote(pythonval) + "</string>"
   elif type(pythonval) == type(xmlrpc_server_Binary()):
     response += "<base64>" + base64_b64encode(pythonval.data) + "</base64>"
   elif type(pythonval) == type([]):
