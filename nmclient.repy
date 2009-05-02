@@ -162,7 +162,7 @@ def nmclient_signedcommunicate(nmhandle, *args):
       session_sendmessage(thisconnobject, signeddata)
       message = session_recvmessage(thisconnobject)
     except Exception, e:
-      raise NMClientException, str(e)
+      raise NMClientException, "signedcommunicate failed on session_sendmessage or session_recvmessage with error '"+str(e)+"'"
     return message
   finally:
     thisconnobject.close()
@@ -285,6 +285,7 @@ def nmclient_rawsay(nmhandle, *args):
 
 # Public:  Use this for signed operations...
 def nmclient_signedsay(nmhandle, *args):
+
   fullresponse = nmclient_signedcommunicate(nmhandle, *args)
 
   try:
