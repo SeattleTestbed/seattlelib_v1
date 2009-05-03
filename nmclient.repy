@@ -160,9 +160,16 @@ def nmclient_signedcommunicate(nmhandle, *args):
 
     try:
       session_sendmessage(thisconnobject, signeddata)
+    except Exception, e:
+      # label the exception and change the type...
+      raise NMClientException, "signedcommunicate failed on session_sendmessage with error '"+str(e)+"'"
+
+    try:
       message = session_recvmessage(thisconnobject)
     except Exception, e:
-      raise NMClientException, "signedcommunicate failed on session_sendmessage or session_recvmessage with error '"+str(e)+"'"
+      # label the exception and change the type...
+      raise NMClientException, "signedcommunicate failed on session_recvmessage with error '"+str(e)+"'"
+
     return message
   finally:
     thisconnobject.close()
