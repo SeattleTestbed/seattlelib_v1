@@ -1,0 +1,94 @@
+"""
+  Author: Zachary Boka
+    timefromservice.repy
+
+  Start Date: 3 May 2009
+
+  Description:
+
+    Contacts server running time_server.repy to get the current time from an NTP
+    because only the server can communicate with an NTP.
+
+    To use this module, make one call to timefromservice_updatetime() to get the
+    time from the server.  This function also implicitly sets the time.  Then
+    call timefromservice_gettime() every time the current time is needed.
+
+"""
+
+
+include centralizedadvertise.repy
+
+include time.repy
+
+
+
+
+
+# This function contacts the server to get the time from an NTP
+def timefromservice_updatetime():
+  """
+  <Purpose>
+    Opens a connection with the server to get the current time via a NTP,
+    then calls time_settime(float(currenttime)) to set the current time to the
+    received value form the server.
+
+  <Arguments>
+    None.
+
+  <Exceptions>
+    None.
+
+  <Side Effects>
+    time_settime(float(currenttime)) is called to set the time.
+
+  <Returns>
+    None.
+
+"""
+
+
+  # Get the server's ip and port, retrying every tiem there is an exception
+  gotval = False
+  while gotval != True:
+    try:
+      value = centralizedadvertise_lookup("time_server")
+    except Exception,e:
+      print e, " looking up server's ip and port again..."
+      sleep(10)                       # Look up the value again in 10 seconds
+    else:
+      gotval = True                   # Successfully obtained the value
+
+  remoteip = value[0]
+  remoteport = int(value[1])
+
+
+  timelength = 25  # Length of the time, as a string, to receive from server
+
+
+  # Open a connection with the server, retrying every time there is an exception
+  connect = True
+  while connect:
+    try:
+      sockobject = openconn(remoteip,remoteport)
+    except Exception,e:
+      print e, " retrying to connect to server..."
+    else:
+      connect = False         # Successfully connected with the server
+
+
+  currenttime = sockobject.recv(timelength)
+
+  sockobject.close()
+
+  timefromservice_settime(float(currenttime))
+
+
+
+# This function provides the same interface as time_settime in time.repy
+def timefromservice_settime(currenttime):
+  time_settime(currenttime)
+
+
+# This function provides the same interface as time_gettime() in time.repy
+def timefromservice_gettime():
+  return time_gettime()
