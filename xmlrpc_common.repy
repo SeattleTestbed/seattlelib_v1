@@ -289,47 +289,6 @@ def xmlrpc_value_to_xml(obj):
   return xml_string
 
 
-def xmlrpc_xml_to_python(xml):
-  """
-  <Purpose>
-    Convert a XML-RPC payload to its Python equivalent.
-
-  <Arguments>
-    xml:
-      The XML-RPC string to convert.
-
-  <Exceptions>
-    xmlrpc_Fault on decoding a XML-RPC fault.
-    xmlrpc_XMLParseError on XML-RPC data parse error.
-    xmlparse_XMLParseError on XML decoding error.
-
-  <Side Effects>
-    None.
-
-  <Returns>
-    A pair with (1) a boolean indicating this is a method call if True
-    or a method response if False and (2) the method arguments or
-    response, depending on (1).
-
-  """
-  try:
-    return xmlrpc_method_call_to_python(xml)
-  except xmlrpc_XMLParseError:
-    pass
-
-  try:
-    return xmlrpc_method_response_to_python(xml)
-  except xmlrpc_XMLParseError:
-    pass
-
-  try:
-    return xmlrpc_method_fault_to_xml(xml)
-  except xmlrpc_XMLParseError:
-    pass
-
-  raise xmlrpc_XMLParseError()
-
-
 def xmlrpc_method_call_to_python(xml):
   """
   <Purpose>

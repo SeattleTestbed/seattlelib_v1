@@ -168,3 +168,5 @@ fault</string></value></member></struct></value></fault>\
   actual_output = xmlrpc_method_response_to_python(test_input)
   assert(expected_output_faultString == actual_output.message)
   assert(expected_output_faultCode == actual_output.code)
+
+  print "All tests passed"

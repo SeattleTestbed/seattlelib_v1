@@ -207,3 +207,5 @@ hb4Ch97aqA=='
   assert(standard_b64decode(encoded_string) == decoded_string)
   assert(urlsafe_b64encode(decoded_string) == safe_encoded_string)
   assert(urlsafe_b64decode(safe_encoded_string) == decoded_string)
+
+  print "All tests passed"
