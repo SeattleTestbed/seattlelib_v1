@@ -1,0 +1,17 @@
+# Armon Dadgar
+# Tests the rsa.repy file.
+#
+
+include rsa.repy
+
+if callfunc == "initialize":
+   # Test rsa_matching_keys
+   privategood = rsa_file_to_privatekey("good.privatekey")
+   publicgood = rsa_file_to_publickey("good.publickey")
+   publicjustin = rsa_file_to_publickey("justin.publickey")
+
+   goodwithgood = rsa_matching_keys(privategood, publicgood)
+   goodwithjustin = rsa_matching_keys(privategood, publicjustin)
+   assert(goodwithgood == True)
+   assert(goodwithjustin == False) 
+
