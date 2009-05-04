@@ -1,0 +1,146 @@
+"""
+<Program Name>
+  xmlrpc_client.py
+
+<Started>
+  May 3, 2009
+
+<Author>
+  Michael Phan-Ba
+
+<Purpose>
+  Implements the client-side XML-RPC protocol.
+
+"""
+
+
+include xmlrpc_common.repy
+
+
+class xmlrpc_Client(object):
+  """
+  <Purpose>
+    XML-RPC client implementation.
+
+  <Side Effects>
+    None.
+
+  <Example Use>
+    client = xmlrpc_Client("phpxmlrpc.sourceforge.net",
+      server_path="/server.php")
+    print client.send_request("examples.getStateName", (1,))
+
+  """
+
+  USER_AGENT = "seattlelib/1.0.0"
+
+  def __init__(self, host, **kwargs):
+    """
+    <Purpose>
+      Create a new XML-RPC Client object.
+
+    <Arguments>
+      host:
+        The host on which the XML-RPC server is located.
+
+    <Keyword Arguments>
+      server_port:
+        The port on the server to use.
+
+      server_path:
+        The URL path on the server to use.
+
+    <Exceptions>
+      None.
+
+    """
+
+    self.server_host = host
+
+    try:
+      self.server_port = kwargs["server_port"]
+    except KeyError:
+      self.server_port = 80
+
+    try:
+      self.server_path = kwargs["server_path"]
+    except KeyError:
+      self.server_path = "/"
+
+  def send_request(self, method_name, params):
+    """
+    <Purpose>
+      Send an XML-RPC request.
+
+    <Arguments>
+      method_name:
+        The method name.
+
+      params:
+        The method parameters.
+
+    <Exceptions>
+      xmlrpc_Fault on a XML-RPC response fault.
+      xmlrpc_XMLParseError on a XML-RPC structural parse error.
+      xmlparse_XMLParseError on a general XML parse error.
+
+    <Side Effects>
+      None.
+
+    <Returns>
+      The XML-RPC method return values.
+
+    """
+
+    request_xml = xmlrpc_method_call_to_xml(method_name, params)
+
+    socket = openconn(self.server_host, self.server_port)
+
+    socket.send("POST %s HTTP/1.1\r\n" % self.server_path)
+    socket.send("User-Agent: %s\r\n" % self.USER_AGENT)
+    socket.send("Host: %s\r\n" % self.server_host)
+    socket.send("Content-Type: text/xml\r\n")
+    socket.send("Content-Length: %d\r\n" % len(request_xml))
+    socket.send("\r\n")
+    socket.send(request_xml)
+
+    response = socket.recv(4096)
+    while not response.find("\r\n\r\n"):
+      response += socket.recv(4096)
+
+    raw_header, raw_content = response.split("\r\n\r\n", 1)
+    raw_header_lines = raw_header.split("\r\n")
+
+    if raw_header_lines[0] != "HTTP/1.1 200 OK":
+      raise ValueError("Did not receive a valid response")
+
+    content_size = 0
+
+    for line in raw_header_lines[1:]:
+      header_tag, header_value = line.split(":", 1)
+      if header_tag.strip().lower() == "content-length":
+        content_size = int(header_value.strip())
+
+    while len(raw_content) < content_size:
+      raw_content += socket.recv(4096)
+
+    xml_response = raw_content[0:content_size]
+
+    # Workaround to Ticket #362: remove the comments
+    while True:
+      comment_start = xml_response.find("<!--")
+      if comment_start >= 0:
+        comment_end = xml_response.find("-->", comment_start) + 3
+      else:
+        break
+      xml_response = xml_response[0:comment_start] + \
+        xml_response[comment_end:]
+
+    response_value = xmlrpc_method_response_to_python(xml_response)
+
+    socket.close()
+
+    if isinstance(response_value, xmlrpc_Fault):
+      raise response_value
+
+    return response_value

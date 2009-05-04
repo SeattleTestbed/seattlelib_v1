@@ -1,0 +1,40 @@
+"""
+<Program Name>
+  testxmlrpc_client.py
+
+<Started>
+  May 3, 2009
+
+<Author>
+  Michael Phan-Ba
+
+<Purpose>
+  Runs unit tests on xmlrpc_client.repy.
+
+"""
+
+
+include xmlrpc_client.repy
+
+
+if callfunc == 'initialize':
+
+  client = xmlrpc_Client("phpxmlrpc.sourceforge.net",
+    server_path="/server.php")
+
+  expected_output = "Alabama"
+  actual_output = client.send_request("examples.getStateName", (1,))
+  assert(expected_output == actual_output)
+
+  expected_output = "Washington"
+  actual_output = client.send_request("examples.getStateName", (48,))
+  assert(expected_output == actual_output)
+
+  exception_raised = False
+  try:
+    client.send_request("examples.getStateName", ("3",))
+  except xmlrpc_Fault:
+    exception_raised = True
+  assert(exception_raised)
+
+  print "All tests passed"
