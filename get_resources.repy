@@ -7,96 +7,94 @@ Given a vessel name the functions finds the correct vessel and print out all the
 include nmclient.repy
 include rsa.repy
 
-"""
-<Purpose>
-  Find all the vessels that have the port number requested and then return a dictionary with all the resources
+def get_vesselport_resources(portnum):
+  """
+  <Started>
+    April 25, 2009
 	
-<Arguments>
-  pubkey(string) - the public key of user encrypted into 
-  portNum(int) - the port number that the user is looking for 
+  <Author>
+    Monzur Muhammad
 	
-<Result>
-  returns a dictionary where the keys are the vessel name and the values are a list of resources
-"""
-def get_vesselPort_resources(portNum, pubkey):	
-
-  #checks to see if  public key is valid
-  if not rsa_is_valid_publickey(pubkey):
-    raise ValueError, "Invalid public key"
-
-  nmhandle = nmclient_createhandle(getmyip(), 1224)
+  <Purpose>
+    Find all the vessels that have the port number requested and then return a dictionary with all the vessels
+	and their resources that are available
 	
-  #dictionary that contains all the resources for the vessel
-  resultDict={}
+  <Arguments>
+    pubkey(string) - the public key of user encrypted into 
+    portnum(int) - the port number that the user is looking for 
 	
-  #get a list of all the vessels that the user can access/use
-  vessel_group = nmclient_listaccessiblevessels(nmhandle, pubkey)
-	
-  #go through the two groups of vessels. vessel_group is in the form ([][])
-  for group in vessel_group:
-	
-    for cur_vessel in group:
-
-      #if the list is null, then ignore it and move on to the next vessel name
-      try:
-        fullresources = nmclient_rawsay(nmhandle, "GetVesselResources",cur_vessel)
-      except:
-        continue
-			
-      #check to see if the current vessel has the port number as one of the resource, if not then continue on to the next vessel
-      if not str(portNum) in fullresources:
-        continue
-			
-      else:
-        #initialize the value for the current vessel as an empty list
-        resultDict[cur_vessel]=[]
-				
-        for cur_resource in fullresources.split('\n'):
-          if 'resource' in cur_resource:
-            #gets rid of the keyword 'resource' and just adds the port numbers and their type to the dictionary
-            resultDict[cur_vessel].append(cur_resource.split('resource')[1].split('#')[0])
-					
-  return resultDict
-
-  
-"""
-<Purpose>
-	Given a vessel name, find all the resources available for that vessel and return a dictionary of the resources
-	
-<Arguments>
-	pubkey(string) - the public key of user encrypted into 
-	vesselname(string) - the vessel that the user wants the resource for
-	
-<Result>
-	returns a dictionary where the keys are the vessel name and the values are a list of resources
-"""	
-def get_vesselName_resources(vesselName, pubkey):
-
-  #checks to see if  public key is valid
-  if not rsa_is_valid_publickey(pubkey):
-    raise ValueError, "Invalid public key"
+  <Result>
+    returns a dictionary where the keys are the vessel name and the values are a list of resources
+  """
 
   nmhandle = nmclient_createhandle(getmyip(), 1224)
 	
   #dictionary that contains all the resources for the vessel
-  resultDict={}
+  resultdict={}
+	
+  #get a list of all the vessels 
+  vessel_group = nmclient_getvesseldict(nmhandle)
+	
+  #go through all the vessels 
+  for cur_vessel in vessel_group['vessels']:
+    resource_dict=get_vesselname_resources(cur_vessel)
+			
+    #check to see if the current vessel has the port number as one of the resource, if not then continue on to the next vessel
+    if str(portnum) in resource_dict[cur_vessel]['messport']:
+      resultdict[cur_vessel]=get_vesselname_resources(cur_vessel)[cur_vessel]
+			
+  return resultdict
+
+def get_vesselname_resources(vesselname):
+  """
+   <Started>
+    April 25, 2009
+	
+  <Author>
+    Monzur Muhammad
+	
+  <Purpose>
+    Given a vessel name, find all the resources available for that vessel and return a dictionary of the resources for that vessel
+	
+  <Arguments>
+    pubkey(string) - the public key of user encrypted into 
+    vesselname(string) - the vessel that the user wants the resource for
+	
+  <Result>
+    returns a dictionary where the keys are the vessel name and the values are a list of resources
+  """	
+
+  nmhandle = nmclient_createhandle(getmyip(), 1224)
+	
+  #dictionary that contains all the resources for the vessel
+  resultdict={}
 
   #initialize the list for the vessel that the user is looking for  
-  resultDict[vesselName]=[]
+  resultdict[vesselname]={}
 	
   #if vessel name is invalid, throw an error
   try:
-    fullresources = nmclient_rawsay(nmhandle, "GetVesselResources",vesselName)
+    fullresources = nmclient_rawsay(nmhandle, "GetVesselResources",vesselname)
   except InvalidVessel:
     raise VesselError, "Invalid vessel name"
 
   for cur_resource in fullresources.split('\n'):
     if 'resource' in cur_resource:
-      #gets rid of the keyword 'resource' and just adds the port numbers and their type to the return string
-      resultDict[vesselName].append(cur_resource.split('resource')[1].split('#')[0])
-		
-  return resultDict
+      #gets rid of the keyword 'resource ' and then seperates the resource name and the resource value
+	  resource = cur_resource.split('resource ')[1].split('#')[0]
+	  resource_name = resource.split(' ')[0]
+	  resource_value = resource.split(' ')[1]
+	  
+	  #if its a new type of resource then add it in the dictionary as an empty list
+	  if not resource_name in resultdict[vesselname].keys():
+	    resultdict[vesselname][resource_name]=[]
+	  
+	  #adds the resrouce value in the list for the resource
+	  resultdict[vesselname][resource_name].append(resource_value)
+	  
+  return resultdict
 					
 
+	
 	
 
