@@ -19,7 +19,7 @@ include xmlrpc_client.repy
 
 if callfunc == 'initialize':
 
-  client = xmlrpc_Client("phpxmlrpc.sourceforge.net",
+  client = xmlrpc_client_Client("phpxmlrpc.sourceforge.net",
     server_path="/server.php")
 
   expected_output = "Alabama"
@@ -33,7 +33,7 @@ if callfunc == 'initialize':
   exception_raised = False
   try:
     client.send_request("examples.getStateName", ("3",))
-  except xmlrpc_Fault:
+  except xmlrpc_common_Fault:
     exception_raised = True
   assert(exception_raised)
 
