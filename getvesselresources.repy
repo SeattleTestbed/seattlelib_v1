@@ -1,5 +1,7 @@
 """
+Program Name: getvesselresources.repy
 Author: Monzur Muhammad
+Started: April 25, 2009
 Description:
 Given a vessel name the functions finds the correct vessel and print out all the resources available.
 """
@@ -111,7 +113,16 @@ def get_vesselname_resources(vesselname, ipaddr=getmyip(), portval=1224):
 	  
   return resultdict
 					
+if callfunc == 'initialize':
 
+  tempDict=get_vesselname_resources('v4')
+  print tempDict.keys()
+  print tempDict.values()
+  
+  tempDict=get_vesselport_resources(63159)
+
+  print tempDict.keys()
+  print tempDict.values()
 	
 	
 
