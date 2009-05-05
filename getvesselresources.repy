@@ -49,8 +49,8 @@ def get_vesselport_resources(portnum):
     if str(portnum) in resource_dict[cur_vessel]['messport']:
       resultdict[cur_vessel]=resource_dict[cur_vessel]
 	
-	elif str(portnum) in resource_dict[cur_vessel]['connport']:
-	  resultdict[cur_vessel]=resource_dict[cur_vessel]
+    elif str(portnum) in resource_dict[cur_vessel]['connport']:
+      resultdict[cur_vessel]=resource_dict[cur_vessel]
 			
   return resultdict
 
@@ -67,8 +67,8 @@ def get_vesselname_resources(vesselname, ipaddr=getmyip(), portval=1224):
 	
   <Arguments>
     vesselname(string) - the vessel that the user wants the resource for
-	ipaddr-the ip address for which to get the vessels for. By default its local ip address
-	portval-the port number for which to find vessels. By defaults its 1224
+    ipaddr-the ip address for which to get the vessels for. By default its local ip address
+    portval-the port number for which to find vessels. By defaults its 1224
 
   <Exceptions>
     Throws InvalidVessel exception on an invalide vessel name input
