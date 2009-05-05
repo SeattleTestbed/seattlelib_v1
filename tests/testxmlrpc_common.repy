@@ -80,6 +80,13 @@ if callfunc == 'initialize':
     error_raised = True
   assert(error_raised)
 
+  error_raised = False
+  try:
+    xmlrpc_common_value_to_xml(ValueError())
+  except ValueError:
+    error_raised = True
+  assert(error_raised)
+
   # Test xmlrpc_common_params_to_xml for correctness.
 
   expected_output = "<params><param><value><int>1</int></value></param>\
