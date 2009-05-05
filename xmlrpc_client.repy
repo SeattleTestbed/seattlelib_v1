@@ -97,7 +97,7 @@ class xmlrpc_client_Client(object):
     request_xml = xmlrpc_common_method_call_to_xml(method_name, params)
 
     # Open the connection to the server with a default timeout of 10sec.
-    socket = openconn(self.server_host, self.server_port, None, 0, 10)
+    socket = openconn(self.server_host, self.server_port, timeout=10)
 
     # Send HTTP headers.
     socket.send("POST %s HTTP/1.1\r\n" % self.server_path)
