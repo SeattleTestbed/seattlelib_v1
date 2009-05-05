@@ -334,6 +334,8 @@ def xmlrpc_common_method_call_to_python(xml):
   if xml_node.tag_name != "methodCall":
     message = "Unexpected root node: %s" % xml_node.tag_name
     raise xmlrpc_common_XMLParseError(message)
+  elif xml_node.children is None:
+    raise xmlrpc_common_XMLParseError("No parameters found")
   elif len(xml_node.children) > 2:
     raise xmlrpc_common_XMLParseError("Too many children for 'methodCall'")
 
@@ -349,6 +351,9 @@ def xmlrpc_common_method_call_to_python(xml):
   try:
     params = xmlrpc_common_params_to_python(xml_node.children[1])
   except KeyError:
+    raise xmlrpc_common_XMLParseError("No parameters found")
+
+  if not params:
     raise xmlrpc_common_XMLParseError("No parameters found")
 
   return (method_name, params)
@@ -382,22 +387,29 @@ def xmlrpc_common_method_response_to_python(xml):
   if xml_node.tag_name != "methodResponse":
     message = "Unexpected root node: %s" % xml_node.tag_name
     raise xmlrpc_common_XMLParseError(message)
+  elif xml_node.children is None:
+    raise xmlrpc_common_XMLParseError("No parameters found")
   elif len(xml_node.children) > 1:
     raise xmlrpc_common_XMLParseError("Too many children for 'methodCall'")
 
   fault_node = xml_node.children[0]
   if fault_node.tag_name == "fault":
-    if len(fault_node.children) > 1:
+    if fault_node.children is None:
+      raise xmlrpc_common_XMLParseError("No children found for 'fault'")
+    elif len(fault_node.children) != 1:
       raise xmlrpc_common_XMLParseError("Too many children for 'fault'")
     params = xmlrpc_common_value_to_python(fault_node.children[0])
-    return xmlrpc_common_Fault(params["faultString"], params["faultCode"])
+    try:
+      return xmlrpc_common_Fault(params["faultString"], params["faultCode"])
+    except KeyError:
+      raise xmlrpc_common_XMLParseError("Invalid fault object")
 
   try:
     params = xmlrpc_common_params_to_python(xml_node.children[0])
   except KeyError:
     raise xmlrpc_common_XMLParseError("No parameters found")
 
-  if len(params) > 1:
+  if len(params) != 1:
     raise xmlrpc_common_XMLParseError("Too many children for 'params'")
 
   return params[0]
@@ -430,13 +442,18 @@ def xmlrpc_common_params_to_python(xml_node):
     message = "Unexpected XML node: %s" % xml_node.tag_name
     raise xmlrpc_common_XMLParseError(message)
 
+  if xml_node.children is None or len(xml_node.children) < 1:
+    return []
+
   params = []
 
   for param_node in xml_node.children:
     if param_node.tag_name != "param":
       message = "Unexpected XML node: %s" % param_node.tag_name
       raise xmlrpc_common_XMLParseError(message)
-    if len(param_node.children) > 1:
+    elif param_node.children is None:
+      raise xmlrpc_common_XMLParseError("Unexpected empty param node")
+    elif len(param_node.children) > 1:
       raise xmlrpc_common_XMLParseError("Too many children for 'param'")
     params.append(xmlrpc_common_value_to_python(param_node.children[0]))
 
