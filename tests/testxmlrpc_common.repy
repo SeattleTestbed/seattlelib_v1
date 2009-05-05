@@ -48,7 +48,7 @@ if callfunc == 'initialize':
   right_index = actual_output.rfind(right_expected_output)
   assert(right_index > left_index)
   output_value = float(actual_output[left_index:right_index])
-  assert(input_value == output_value)
+  assert(-0.00001 < input_value - output_value < 0.00001)
 
   expected_output = "<value><array><data><value><int>1</int></value>\
 <value><string>a</string></value><value><boolean>1</boolean></value>\
