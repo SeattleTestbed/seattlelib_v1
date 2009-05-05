@@ -113,16 +113,16 @@ class xmlrpc_client_Client(object):
     # Receive the raw response.  If the server does not respond before
     # the timeout, a socket.error exception will be raised.
     response = socket.recv(4096)
-    while not response.find("\r\n\r\n"):
+    while response.find("\r\n\r\n") < 0:
       response += socket.recv(4096)
 
     # Separate the header from the response body.
     raw_header, raw_content = response.split("\r\n\r\n", 1)
     raw_header_lines = raw_header.split("\r\n")
 
-    # Parse headers for the appropriate server response.  HTTP/1.1 was
-    # used, so it is also expected.
-    if raw_header_lines[0] != "HTTP/1.1 200 OK":
+    # Parse headers for the appropriate server response.
+    if raw_header_lines[0] != "HTTP/1.1 200 OK" and \
+      raw_header_lines[0] != "HTTP/1.0 200 OK":
       raise ValueError("Invalid response protocol: %s" % raw_header_lines[0])
 
     # The response content size is initially 0.

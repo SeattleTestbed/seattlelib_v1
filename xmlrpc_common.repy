@@ -226,6 +226,9 @@ def xmlrpc_common_params_to_xml(params):
     The XML-RPC parameters string.
 
   """
+  if params is None:
+    return "<params><param><value><nil/></value></param></params>"
+
   xml_string = ["<params>"]
 
   for param in params:
