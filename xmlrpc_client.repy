@@ -80,8 +80,8 @@ class xmlrpc_Client(object):
         The method parameters.
 
     <Exceptions>
-      xmlrpc_Fault on a XML-RPC response fault.
-      xmlrpc_XMLParseError on a XML-RPC structural parse error.
+      xmlrpc_common_Fault on a XML-RPC response fault.
+      xmlrpc_common_XMLParseError on a XML-RPC structural parse error.
       xmlparse_XMLParseError on a general XML parse error.
 
     <Side Effects>
@@ -92,7 +92,7 @@ class xmlrpc_Client(object):
 
     """
 
-    request_xml = xmlrpc_method_call_to_xml(method_name, params)
+    request_xml = xmlrpc_common_method_call_to_xml(method_name, params)
 
     socket = openconn(self.server_host, self.server_port)
 
@@ -136,11 +136,11 @@ class xmlrpc_Client(object):
       xml_response = xml_response[0:comment_start] + \
         xml_response[comment_end:]
 
-    response_value = xmlrpc_method_response_to_python(xml_response)
+    response_value = xmlrpc_common_method_response_to_python(xml_response)
 
     socket.close()
 
-    if isinstance(response_value, xmlrpc_Fault):
+    if isinstance(response_value, xmlrpc_common_Fault):
       raise response_value
 
     return response_value

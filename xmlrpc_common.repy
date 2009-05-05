@@ -23,7 +23,7 @@ include xmlparse.repy
 
 
 
-class xmlrpc_Binary(object):
+class xmlrpc_common_Binary(object):
   """
   <Purpose>
     Wrapper class for base64-encoded binary data in XML-RPC requests and
@@ -33,7 +33,7 @@ class xmlrpc_Binary(object):
     None.
 
   <Example Use>
-    blob = xmlrpc_Binary("\x00\x01\x00")
+    blob = xmlrpc_common_Binary("\x00\x01\x00")
 
   """
 
@@ -56,7 +56,7 @@ class xmlrpc_Binary(object):
 
 
 
-class xmlrpc_Fault(ValueError):
+class xmlrpc_common_Fault(ValueError):
   """
   <Purpose>
     Exception representing a XML-RPC Fault.
@@ -65,7 +65,7 @@ class xmlrpc_Fault(ValueError):
     None.
 
   <Example Use>
-    raise xmlrpc_Fault("An error occurred", -1)
+    raise xmlrpc_common_Fault("An error occurred", -1)
 
   """
 
@@ -93,7 +93,7 @@ class xmlrpc_Fault(ValueError):
 
 
 
-class xmlrpc_XMLParseError(ValueError):
+class xmlrpc_common_XMLParseError(ValueError):
   """
   <Purpose>
     Exception representing an error in parsing XML-RPC data.
@@ -102,7 +102,7 @@ class xmlrpc_XMLParseError(ValueError):
     None.
 
   <Example Use>
-    raise xmlrpc_XMLParseError()
+    raise xmlrpc_common_XMLParseError()
 
   """
 
@@ -110,7 +110,7 @@ class xmlrpc_XMLParseError(ValueError):
 
 
 
-def xmlrpc_method_call_to_xml(method_name, params):
+def xmlrpc_common_method_call_to_xml(method_name, params):
   """
   <Purpose>
     Build a XML-RPC method call.
@@ -135,13 +135,13 @@ def xmlrpc_method_call_to_xml(method_name, params):
   """
   xml_string = '<?xml version="1.0"?>'
   xml_string += "<methodCall><methodName>%s</methodName>" % method_name
-  xml_string += xmlrpc_params_to_xml(params)
+  xml_string += xmlrpc_common_params_to_xml(params)
   xml_string += "</methodCall>"
 
   return xml_string
 
 
-def xmlrpc_method_response_to_xml(param):
+def xmlrpc_common_method_response_to_xml(param):
   """
   <Purpose>
     Build a XML-RPC method response.
@@ -161,13 +161,13 @@ def xmlrpc_method_response_to_xml(param):
 
   """
   xml_string = '<?xml version="1.0"?><methodResponse>'
-  xml_string += xmlrpc_params_to_xml((param,))
+  xml_string += xmlrpc_common_params_to_xml((param,))
   xml_string += "</methodResponse>"
 
   return xml_string
 
 
-def xmlrpc_method_fault_to_xml(message, code):
+def xmlrpc_common_method_fault_to_xml(message, code):
   """
   <Purpose>
     Build a XML-RPC fault response.
@@ -191,13 +191,13 @@ def xmlrpc_method_fault_to_xml(message, code):
   """
   struct = {"faultCode": code, "faultString": message}
   xml_string = '<?xml version="1.0"?><methodResponse><fault>'
-  xml_string += xmlrpc_value_to_xml(struct)
+  xml_string += xmlrpc_common_value_to_xml(struct)
   xml_string += "</fault></methodResponse>"
 
   return xml_string
 
 
-def xmlrpc_params_to_xml(params):
+def xmlrpc_common_params_to_xml(params):
   """
   <Purpose>
     Translate Python values to XML-RPC parameters.
@@ -220,14 +220,14 @@ def xmlrpc_params_to_xml(params):
   xml_string = "<params>"
 
   for param in params:
-    xml_string += "<param>%s</param>" % xmlrpc_value_to_xml(param)
+    xml_string += "<param>%s</param>" % xmlrpc_common_value_to_xml(param)
 
   xml_string += "</params>"
 
   return xml_string
 
 
-def xmlrpc_value_to_xml(obj):
+def xmlrpc_common_value_to_xml(obj):
   """
   <Purpose>
     Translate a Python value to XML-RPC.
@@ -267,18 +267,18 @@ def xmlrpc_value_to_xml(obj):
   elif object_type in (list, tuple, xrange, set, frozenset):
     xml_string += "<array><data>"
     for value in obj:
-      xml_string += xmlrpc_value_to_xml(value)
+      xml_string += xmlrpc_common_value_to_xml(value)
     xml_string += "</data></array>"
 
   elif object_type is dict:
     xml_string += "<struct>"
     for key, value in obj.iteritems():
       xml_string += "<member><name>%s</name>" % key
-      xml_string += xmlrpc_value_to_xml(value)
+      xml_string += xmlrpc_common_value_to_xml(value)
       xml_string += "</member>"
     xml_string += "</struct>"
 
-  elif object_type is xmlrpc_Binary:
+  elif object_type is xmlrpc_common_Binary:
     xml_string += "<base64>%s</base64>" % base64_encode(obj)
 
   else:
@@ -289,7 +289,7 @@ def xmlrpc_value_to_xml(obj):
   return xml_string
 
 
-def xmlrpc_method_call_to_python(xml):
+def xmlrpc_common_method_call_to_python(xml):
   """
   <Purpose>
     Convert a XML-RPC method call to its Python equivalent.
@@ -299,7 +299,7 @@ def xmlrpc_method_call_to_python(xml):
       The XML-RPC string to convert.
 
   <Exceptions>
-    xmlrpc_XMLParseError on a XML-RPC structural parse error.
+    xmlrpc_common_XMLParseError on a XML-RPC structural parse error.
     xmlparse_XMLParseError on a general XML parse error.
 
   <Side Effects>
@@ -314,28 +314,28 @@ def xmlrpc_method_call_to_python(xml):
 
   if xml_node.tag_name != "methodCall":
     message = "Unexpected root node: %s" % xml_node.tag_name
-    raise xmlrpc_XMLParseError(message)
+    raise xmlrpc_common_XMLParseError(message)
   elif len(xml_node.children) > 2:
-    raise xmlrpc_XMLParseError("Too many children for 'methodCall'")
+    raise xmlrpc_common_XMLParseError("Too many children for 'methodCall'")
 
   try:
     method_name_node = xml_node.children[0]
     if method_name_node.tag_name != "methodName":
       message = "Unexpected XML node: %s" % method_name_node.tag_name
-      raise xmlrpc_XMLParseError(message)
+      raise xmlrpc_common_XMLParseError(message)
     method_name = method_name_node.content
   except KeyError:
-    raise xmlrpc_XMLParseError("No method name found")
+    raise xmlrpc_common_XMLParseError("No method name found")
 
   try:
-    params = xmlrpc_params_to_python(xml_node.children[1])
+    params = xmlrpc_common_params_to_python(xml_node.children[1])
   except KeyError:
-    raise xmlrpc_XMLParseError("No parameters found")
+    raise xmlrpc_common_XMLParseError("No parameters found")
 
   return (method_name, params)
 
 
-def xmlrpc_method_response_to_python(xml):
+def xmlrpc_common_method_response_to_python(xml):
   """
   <Purpose>
     Convert a XML-RPC method response to its Python equivalent.
@@ -345,43 +345,43 @@ def xmlrpc_method_response_to_python(xml):
       The XML-RPC string to convert.
 
   <Exceptions>
-    xmlrpc_XMLParseError on a XML-RPC structural parse error.
+    xmlrpc_common_XMLParseError on a XML-RPC structural parse error.
     xmlparse_XMLParseError on a general XML parse error.
 
   <Side Effects>
     None.
 
   <Returns>
-    The method results or a xmlrpc_Fault on reading a fault.
+    The method results or a xmlrpc_common_Fault on reading a fault.
 
   """
   xml_node = xmlparse_parse(xml)
 
   if xml_node.tag_name != "methodResponse":
     message = "Unexpected root node: %s" % xml_node.tag_name
-    raise xmlrpc_XMLParseError(message)
+    raise xmlrpc_common_XMLParseError(message)
   elif len(xml_node.children) > 1:
-    raise xmlrpc_XMLParseError("Too many children for 'methodCall'")
+    raise xmlrpc_common_XMLParseError("Too many children for 'methodCall'")
 
   fault_node = xml_node.children[0]
   if fault_node.tag_name == "fault":
     if len(fault_node.children) > 1:
-      raise xmlrpc_XMLParseError("Too many children for 'fault'")
-    params = xmlrpc_value_to_python(fault_node.children[0])
-    return xmlrpc_Fault(params["faultString"], params["faultCode"])
+      raise xmlrpc_common_XMLParseError("Too many children for 'fault'")
+    params = xmlrpc_common_value_to_python(fault_node.children[0])
+    return xmlrpc_common_Fault(params["faultString"], params["faultCode"])
 
   try:
-    params = xmlrpc_params_to_python(xml_node.children[0])
+    params = xmlrpc_common_params_to_python(xml_node.children[0])
   except KeyError:
-    raise xmlrpc_XMLParseError("No parameters found")
+    raise xmlrpc_common_XMLParseError("No parameters found")
 
   if len(params) > 1:
-    raise xmlrpc_XMLParseError("Too many children for 'params'")
+    raise xmlrpc_common_XMLParseError("Too many children for 'params'")
 
   return params[0]
 
 
-def xmlrpc_params_to_python(xml_node):
+def xmlrpc_common_params_to_python(xml_node):
   """
   <Purpose>
     Convert XML-RPC params the Python equivalent.
@@ -391,7 +391,7 @@ def xmlrpc_params_to_python(xml_node):
       The XML node to consider.
 
   <Exceptions>
-    xmlrpc_XMLParseError on a XML-RPC structural parse error.
+    xmlrpc_common_XMLParseError on a XML-RPC structural parse error.
 
   <Side Effects>
     None.
@@ -402,22 +402,22 @@ def xmlrpc_params_to_python(xml_node):
   """
   if xml_node.tag_name != "params":
     message = "Unexpected XML node: %s" % xml_node.tag_name
-    raise xmlrpc_XMLParseError(message)
+    raise xmlrpc_common_XMLParseError(message)
 
   params = []
 
   for param_node in xml_node.children:
     if param_node.tag_name != "param":
       message = "Unexpected XML node: %s" % param_node.tag_name
-      raise xmlrpc_XMLParseError(message)
+      raise xmlrpc_common_XMLParseError(message)
     if len(param_node.children) > 1:
-      raise xmlrpc_XMLParseError("Too many children for 'param'")
-    params.append(xmlrpc_value_to_python(param_node.children[0]))
+      raise xmlrpc_common_XMLParseError("Too many children for 'param'")
+    params.append(xmlrpc_common_value_to_python(param_node.children[0]))
 
   return params
 
 
-def xmlrpc_value_to_python(xml_node):
+def xmlrpc_common_value_to_python(xml_node):
   """
   <Purpose>
     Convert a XML-RPC value the Python equivalent.
@@ -427,7 +427,7 @@ def xmlrpc_value_to_python(xml_node):
       The XML node to consider.
 
   <Exceptions>
-    xmlrpc_XMLParseError on a XML-RPC structural parse error.
+    xmlrpc_common_XMLParseError on a XML-RPC structural parse error.
 
   <Side Effects>
     None.
@@ -438,9 +438,9 @@ def xmlrpc_value_to_python(xml_node):
   """
   if xml_node.tag_name not in ("value"):
     message = "Unexpected XML node: %s" % xml_node.tag_name
-    raise xmlrpc_XMLParseError(message)
+    raise xmlrpc_common_XMLParseError(message)
   elif len(xml_node.children) > 1:
-    raise xmlrpc_XMLParseError("Too many children for 'value'")
+    raise xmlrpc_common_XMLParseError("Too many children for 'value'")
 
   value_node = xml_node.children[0]
   tag = value_node.tag_name
@@ -463,11 +463,11 @@ def xmlrpc_value_to_python(xml_node):
 
   elif tag == "array":
     if len(value_node.children) > 1:
-      raise xmlrpc_XMLParseError("Too many children for 'array'")
+      raise xmlrpc_common_XMLParseError("Too many children for 'array'")
     data_node = value_node.children[0]
     result = []
     for item_node in data_node.children:
-      result.append(xmlrpc_value_to_python(item_node))
+      result.append(xmlrpc_common_value_to_python(item_node))
     return result
 
   elif tag == "struct":
@@ -476,19 +476,19 @@ def xmlrpc_value_to_python(xml_node):
     for member_node in value_node.children:
       if len(member_node.children) != 2:
         message = "Incorrect number of children for 'member'"
-        raise xmlrpc_XMLParseError(message)
+        raise xmlrpc_common_XMLParseError(message)
 
       key = member_node.children[0].content
-      value = xmlrpc_value_to_python(member_node.children[1])
+      value = xmlrpc_common_value_to_python(member_node.children[1])
 
       result[key] = value
 
     return result
 
   elif tag == "base64":
-    return xmlrpc_Binary(base64_decode(value_node.content))
+    return xmlrpc_common_Binary(base64_decode(value_node.content))
 
   else:
     message = "Demashaller: Unsupported value type: %s" % value_node.tag_name
-    raise xmlrpc_XMLParseError(message)
+    raise xmlrpc_common_XMLParseError(message)
     return value

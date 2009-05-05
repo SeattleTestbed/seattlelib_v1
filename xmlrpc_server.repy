@@ -265,7 +265,7 @@ class xmlrpc_server_SimpleXMLRPCServer:
     # blocking support to our emulated_socket class).
     while True:
       try:
-        methodname, params = xmlrpc_method_call_to_python(post_payload)
+        methodname, params = xmlrpc_common_method_call_to_python(post_payload)
         break
       except Exception:
         post_payload += socket.recv(4096)
@@ -277,7 +277,7 @@ class xmlrpc_server_SimpleXMLRPCServer:
       result = None   # Maybe we should send a fault back to the client?
 
     # Encode the result and send it back to the client.
-    xmlresponse = xmlrpc_method_response_to_xml(result)
+    xmlresponse = xmlrpc_common_method_response_to_xml(result)
 
     response = "HTTP/1.1 200 OK\r\nServer: SimpleXMLRPCServer on Repy\r\n" + \
       "Content-type: text/xml\r\nContent-length: %i\r\n\r\n%s" % \

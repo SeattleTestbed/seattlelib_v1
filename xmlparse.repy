@@ -318,8 +318,11 @@ def _xmlparse_parse(xmldata):
   nodelist = []
 
   while True:
+    # Whitespace between tags isn't important to the content of
+    # an XML document.
     xmldata = xmldata.strip()
 
+    # Strip out XML comments.
     if xmldata.startswith("<!--"):
       commentendloc = xmldata.find("-->", 4)
       if commentendloc < 0:
@@ -327,11 +330,13 @@ def _xmlparse_parse(xmldata):
       xmldata = xmldata[commentendloc+3:]
       continue
 
+    # Find the end of the current tag.
     nexttagend = _xmlparse_find_next_tag(xmldata)
 
     thisnode_str = xmldata[0:nexttagend]
     xmldata = xmldata[nexttagend:]
 
+    # Parse a tag out of the string we just found.
     thisnode = _xmlparse_node_from_string(thisnode_str)
     nodelist.append(thisnode)
 
