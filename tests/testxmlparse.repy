@@ -165,3 +165,16 @@ if callfunc == 'initialize':
     excepted = True
 
   assert(excepted)    # XML documents have *one* root node, no more.
+
+
+  # XML comments should be allowed
+
+
+  teststring = """
+  <!-- Hi, a comment -->
+  <xml>
+    <blah>5</blah>
+  </xml>
+  """
+
+  parsed = xmlparse_parse(teststring)

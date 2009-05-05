@@ -34,6 +34,27 @@ class xmlparse_XMLTreeNode:
       return "%s:%s" % (self.tag_name, str(self.children))
 
 
+  def to_string(self):
+    result = "<" + self.tag_name
+    for attribute_name in self.attributes.keys():
+      attribute_value_escaped = \
+          self.attributes[attribute_name].replace("\"", "\\\"")
+      result += " " + attribute_name + "=\"" + attribute_value_escaped + "\""
+    
+    if self.content is None:
+      result += ">"
+      for childnode in self.children:
+        result += childnode.to_string()
+      result += "</" + self.tag_name + ">"
+    else:
+      if len(self.content) == 0:
+        result += "/>"
+      else:
+        result += ">" + self.content + "</" + self.tag_name + ">"
+
+    return result
+
+
 
 
 def xmlparse_parse(data):
@@ -297,6 +318,15 @@ def _xmlparse_parse(xmldata):
   nodelist = []
 
   while True:
+    xmldata = xmldata.strip()
+
+    if xmldata.startswith("<!--"):
+      commentendloc = xmldata.find("-->", 4)
+      if commentendloc < 0:
+        raise xmlparse_XMLParseError()
+      xmldata = xmldata[commentendloc+3:]
+      continue
+
     nexttagend = _xmlparse_find_next_tag(xmldata)
 
     thisnode_str = xmldata[0:nexttagend]

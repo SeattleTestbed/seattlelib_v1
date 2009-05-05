@@ -1,4 +1,5 @@
 include xmlparse.repy
+include xmlrpc_common.repy
 include urllib.repy
 
 def _xmlrpc_server_lookup_ip(hostname):
@@ -15,180 +16,6 @@ def _xmlrpc_server_lookup_ip(hostname):
     raise ArgumentError()
 
   return listen_ips[0]
-
-
-
-
-class xmlrpc_server_Binary:
-  # Note: this should become part of the shared XMLRPC codebase.
-  """
-  <Purpose>
-    Wrapper class for base64-encoded binary data in XMLRPC requests and
-    responses.
-
-  <Side Effects>
-    None.
-
-  <Example Use>
-    # create a new binary "blob" to return to the caller
-    def foo():
-      return xmlrpc_server_Binary("\\xfbZt\\xe2")
-    # This should mostly only be used for sending and recieving
-    # base64-encoded binary data over XMLRPC.
-  """
-
-  def __init__(self, data=None):
-    if data is None:
-      self.data = ""
-    else:
-      self.data = base64_b64decode(data)
-
-
-
-
-def _xmlrpc_server_valuenode_to_python(valuenode):
-  # Converts an xmlparse_XMLTreeNode of a 'value' tag to a real
-  # python value, and returns this value.
-
-  # Note: this function will be replaced by or moved into Michael's
-  # xmlrpc_Marshaller library at some point.
-
-  if valuenode.children is None:
-    # The XMLRPC spec says that values without explicit type are assumed
-    # to be strings.
-    return urllib_unquote(valuenode.content)
-
-  if len(valuenode.children) != 1:
-    raise xmlrpc_server_ClientError()
-
-  typenode = valuenode.children[0]
-
-  if typenode.tag_name == "string":
-    if typenode.content is None:
-      raise xmlrpc_server_ClientError()
-
-    return urllib_unquote(typenode.content)
-
-  elif typenode.tag_name == "boolean":
-    if typenode.content is None:
-      raise xmlrpc_server_ClientError()
-
-    return bool(int(typenode.content))
-
-  elif typenode.tag_name == "int" or typenode.tag_name == "i4":
-    if typenode.content is None:
-      raise xmlrpc_server_ClientError()
-
-    return int(typenode.content)
-
-  elif typenode.tag_name == "array":
-    if typenode.children is None or len(typenode.children) != 1:
-      raise xmlrpc_server_ClientError()
-
-    datanode = typenode.children[0]
-
-    # Arrays have a single child element named "data", which contains a
-    # series of <value> elements.
-    if datanode.tag_name != "data" or datanode.children is None:
-      raise xmlrpc_server_ClientError()
-
-    result_array = []
-    for subvalue in datanode.children:
-      result_array.append(_xmlrpc_server_valuenode_to_python(subvalue))
-
-    return result_array
-
-  elif typenode.tag_name == "double":
-    if typenode.content is None:
-      raise xmlrpc_server_ClientError()
-
-    return float(typenode.content)
-  
-  elif typenode.tag_name == "dateTime.iso8601":
-    # We don't really have a concept of datetime in RePy
-    raise xmlrpc_server_ClientError()
-  
-  elif typenode.tag_name == "base64":
-    if typenode.content is None:
-      raise xmlrpc_server_ClientError()
-
-    # Python doesn't really have a concept of a distinction between binary
-    # strings and ordinary strings, so we have a wrapper class for base64-
-    # encoded XMLRPC data. This is identical to the way the Python version
-    # handles <base64> values.
-    return xmlrpc_server_Binary(typenode.content)
-
-  elif typenode.tag_name == "struct":
-    if typenode.children is None:
-      raise xmlrpc_server_ClientError()
-
-    # Python interprets XMLRPC "struct" objects as plain dictionaries.
-    resultdict = {}
-
-    for membernode in typenode.children:
-      # Each member in an XMLRPC struct has exactly two children elements:
-      # <name> and a <value>.
-      if membernode.children is None or len(membernode.children) != 2:
-        raise xmlrpc_server_ClientError()
-
-      memberdict = {}
-
-      # Here we loop through each child element of this <member> node, and
-      # we take <name> or <value> nodes and save them into memberdict as we
-      # run across them.
-      for childnode in membernode.children:
-        if childnode.tag_name == "name":
-          if childnode.content is None:
-            raise xmlrpc_server_ClientError()
-
-          memberdict["name"] = childnode.content
-        elif childnode.tag_name == "value":
-          memberdict["value"] = _xmlrpc_server_valuenode_to_python(childnode)
-
-      if not memberdict.has_key("name") or not memberdict.has_key("value"):
-        raise xmlrpc_server_ClientError()
-
-      resultdict[memberdict["name"]] = memberdict["value"]
-
-    return resultdict
-
-
-
-
-
-def _xmlrpc_server_python_to_xmlvalue(pythonval):
-  # Converts a python value to an xml 'value' tag string, and returns it.
-
-  # Note: this function will be replaced by or moved into Michael's
-  # xmlrpc_Marshaller library at some point.
-
-  response = "<value>"
-  if type(pythonval) == type(0):
-    response += "<int>" + str(pythonval) + "</int>"
-  elif type(pythonval) == type(0.1):
-    response += "<double>" + str(pythonval) + "</double>"
-  elif type(pythonval) == type(True):
-    response += "<boolean>" + str(int(pythonval)) + "</boolean>"
-  elif type(pythonval) == type(""):
-    response += "<string>" + urllib_quote(pythonval) + "</string>"
-  elif type(pythonval) == type(xmlrpc_server_Binary()):
-    response += "<base64>" + base64_b64encode(pythonval.data) + "</base64>"
-  elif type(pythonval) == type([]):
-    response += "<array><data>"
-    for item in pythonval:
-      response += _xmlrpc_server_python_to_xmlvalue(item)
-    response += "</data></array>"
-  elif type(pythonval) == type({}):
-    response += "<struct>"
-    for key, val in pythonval.items():
-      response += "<member>"
-      response += "<name>" + key + "</name>"
-      response += _xmlrpc_server_python_to_xmlvalue(val)
-      response += "</member>"
-    response += "</struct>"
-
-  response += "</value>"
-  return response
 
 
 
@@ -403,23 +230,18 @@ class xmlrpc_server_SimpleXMLRPCServer:
 
   def _connect(self, remoteip, remoteport, socket, commhandle, listen_commhandle):
     # The callback for client connections.  Handle the request.
-    request_data = ""
-    while True:
+    full_request_data = ""
+    while full_request_data.find("\r\n\r\n") < 0:   # working around
+                                          # our sockets not knowing when they
+                                          # hit EOF
       try:
-        more_data = socket.recv(4096)
+        full_request_data += socket.recv(4096)
       except Exception:
         # The client probably disconnected.
         stopcomm(commhandle)
         return
 
-      if len(more_data) == 0:
-        break
-      request_data += more_data
-              # TODO: Grab more data once we have a non-blocking socket
-              # interface.
-      break   # For now, assume requests are in the first 4kiB
-
-    http_commandline, request_data = request_data.split("\r\n", 1)
+    http_commandline, request_data = full_request_data.split("\r\n", 1)
 
     http_command, http_path, http_protocol = http_commandline.split(None, 2)
     if not (http_path == "/RPC2" or http_path == "/") or http_command != "POST":
@@ -435,48 +257,29 @@ class xmlrpc_server_SimpleXMLRPCServer:
       header_name, header_value = line.split(": ", 1)
       http_headers[header_name.lower()] = header_value
 
-    xmltree = xmlparse_parse(post_payload)
-    if not xmltree.tag_name == "methodCall" or xmltree.children is None:
-      raise xmlrpc_server_ClientError()
-
-    # Find the method name in the xml tree of the POST payload.
-    methodname = None
-    for childtag in xmltree.children:
-      if childtag.tag_name == "methodName":
-        if childtag.content is None:
-          raise xmlrpc_server_ClientError()
-        methodname = childtag.content
+    # Sometimes the client hasn't finished sending us the request; in this
+    # case we keep trying to recieve more data until we can parse the
+    # data. There is probably a better way of doing this (one solution is
+    # to fix our client to send the request as one chunk of data so we
+    # don't have to do things like this; another is to add EOF and non-
+    # blocking support to our emulated_socket class).
+    while True:
+      try:
+        methodname, params = xmlrpc_method_call_to_python(post_payload)
         break
-
-    if methodname is None:
-      raise xmlrpc_server_ClientError()
-
-    # Find the <params> element of the xml tree.
-    paramxmlnodes = None
-    for childtag in xmltree.children:
-      if childtag.tag_name == "params":
-        paramxmlnodes = childtag.children
-        break
-
-    # Make a list of the parameters to the method call.
-    params = []
-    if paramxmlnodes is not None:
-      for paramnode in paramxmlnodes:
-        if paramnode.tag_name != "param" or paramnode.children is None or \
-            len(paramnode.children) != 1:
-          raise xmlrpc_server_ClientError()
-        params.append(_xmlrpc_server_valuenode_to_python(paramnode.children[0]))
+      except Exception:
+        post_payload += socket.recv(4096)
 
     # Make the method call, get the result.
-    result = self._call_function(methodname, params)
+    try:
+      result = self._call_function(methodname, params)
+    except Exception:
+      result = None   # Maybe we should send a fault back to the client?
 
     # Encode the result and send it back to the client.
-    xmlresponse = _xmlrpc_server_python_to_xmlvalue(result)
-    xmlresponse = "<?xml version='1.0'?>\r\n<methodResponse>\r\n" + \
-        "<params>\r\n<param>\r\n" + xmlresponse + "\r\n</param>\r\n" + \
-        "</params>\r\n</methodResponse>"
+    xmlresponse = xmlrpc_method_response_to_xml(result)
 
-    response = "HTTP/1.0 200 OK\r\nServer: SimpleXMLRPCServer on Repy\r\n" + \
+    response = "HTTP/1.1 200 OK\r\nServer: SimpleXMLRPCServer on Repy\r\n" + \
       "Content-type: text/xml\r\nContent-length: %i\r\n\r\n%s" % \
       (len(xmlresponse), xmlresponse)
 

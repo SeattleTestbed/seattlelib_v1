@@ -450,13 +450,13 @@ def xmlrpc_value_to_python(xml_node):
     return None
 
   elif tag == "boolean":
-    return bool(value)
+    return bool(int(value))
 
   elif tag in ("i4", "int"):
     return int(value)
 
   elif tag == "double":
-    return long(value)
+    return float(value)
 
   elif tag == "string":
     return value
@@ -466,7 +466,7 @@ def xmlrpc_value_to_python(xml_node):
       raise xmlrpc_XMLParseError("Too many children for 'array'")
     data_node = value_node.children[0]
     result = []
-    for item_node in data_node:
+    for item_node in data_node.children:
       result.append(xmlrpc_value_to_python(item_node))
     return result
 
