@@ -8,7 +8,7 @@ if callfunc == 'initialize':
   def struct_setter(s):
     s["foo"] = "bar"
     return s
-  
+
   def test(a,b,c,d,e):
     return a == 5 and b == 6.5 and c == "hi" and d == [1,2] and e == {"1":2}
 
@@ -21,7 +21,7 @@ if callfunc == 'initialize':
   server.register_function(struct_setter)
   server.serve_nonblocking()
 
-  client = xmlrpc_Client("localhost", server_port=12345)
+  client = xmlrpc_client_Client("localhost", server_port=12345)
   assert(client.send_request("foo", [42]))
   assert(not client.send_request("foo", [41]))
 

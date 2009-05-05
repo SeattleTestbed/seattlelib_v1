@@ -27,7 +27,8 @@ class xmlrpc_common_Binary(object):
   """
   <Purpose>
     Wrapper class for base64-encoded binary data in XML-RPC requests and
-    responses.
+    responses.  This class is used when sending and receiving binary
+    data through XML-RPC.
 
   <Side Effects>
     None.
@@ -40,11 +41,12 @@ class xmlrpc_common_Binary(object):
   def __init__(self, data=""):
     """
     <Purpose>
-      Create a new Binary object.
+      Create a new Binary wrapper object for use with the XML-RPC
+      libraries.
 
     <Arguments>
       data:
-        A string representing an unencoded binary data.
+        The unencoded binary data.
 
     <Exceptions>
       None.
@@ -59,7 +61,8 @@ class xmlrpc_common_Binary(object):
 class xmlrpc_common_Fault(ValueError):
   """
   <Purpose>
-    Exception representing a XML-RPC Fault.
+    Exception representing a XML-RPC Fault.  The exception is returned
+    by the parsing functions when a XML-RPC server returns a fault.
 
   <Side Effects>
     None.
@@ -96,7 +99,8 @@ class xmlrpc_common_Fault(ValueError):
 class xmlrpc_common_XMLParseError(ValueError):
   """
   <Purpose>
-    Exception representing an error in parsing XML-RPC data.
+    Exception representing an error in parsing XML-RPC data.  The
+    exception is thrown when bad XML data is encountered.
 
   <Side Effects>
     None.
@@ -113,7 +117,7 @@ class xmlrpc_common_XMLParseError(ValueError):
 def xmlrpc_common_method_call_to_xml(method_name, params):
   """
   <Purpose>
-    Build a XML-RPC method call.
+    Build a XML-RPC method call to send to a XML-RPC server.
 
   <Arguments>
     method_name:
@@ -133,18 +137,20 @@ def xmlrpc_common_method_call_to_xml(method_name, params):
     The XML-RPC method call string.
 
   """
-  xml_string = '<?xml version="1.0"?>'
-  xml_string += "<methodCall><methodName>%s</methodName>" % method_name
-  xml_string += xmlrpc_common_params_to_xml(params)
-  xml_string += "</methodCall>"
+  xml_string = ['<?xml version="1.0"?>',
+    "<methodCall><methodName>%s</methodName>" % method_name,
+    xmlrpc_common_params_to_xml(params),
+    "</methodCall>"]
 
-  return xml_string
+  return "".join(xml_string)
 
 
 def xmlrpc_common_method_response_to_xml(param):
   """
   <Purpose>
-    Build a XML-RPC method response.
+    Build a XML-RPC method response to send to a XML-RPC client.  This
+    is the XML document that represents the return values or fault from
+    a XML-RPC call.
 
   <Arguments>
     param:
@@ -160,17 +166,19 @@ def xmlrpc_common_method_response_to_xml(param):
     The XML-RPC method response string.
 
   """
-  xml_string = '<?xml version="1.0"?><methodResponse>'
-  xml_string += xmlrpc_common_params_to_xml((param,))
-  xml_string += "</methodResponse>"
+  xml_string = ['<?xml version="1.0"?><methodResponse>',
+    xmlrpc_common_params_to_xml((param,)),
+    "</methodResponse>"]
 
-  return xml_string
+  return "".join(xml_string)
 
 
 def xmlrpc_common_method_fault_to_xml(message, code):
   """
   <Purpose>
-    Build a XML-RPC fault response.
+    Build a XML-RPC fault response to send to a XML-RPC client.  A fault
+    response can occur from a server failure, an incorrectly generated
+    XML request, or bad program arguments.
 
   <Arguments>
     message:
@@ -190,17 +198,18 @@ def xmlrpc_common_method_fault_to_xml(message, code):
 
   """
   struct = {"faultCode": code, "faultString": message}
-  xml_string = '<?xml version="1.0"?><methodResponse><fault>'
-  xml_string += xmlrpc_common_value_to_xml(struct)
-  xml_string += "</fault></methodResponse>"
+  xml_string = ['<?xml version="1.0"?><methodResponse><fault>',
+    xmlrpc_common_value_to_xml(struct),
+    "</fault></methodResponse>"]
 
-  return xml_string
+  return "".join(xml_string)
 
 
 def xmlrpc_common_params_to_xml(params):
   """
   <Purpose>
-    Translate Python values to XML-RPC parameters.
+    Translate Python parameter values to XML-RPC for use in building a
+    XML-RPC request or response.
 
   <Arguments>
     params:
@@ -217,20 +226,21 @@ def xmlrpc_common_params_to_xml(params):
     The XML-RPC parameters string.
 
   """
-  xml_string = "<params>"
+  xml_string = ["<params>"]
 
   for param in params:
-    xml_string += "<param>%s</param>" % xmlrpc_common_value_to_xml(param)
+    xml_string.append("<param>%s</param>" % xmlrpc_common_value_to_xml(param))
 
-  xml_string += "</params>"
+  xml_string.append("</params>")
 
-  return xml_string
+  return "".join(xml_string)
 
 
 def xmlrpc_common_value_to_xml(obj):
   """
   <Purpose>
-    Translate a Python value to XML-RPC.
+    Translate a Python value to XML-RPC for use in building the params
+    portion of a request or response.
 
   <Arguments>
     obj:
@@ -247,52 +257,61 @@ def xmlrpc_common_value_to_xml(obj):
 
   """
   object_type = type(obj)
-  xml_string = "<value>"
+
+  xml_string = ["<value>"]
 
   if obj is None:
-    xml_string += "<nil/>"
+    xml_string.append("<nil/>")
 
   elif object_type is bool:
-    xml_string += "<boolean>%d</boolean>" % int(obj)
+    xml_string.append("<boolean>%d</boolean>" % int(obj))
 
   elif object_type in (int, long):
-    xml_string += "<int>%d</int>" % obj
+    xml_string.append("<int>%d</int>" % obj)
 
   elif object_type is float:
-    xml_string += "<double>%f</double>" % obj
+    xml_string.append("<double>%f</double>" % obj)
 
-  elif object_type in (str, unicode):
-    xml_string += "<string>%s</string>" % obj
+  elif object_type in (str, unicode, basestring):
+    xml_string.append("<string>%s</string>" % obj)
 
   elif object_type in (list, tuple, xrange, set, frozenset):
-    xml_string += "<array><data>"
+    xml_string.append("<array><data>")
     for value in obj:
-      xml_string += xmlrpc_common_value_to_xml(value)
-    xml_string += "</data></array>"
+      xml_string.append(xmlrpc_common_value_to_xml(value))
+    xml_string.append("</data></array>")
 
   elif object_type is dict:
-    xml_string += "<struct>"
+    xml_string.append("<struct>")
     for key, value in obj.iteritems():
-      xml_string += "<member><name>%s</name>" % key
-      xml_string += xmlrpc_common_value_to_xml(value)
-      xml_string += "</member>"
-    xml_string += "</struct>"
+      xml_string.append("<member><name>%s</name>" % key)
+      xml_string.append(xmlrpc_common_value_to_xml(value))
+      xml_string.append("</member>")
+    xml_string.append("</struct>")
 
+  # This requires the new object inheritance model to be used. e.g. do
+  #   class Foo(object): pass
+  # rather than
+  #   class Foo: pass
   elif object_type is xmlrpc_common_Binary:
-    xml_string += "<base64>%s</base64>" % base64_encode(obj)
+    xml_string.append("<base64>%s</base64>" % base64_encode(obj))
 
   else:
-    raise ValueError("Marshaller: Unsupported type '%s'" % object_type)
+    raise ValueError("Marshaller: Unsupported type '%s'" % type(obj))
 
-  xml_string += "</value>"
+  xml_string.append("</value>")
 
-  return xml_string
+  return "".join(xml_string)
 
 
 def xmlrpc_common_method_call_to_python(xml):
   """
   <Purpose>
     Convert a XML-RPC method call to its Python equivalent.
+
+    The request from a XML-RPC client is parsed into native Python
+    types so that the server may use the data to execute a method, as
+    appropriate.
 
   <Arguments>
     xml:
@@ -340,6 +359,9 @@ def xmlrpc_common_method_response_to_python(xml):
   <Purpose>
     Convert a XML-RPC method response to its Python equivalent.
 
+    The response from a XML-RPC server is parsed into native Python
+    types so that the client may use the data as appropriate.
+
   <Arguments>
     xml:
       The XML-RPC string to convert.
@@ -386,6 +408,10 @@ def xmlrpc_common_params_to_python(xml_node):
   <Purpose>
     Convert XML-RPC params the Python equivalent.
 
+    The parameters portion of a XML-RPC request or response is parsed
+    into Python equivalents so that the method request and response
+    parsing functions can return the relevant data.
+
   <Arguments>
     xml_node:
       The XML node to consider.
@@ -421,6 +447,9 @@ def xmlrpc_common_value_to_python(xml_node):
   """
   <Purpose>
     Convert a XML-RPC value the Python equivalent.
+
+    A XML-RPC value is converted to its Python equivalent for use in the
+    parameters parser.
 
   <Arguments>
     xml_node:
@@ -491,4 +520,3 @@ def xmlrpc_common_value_to_python(xml_node):
   else:
     message = "Demashaller: Unsupported value type: %s" % value_node.tag_name
     raise xmlrpc_common_XMLParseError(message)
-    return value
