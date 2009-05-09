@@ -379,11 +379,21 @@ signeddata_fatal_comments = ['Malformed signed data', 'Different public key', "B
 
 signeddata_all_comments = signeddata_warning_comments + signeddata_fatal_comments
 
+def signeddata_shouldtrustmeta(oldsignature, newsigneddata, publickey=None):
+  """
+  the signature of the metadata should be specified for the oldsignature parameter
+  newsigneddata must contain the full request,
+  """
+  return signeddata_shouldtrust(oldsignature, newsigneddata, publickey=None, oldsigneddata_is_fullrequest=False)
 
-def signeddata_shouldtrust(oldsigneddata, newsigneddata, publickey=None):
+def signeddata_shouldtrust(oldsigneddata, newsigneddata, publickey=None, oldsigneddata_is_fullrequest=True):
   """ Returns False for 'don't trust', None for 'use your discretion' and True 
   for everything is okay.   The second item in the return value is a list of
-  reasons / justifications"""
+  reasons / justifications
+  newsigneddata must contain full request
+  by default, oldsigneddata must contain only the full previous request (for compatibility issues).
+  if oldsigneddata_is_fullrequest=False, only the signature must be specified for oldsigneddata
+  """
 
   returned_comments = []
 
@@ -404,7 +414,13 @@ def signeddata_shouldtrust(oldsigneddata, newsigneddata, publickey=None):
   
   #BUG FIX: only if the oldmetadata is not set to None, we want to split it and verify it
   if oldsigneddata != None :
-    oldjunk, oldpubkey, oldtime, oldexpire, oldsequence, olddestination = signeddata_split(oldsigneddata)
+  
+    if (oldsigneddata_is_fullrequest):
+      oldjunk, oldpubkey, oldtime, oldexpire, oldsequence, olddestination = signeddata_split(oldsigneddata)
+    else:
+      oldrawpublickey, oldrawtimestamp, oldrawexpiration, oldrawsequenceno, oldrawdestination, oldjunksignature = oldsigneddata.rsplit('!',5)
+      oldpubkey, oldtime, oldexpire, oldsequence, olddestination = rsa_string_to_publickey(oldrawpublickey[1:]), signeddata_string_to_timestamp(oldrawtimestamp), signeddata_string_to_expiration(oldrawexpiration), signeddata_string_to_sequencenumber(oldrawsequenceno), signeddata_string_to_destination(oldrawdestination)
+    
   
 
     # get comments on everything but the timestamp and sequence number

@@ -40,24 +40,28 @@ if callfunc == 'initialize':
   # would have been an exception earlier
   print signeddata_shouldtrust(oldsigneddata, newsigneddata)
   assert(signeddata_shouldtrust(oldsigneddata, newsigneddata)[0] == True)
-
+  assert(signeddata_shouldtrustmeta(signeddata_split_signature(oldsigneddata)[1], newsigneddata)[0] == True)
+  
   # same timestamp
   sametssigneddata = signeddata_signdata(olddata,keys[1],keys[0],1,time_gettime()+1000)
   # must be none because timestamps are the same.
   print signeddata_shouldtrust(oldsigneddata, sametssigneddata)
   assert(signeddata_shouldtrust(oldsigneddata, sametssigneddata)[0] == None)
-
+  assert(signeddata_shouldtrustmeta(signeddata_split_signature(oldsigneddata)[1], newsigneddata)[0] == True)
+  
   # older timestamp
   oldertimestampsigneddata = signeddata_signdata(olddata,keys[1],keys[0],0,time_gettime()+1000)
   # must be false because of the timestamp
   print signeddata_shouldtrust(oldsigneddata, oldertimestampsigneddata)
   assert(signeddata_shouldtrust(oldsigneddata, oldertimestampsigneddata)[0] == False)
-
+  assert(signeddata_shouldtrustmeta(signeddata_split_signature(oldsigneddata)[1], newsigneddata)[0] == True)
+  
   # expired...
   expiredsigneddata = signeddata_signdata(olddata,keys[1],keys[0],2,time_gettime()-1000)
   # must be false because of the expiration time
   print signeddata_shouldtrust(oldsigneddata, expiredsigneddata)
   assert(signeddata_shouldtrust(oldsigneddata, expiredsigneddata)[0] == False)
+  assert(signeddata_shouldtrustmeta(signeddata_split_signature(oldsigneddata)[1], expiredsigneddata)[0] == False)
 
 
   #destination checking
