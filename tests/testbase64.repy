@@ -208,4 +208,67 @@ hb4Ch97aqA=='
   assert(urlsafe_b64encode(decoded_string) == safe_encoded_string)
   assert(urlsafe_b64decode(safe_encoded_string) == decoded_string)
 
+  # Bad data test
+  encoded_string = "TGIF IT*S FRIDAY!"
+  error_raised = False
+  try:
+    b64decode(encoded_string)
+  except TypeError:
+    error_raised = True
+  assert(error_raised)
+  error_raised = False
+  try:
+    standard_b64decode(encoded_string)
+  except TypeError:
+    error_raised = True
+  assert(error_raised)
+  error_raised = False
+  try:
+    urlsafe_b64decode(encoded_string)
+  except TypeError:
+    error_raised = True
+  assert(error_raised)
+
+  # Misalignment test 1
+  encoded_string = "AA="
+  error_raised = False
+  try:
+    b64decode(encoded_string)
+  except TypeError:
+    error_raised = True
+  assert(error_raised)
+  error_raised = False
+  try:
+    standard_b64decode(encoded_string)
+  except TypeError:
+    error_raised = True
+  assert(error_raised)
+  error_raised = False
+  try:
+    urlsafe_b64decode(encoded_string)
+  except TypeError:
+    error_raised = True
+  assert(error_raised)
+
+  # Misalignment test 2
+  encoded_string = "AAA"
+  error_raised = False
+  try:
+    b64decode(encoded_string)
+  except TypeError:
+    error_raised = True
+  assert(error_raised)
+  error_raised = False
+  try:
+    standard_b64decode(encoded_string)
+  except TypeError:
+    error_raised = True
+  assert(error_raised)
+  error_raised = False
+  try:
+    urlsafe_b64decode(encoded_string)
+  except TypeError:
+    error_raised = True
+  assert(error_raised)
+
   print "All tests passed"
