@@ -98,6 +98,11 @@ if callfunc == 'initialize':
   # Test xmlrpc_common_method_call_to_xml for correctness.
 
   expected_output = '<?xml version="1.0"?><methodCall><methodName>foo\
+</methodName></methodCall>'
+  actual_output = xmlrpc_common_method_call_to_xml("foo", ())
+  assert(expected_output == actual_output)
+
+  expected_output = '<?xml version="1.0"?><methodCall><methodName>foo\
 </methodName><params><param><value><int>1</int></value></param><param>\
 <value><string>a</string></value></param><param><value><boolean>1\
 </boolean></value></param></params></methodCall>'
@@ -132,6 +137,14 @@ fault</string></value></member></struct></value></fault>\
       </params>
     </methodCall>"""
   expected_output = ('examples.getStateName', [40])
+  actual_output = xmlrpc_common_method_call_to_python(test_input)
+  assert(expected_output == actual_output)
+
+  test_input = """<?xml version="1.0"?>
+    <methodCall>
+      <methodName>noArgsFunc</methodName>
+    </methodCall>"""
+  expected_output = ('noArgsFunc', ())
   actual_output = xmlrpc_common_method_call_to_python(test_input)
   assert(expected_output == actual_output)
 

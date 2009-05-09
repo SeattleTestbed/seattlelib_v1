@@ -53,6 +53,10 @@ if callfunc == 'initialize':
   actual_result = client.send_request("echo", (expected_result,))
   assert(expected_result == actual_result)
 
+  expected_result = "Hello World!"
+  actual_result = client.send_request("hello_world", None)
+  assert(expected_result == actual_result)
+
   # Test for proper errors.
 
   # No such method.

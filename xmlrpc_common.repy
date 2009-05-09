@@ -226,8 +226,8 @@ def xmlrpc_common_params_to_xml(params):
     The XML-RPC parameters string.
 
   """
-  if params is None:
-    return "<params><param><value><nil/></value></param></params>"
+  if params is None or params is ():
+    return ""
 
   xml_string = ["<params>"]
 
@@ -348,13 +348,13 @@ def xmlrpc_common_method_call_to_python(xml):
       message = "Unexpected XML node: %s" % method_name_node.tag_name
       raise xmlrpc_common_XMLParseError(message)
     method_name = method_name_node.content
-  except KeyError:
+  except IndexError:
     raise xmlrpc_common_XMLParseError("No method name found")
 
   try:
     params = xmlrpc_common_params_to_python(xml_node.children[1])
-  except KeyError:
-    raise xmlrpc_common_XMLParseError("No parameters found")
+  except IndexError:
+    return (method_name, ())
 
   if not params:
     raise xmlrpc_common_XMLParseError("No parameters found")
