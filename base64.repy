@@ -18,94 +18,9 @@
 
 """
 
-# TODO: Improve performance by implementing in-stream encoding and
-# decoding to reduce the use of expensive translation and to reduce
-# redundancy.  The memory footprint will also improve by not using
-# multiple temporary strings in memory.
-
-# cache
+# The Base64 for use in encoding
 BASE64_ALPHABET = \
   "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
-
-# _BASE64_TRANSLATION = [chr(_base64_x) for _base64_x in xrange(256)]
-_BASE64_TRANSLATION = ['\x00', '\x01', '\x02', '\x03', '\x04', '\x05',
-  '\x06', '\x07', '\x08', '\t', '\n', '\x0b', '\x0c', '\r', '\x0e',
-  '\x0f', '\x10', '\x11', '\x12', '\x13', '\x14', '\x15', '\x16', '\x17',
-  '\x18', '\x19', '\x1a', '\x1b', '\x1c', '\x1d', '\x1e', '\x1f', ' ',
-  '!', '"', '#', '$', '%', '&', "'", '(', ')', '*', '+', ',', '-', '.',
-  '/', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', ':', ';', '<',
-  '=', '>', '?', '@', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J',
-  'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X',
-  'Y', 'Z', '[', '\\', ']', '^', '_', '`', 'a', 'b', 'c', 'd', 'e', 'f',
-  'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't',
-  'u', 'v', 'w', 'x', 'y', 'z', '{', '|', '}', '~', '\x7f', '\x80',
-  '\x81', '\x82', '\x83', '\x84', '\x85', '\x86', '\x87', '\x88', '\x89',
-  '\x8a', '\x8b', '\x8c', '\x8d', '\x8e', '\x8f', '\x90', '\x91', '\x92',
-  '\x93', '\x94', '\x95', '\x96', '\x97', '\x98', '\x99', '\x9a', '\x9b',
-  '\x9c', '\x9d', '\x9e', '\x9f', '\xa0', '\xa1', '\xa2', '\xa3', '\xa4',
-  '\xa5', '\xa6', '\xa7', '\xa8', '\xa9', '\xaa', '\xab', '\xac', '\xad',
-  '\xae', '\xaf', '\xb0', '\xb1', '\xb2', '\xb3', '\xb4', '\xb5', '\xb6',
-  '\xb7', '\xb8', '\xb9', '\xba', '\xbb', '\xbc', '\xbd', '\xbe', '\xbf',
-  '\xc0', '\xc1', '\xc2', '\xc3', '\xc4', '\xc5', '\xc6', '\xc7', '\xc8',
-  '\xc9', '\xca', '\xcb', '\xcc', '\xcd', '\xce', '\xcf', '\xd0', '\xd1',
-  '\xd2', '\xd3', '\xd4', '\xd5', '\xd6', '\xd7', '\xd8', '\xd9', '\xda',
-  '\xdb', '\xdc', '\xdd', '\xde', '\xdf', '\xe0', '\xe1', '\xe2', '\xe3',
-  '\xe4', '\xe5', '\xe6', '\xe7', '\xe8', '\xe9', '\xea', '\xeb', '\xec',
-  '\xed', '\xee', '\xef', '\xf0', '\xf1', '\xf2', '\xf3', '\xf4', '\xf5',
-  '\xf6', '\xf7', '\xf8', '\xf9', '\xfa', '\xfb', '\xfc', '\xfd', '\xfe',
-  '\xff']
-
-# _BASE64_DECODE = _BASE64_TRANSLATION[:]
-# for x in _BASE64_DECODE:
-#   if x not in BASE64_ALPHABET:
-#     _BASE64_DECODE[ord(x)] = chr(255)
-# for k, v in enumerate(BASE64_ALPHABET):
-#   _BASE64_DECODE[ord(v)] = chr(k)
-# _BASE64_DECODE = "".join(_BASE64_DECODE)
-_BASE64_DECODE = '\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\
-\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\
-\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff>\xff\xff\xff?4\
-56789:;<=\xff\xff\xff\xff\xff\xff\xff\x00\x01\x02\x03\x04\x05\x06\x07\
-\x08\t\n\x0b\x0c\r\x0e\x0f\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\xff\
-\xff\xff\xff\xff\xff\x1a\x1b\x1c\x1d\x1e\x1f !"#$%&\'()*+,-./0123\xff\
-\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\
-\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\
-\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\
-\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\
-\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\
-\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\
-\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\
-\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff'
-
-def _base64_translate(s, altchars):
-  """
-  <Purpose>
-    Translate unsafe characters in the standard Base64 alphabet to safe
-    alternatives.
-
-  <Arguments>
-    s:
-      The string to encode.
-
-    altchars:
-      A mapping of characters to encode where the key is the original
-      character and the value is the new character.
-
-  <Exceptions>
-    None.
-
-  <Side Effects>
-    None.
-
-  <Returns>
-    The encoded string.
-
-  """
-  translation = _BASE64_TRANSLATION[:]
-  for k, v in altchars.iteritems():
-    translation[ord(k)] = v[0]
-  translation = "".join(translation)
-  return s.translate(translation)
 
 def b64encode(s, altchars=None):
   """
@@ -132,13 +47,23 @@ def b64encode(s, altchars=None):
     The encoded string.
 
   """
+  # Build the local alphabet.
+  if altchars is None:
+    base64_alphabet = BASE64_ALPHABET
+  else:
+    base64_alphabet = BASE64_ALPHABET[:62] + altchars
+
   # Change from characters to integers for binary operations.
-  bytes = [ord(x) for x in s]
+  bytes = []
+  for x in s:
+    bytes.append(ord(x))
 
   # Encode the 8-bit words into 6-bit words.
   x6bit_words = []
   index = 0
   while True:
+
+    # Encode the first 6 bits from three 8-bit values.
     try:
       x8bits = bytes[index]
     except IndexError:
@@ -146,34 +71,36 @@ def b64encode(s, altchars=None):
     else:
       x6bits = x8bits >> 2
       leftover_bits = x8bits & 3
-      x6bit_words.append(BASE64_ALPHABET[x6bits])
+      x6bit_words.append(base64_alphabet[x6bits])
+
+    # Encode the next 8 bits.
     try:
       x8bits = bytes[index+1]
     except IndexError:
       x6bits = leftover_bits << 4
-      x6bit_words.extend([BASE64_ALPHABET[x6bits], "=="])
+      x6bit_words.extend([base64_alphabet[x6bits], "=="])
       break
     else:
       x6bits = (leftover_bits << 4) | (x8bits >> 4)
       leftover_bits = x8bits & 15
-      x6bit_words.append(BASE64_ALPHABET[x6bits])
+      x6bit_words.append(base64_alphabet[x6bits])
+
+    # Encode the final 8 bits.
     try:
       x8bits = bytes[index+2]
     except IndexError:
       x6bits = leftover_bits << 2
-      x6bit_words.extend([BASE64_ALPHABET[x6bits], "="])
+      x6bit_words.extend([base64_alphabet[x6bits], "="])
       break
     else:
       x6bits = (leftover_bits << 2) | (x8bits >> 6)
-      x6bit_words.append(BASE64_ALPHABET[x6bits])
+      x6bit_words.append(base64_alphabet[x6bits])
       x6bits = x8bits & 63
-      x6bit_words.append(BASE64_ALPHABET[x6bits])
+      x6bit_words.append(base64_alphabet[x6bits])
+
     index += 3
-  encoded_string = "".join(x6bit_words)
-  if altchars is not None:
-    return _base64_translate(encoded_string, {"+": altchars[0],
-      "/": altchars[1]})
-  return encoded_string
+
+  return "".join(x6bit_words)
 
 def b64decode(s, altchars=None):
   """
@@ -203,8 +130,31 @@ def b64decode(s, altchars=None):
     The decoded string.
 
   """
-  if altchars is not None:
-    s = _base64_translate(s, {altchars[0]: "+", altchars[1]: "/"})
+  # Build the local alphabet.
+  if altchars is None:
+    base64_alphabet = BASE64_ALPHABET
+  else:
+    base64_alphabet = BASE64_ALPHABET[:62] + altchars
+
+  # Generate the translation maps for decoding a Base64 string.
+  translate_chars = []
+  for x in xrange(256):
+    char = chr(x)
+    translate_chars.append(char)
+
+  # Build the strings of characters to delete.
+  delete_chars = []
+  for x in translate_chars:
+    if x not in base64_alphabet:
+      delete_chars.append(x)
+  delete_chars = "".join(delete_chars)
+
+  # Insert the 6-bit Base64 values into the translation string.
+  k = 0
+  for v in base64_alphabet:
+    translate_chars[ord(v)] = chr(k)
+    k += 1
+  translate_chars = "".join(translate_chars)
 
   # Count the number of padding characters at the end of the string.
   num_pad = 0
@@ -216,8 +166,9 @@ def b64decode(s, altchars=None):
       break
     i -= 1
 
-  # Translate the string into Base64.
-  s = s.translate(_BASE64_DECODE).replace("\xff", "")
+  # Translate the string into 6-bit characters and delete extraneous
+  # characters.
+  s = s.translate(translate_chars, delete_chars)
 
   # Determine correct alignment by calculating the number of padding
   # characters needed for compliance to the specification.
@@ -226,24 +177,44 @@ def b64decode(s, altchars=None):
     raise TypeError("Incorrect padding")
 
   # Change from characters to integers for binary operations.
-  x6bit_words = [ord(x) for x in s] + [-1 for x in range(align)]
+  x6bit_words = []
+  for x in s:
+    x6bit_words.append(ord(x))
+  for x in xrange(align):
+    x6bit_words.append(-1)
 
   # Decode the 6-bit words into 8-bit words.
   bytes = []
   index = 0
   while True:
+
+    # Work on four 6-bit quantities at a time.  End when no more data is
+    # available.
     try:
       (x6bits1, x6bits2, x6bits3, x6bits4) = x6bit_words[index:index+4]
     except ValueError:
       break
+
+    # Save an 8-bit quantity.
     bytes.append((x6bits1 << 2) | (x6bits2 >> 4))
+
+    # End of valid data.
     if x6bits3 < 0:
       break
+
+    # Save an 8-bit quantity.
     bytes.append(((x6bits2 & 15) << 4) | (x6bits3 >> 2))
+
+    # End of valid data.
     if x6bits4 < 0:
       break
+
+    # Save an 8-bit quantity.
     bytes.append(((x6bits3 & 3) << 6) | x6bits4)
+
+    # Next four 6-bit quantities.
     index += 4
+
   return "".join([chr(x) for x in bytes])
 
 def standard_b64encode(s):
