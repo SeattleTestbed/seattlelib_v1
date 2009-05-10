@@ -297,7 +297,7 @@ def xmlrpc_common_value_to_xml(obj):
   # rather than
   #   class Foo: pass
   elif object_type is xmlrpc_common_Binary:
-    xml_string.append("<base64>%s</base64>" % base64_encode(obj))
+    xml_string.append("<base64>%s</base64>" % standard_b64encode(obj.data))
 
   else:
     raise ValueError("Marshaller: Unsupported type '%s'" % type(obj))
@@ -535,7 +535,7 @@ def xmlrpc_common_value_to_python(xml_node):
     return result
 
   elif tag == "base64":
-    return xmlrpc_common_Binary(base64_decode(value_node.content))
+    return xmlrpc_common_Binary(standard_b64decode(value_node.content))
 
   else:
     message = "Demashaller: Unsupported value type: %s" % value_node.tag_name

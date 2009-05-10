@@ -73,6 +73,11 @@ if callfunc == 'initialize':
   actual_output = xmlrpc_common_value_to_xml(xrange(3))
   assert(expected_output == actual_output)
 
+  value = xmlrpc_common_Binary("Hello World")
+  expected_output = "<value><base64>SGVsbG8gV29ybGQ=</base64></value>"
+  actual_output = xmlrpc_common_value_to_xml(value)
+  assert(expected_output == actual_output)
+
   error_raised = False
   try:
     xmlrpc_common_value_to_xml(complex(1,1))
@@ -139,6 +144,21 @@ fault</string></value></member></struct></value></fault>\
   expected_output = ('examples.getStateName', [40])
   actual_output = xmlrpc_common_method_call_to_python(test_input)
   assert(expected_output == actual_output)
+
+  test_input = """<?xml version="1.0"?>
+    <methodCall>
+      <methodName>examples.getStateName</methodName>
+      <params>
+        <param>
+            <value><base64>SGVsbG8gV29ybGQ=</base64></value>
+        </param>
+      </params>
+    </methodCall>"""
+  value = xmlrpc_common_Binary("Hello World")
+  expected_output = ('examples.getStateName', [value])
+  actual_output = xmlrpc_common_method_call_to_python(test_input)
+  assert(expected_output[0] == actual_output[0])
+  assert(expected_output[1][0].data == actual_output[1][0].data)
 
   test_input = """<?xml version="1.0"?>
     <methodCall>
