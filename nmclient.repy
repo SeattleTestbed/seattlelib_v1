@@ -75,7 +75,7 @@ nmclient_handledictlock = getlock()
 def nmclient_rawcommunicate(nmhandle, *args):
 
   try:
-    thisconnobject = timeout_openconn(nmclient_handledict[nmhandle]['IP'], nmclient_handledict[nmhandle]['port'],timeout=10) 
+    thisconnobject = timeout_openconn(nmclient_handledict[nmhandle]['IP'], nmclient_handledict[nmhandle]['port'],timeout=nmclient_handledict[nmhandle]['timeout']) 
   except Exception, e:
     raise NMClientException, str(e)
 
@@ -147,7 +147,7 @@ def nmclient_signedcommunicate(nmhandle, *args):
     
 
   try:
-    thisconnobject = timeout_openconn(nmclient_handledict[nmhandle]['IP'], nmclient_handledict[nmhandle]['port'], timeout=10)
+    thisconnobject = timeout_openconn(nmclient_handledict[nmhandle]['IP'], nmclient_handledict[nmhandle]['port'], timeout=nmclient_handledict[nmhandle]['timeout'])
   except Exception, e:
     raise NMClientException, str(e)
 
@@ -198,7 +198,7 @@ def nmclient_safelygethandle():
 # public key, private key, and vesselids are left uninitialized unless 
 # specified elsewhere.   Regardless, the keys and vesselid are not used to 
 # create the handle and so are merely transfered to the created handle.
-def nmclient_createhandle(nmIP, nmport, sequenceid = None, timestamp=True, identity = True, expirationtime = 60*60, publickey = None, privatekey = None, vesselid = None):
+def nmclient_createhandle(nmIP, nmport, sequenceid = None, timestamp=True, identity = True, expirationtime = 60*60, publickey = None, privatekey = None, vesselid = None, timeout=10):
 
   thisentry = {}
 
@@ -210,6 +210,7 @@ def nmclient_createhandle(nmIP, nmport, sequenceid = None, timestamp=True, ident
   thisentry['publickey'] = publickey
   thisentry['privatekey'] = privatekey
   thisentry['vesselid'] = vesselid
+  thisentry['timeout'] = timeout
 
     
   newhandle = nmclient_safelygethandle()
