@@ -261,10 +261,14 @@ def nmclient_destroyhandle(nmhandle):
 
 # public.   Use these to get / set attributes about the handles...
 def nmclient_get_handle_info(nmhandle):
+  if nmhandle not in nmclient_handledict:
+    raise NMClientException, "Unknown nmhandle: '"+str(nmhandle)+"'"
   return nmclient_handledict[nmhandle].copy()
 
 
 def nmclient_set_handle_info(nmhandle, dict):
+  if nmhandle not in nmclient_handledict:
+    raise NMClientException, "Unknown nmhandle: '"+str(nmhandle)+"'"
   nmclient_handledict[nmhandle] = dict
 
 
