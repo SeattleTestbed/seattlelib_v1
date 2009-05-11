@@ -6,8 +6,8 @@
 
   Description:
 
-    Contacts server running time_server.repy to get the current time from an NTP
-    because only the server can communicate with an NTP.
+    Contacts a server running time_server.repy to get the current time from an
+    NTP because only the server can communicate with an NTP.
 
     To use this module, make one call to timefromservice_updatetime() to get the
     time from the server.  This function also implicitly sets the time.  Then
@@ -25,15 +25,98 @@ include time.repy
 
 
 # This function contacts the server to get the time from an NTP
-def timefromservice_updatetime():
+def timefromservice_updatetime(tries=3):
   """
   <Purpose>
-    Opens a connection with the server to get the current time via a NTP,
-    then calls time_settime(float(currenttime)) to set the current time to the
-    received value form the server.
+    Opens a connection with a server hosting time_server.repy, which obtains the
+    current time via a NTP, then calls time_settime(float(currenttime)) to set
+    the current time to the received value form the server.
 
   <Arguments>
+    tries:
+
+      The number of times to try to access a server running time_server.repy
+      before giving up and trying a different server.  Default = 3 tries.
+
+  <Exceptions>
+    Exception raised when the value of the parameter "tries" is less than one.
+
+    Exception raised when a connection is not able to be established with any of
+    the servers running time_server.repy.
+
+  <Side Effects>
+    time_settime(float(currenttime)) is called to set the time.
+
+  <Returns>
     None.
+
+"""
+
+
+  if tries < 1:
+    raise Exception("Number of tries to connect to time_server.repy must be at least 1")
+
+
+  # Get the ips and ports of servers hosting time_server.repy, retrying every
+  # time there is an exception
+  gotval = False
+  while not gotval:
+    try:
+      serveraddresses = centralizedadvertise_lookup("time_server")
+    except Exception:
+      sleep(10)                 # Look up the value again in 10 seconds
+    else:
+      gotval = True             # Successfully obtained the value
+
+
+  timelength = 25  # Max length of string, representing the time, to be received
+
+
+  # Open a connection with a server hosting time_server.repy, trying "tries"
+  # number of times before attempting to connect to a different server
+  timeobtained = False
+  serverindex = 0
+  while serverindex < len(serveraddresses)-1:
+    remoteip = serveraddresses[serverindex]
+    remoteport = int(serveraddresses[serverindex + 1])
+
+    t = 0    # Number of tries connecting to the server completed
+    while (t < tries) and not timeobtained:
+      try:
+        sockobject = openconn(remoteip,remoteport)
+      except Exception:
+        t = t + 1
+        sleep(5)    # Wait 5 seconds, then retry opening connection with server
+      else:
+        timeobtained = True
+
+    if timeobtained:
+      break
+    else:
+      serverindex = serverindex + 2
+
+  if not timeobtained:
+    raise Exception("Unable to open connection with any of the ",len(serveraddresses)/2,"servers running time_server.repy.")
+
+
+  currenttime = sockobject.recv(timelength)
+
+  sockobject.close()
+
+  timefromservice_settime(float(currenttime))
+
+
+
+
+def timefromservice_settime(currenttime):
+  """
+  <Purpose>
+    Call the included function time_settime(currenttime).
+
+  <Arguments>
+    currenttime:
+
+      The current time to which the time should be set.
 
   <Exceptions>
     None.
@@ -46,49 +129,30 @@ def timefromservice_updatetime():
 
 """
 
-
-  # Get the server's ip and port, retrying every tiem there is an exception
-  gotval = False
-  while gotval != True:
-    try:
-      value = centralizedadvertise_lookup("time_server")
-    except Exception,e:
-      print e, " looking up server's ip and port again..."
-      sleep(10)                       # Look up the value again in 10 seconds
-    else:
-      gotval = True                   # Successfully obtained the value
-
-  remoteip = value[0]
-  remoteport = int(value[1])
-
-
-  timelength = 25  # Length of the time, as a string, to receive from server
-
-
-  # Open a connection with the server, retrying every time there is an exception
-  connect = True
-  while connect:
-    try:
-      sockobject = openconn(remoteip,remoteport)
-    except Exception,e:
-      print e, " retrying to connect to server..."
-    else:
-      connect = False         # Successfully connected with the server
-
-
-  currenttime = sockobject.recv(timelength)
-
-  sockobject.close()
-
-  timefromservice_settime(float(currenttime))
-
-
-
-# This function provides the same interface as time_settime in time.repy
-def timefromservice_settime(currenttime):
   time_settime(currenttime)
 
 
-# This function provides the same interface as time_gettime() in time.repy
+
+
 def timefromservice_gettime():
+  """
+  <Purpose>
+    Call the included function time_gettime().
+
+  <Arguments>
+    None.
+
+  <Exceptions>
+    None.
+
+  <Side Effects>
+    None.
+
+  <Returns>
+    The current time is returned in seconds.
+
+"""
+
   return time_gettime()
+
+
