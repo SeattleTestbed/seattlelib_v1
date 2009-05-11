@@ -20,6 +20,8 @@ include centralizedadvertise.repy
 
 include time.repy
 
+include random.repy
+
 
 
 
@@ -41,6 +43,9 @@ def timefromservice_updatetime(tries=3):
   <Exceptions>
     Exception raised when the value of the parameter "tries" is less than one.
 
+    Exception raised if centralizedadvertise_lookup("time_server") fails after
+    ten tries.
+
     Exception raised when a connection is not able to be established with any of
     the servers running time_server.repy.
 
@@ -57,35 +62,42 @@ def timefromservice_updatetime(tries=3):
     raise Exception("Number of tries to connect to time_server.repy must be at least 1")
 
 
-  # Get the ips and ports of servers hosting time_server.repy, retrying every
-  # time there is an exception
+  # Get the ips and ports of servers hosting time_server.repy, retrying nine
+  # times if there is an exception.
   gotval = False
-  while not gotval:
+  attemptretrieval = 0
+  while attemptretrieval < 10:
     try:
       serveraddresses = centralizedadvertise_lookup("time_server")
     except Exception:
+      attemptretrieval = attemptretrieval + 1
       sleep(10)                 # Look up the value again in 10 seconds
     else:
       gotval = True             # Successfully obtained the value
+      break
+
+  if not gotval:
+    raise Exception("Unable to locate any servers running time_server.repy")
 
 
   timelength = 25  # Max length of string, representing the time, to be received
+  shuffledserveraddresses = random_sample(serveraddresses,len(serveraddresses))
 
-
-  # Open a connection with a server hosting time_server.repy, trying "tries"
-  # number of times before attempting to connect to a different server
+  # Open a connection with a random server hosting time_server.repy, trying
+  # "tries" number of times before attempting to connect to a different server
   timeobtained = False
   serverindex = 0
-  while serverindex < len(serveraddresses)-1:
-    remoteip = serveraddresses[serverindex]
-    remoteport = int(serveraddresses[serverindex + 1])
+  while serverindex < len(shuffledserveraddresses):
+    remoteaddress = shuffledserveraddresses[serverindex].split(':')
+    remoteip = remoteaddress[0]
+    remoteport = int(remoteaddress[1])
 
-    t = 0    # Number of tries connecting to the server completed
-    while (t < tries) and not timeobtained:
+    connectattempt = 0    # Completed number of tries connecting to the server
+    while (connectattempt < tries) and not timeobtained:
       try:
         sockobject = openconn(remoteip,remoteport)
       except Exception:
-        t = t + 1
+        connectattempt = connectattempt + 1
         sleep(5)    # Wait 5 seconds, then retry opening connection with server
       else:
         timeobtained = True
@@ -93,10 +105,10 @@ def timefromservice_updatetime(tries=3):
     if timeobtained:
       break
     else:
-      serverindex = serverindex + 2
+      serverindex = serverindex + 1
 
   if not timeobtained:
-    raise Exception("Unable to open connection with any of the ",len(serveraddresses)/2,"servers running time_server.repy.")
+    raise Exception("Unable to open connection with any of the ",len(shuffledserveraddresses),"servers running time_server.repy.")
 
 
   currenttime = sockobject.recv(timelength)
@@ -154,5 +166,3 @@ def timefromservice_gettime():
 """
 
   return time_gettime()
-
-
