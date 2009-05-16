@@ -14,6 +14,7 @@
 """
 
 
+include urlparse.repy
 include xmlrpc_common.repy
 
 
@@ -34,39 +35,35 @@ class xmlrpc_client_Client(object):
 
   USER_AGENT = "seattlelib/1.0.0"
 
-  def __init__(self, host, **kwargs):
+  def __init__(self, url):
     """
     <Purpose>
       Create a new XML-RPC Client object to do RPC calls to the given
       server.
 
     <Arguments>
-      host:
-        The host on which the XML-RPC server is located.
-
-    <Keyword Arguments>
-      server_port:
-        The port on the server to use.
-
-      server_path:
-        The URL path on the server to use.
+      address:
+        A pair containing 1. the server name or ip address and 2. the
+        server port (optional, defaults to 80).
 
     <Exceptions>
-      socket.error on socket errors, including server timeouts.
+      None.
 
     """
 
-    self.server_host = host
+    if not isinstance(url, (str, unicode)):
+      raise ValueError("Invalid argument: url must be a URL string")
 
-    try:
-      self.server_port = kwargs["server_port"]
-    except KeyError:
-      self.server_port = 80
+    urlcomponents = urlparse_urlsplit(url, "http", False)
 
-    try:
-      self.server_path = kwargs["server_path"]
-    except KeyError:
-      self.server_path = "/"
+    self.server_host = urlcomponents["hostname"]
+    self.server_port = urlcomponents["port"] or 80
+    self.server_path = urlcomponents["path"] or "/"
+    if urlcomponents["query"]:
+      self.server_path += "?" + urlcomponents["query"]
+
+    if not self.server_host:
+      raise ValueError("Invalid argument: url must have a valid host")
 
   def send_request(self, method_name, params):
     """
@@ -81,6 +78,7 @@ class xmlrpc_client_Client(object):
         The method parameters.
 
     <Exceptions>
+      socket.error on socket errors, including server timeouts.
       xmlrpc_common_Fault on a XML-RPC response fault.
       xmlrpc_common_XMLParseError on a XML-RPC structural parse error.
       xmlparse_XMLParseError on a general XML parse error.
@@ -94,10 +92,10 @@ class xmlrpc_client_Client(object):
     """
 
     # Prepare the XML request.
-    request_xml = xmlrpc_common_method_call_to_xml(method_name, params)
+    request_xml = xmlrpc_common_call2xml(method_name, params)
 
-    # Open the connection to the server with a default timeout of 10sec.
-    socket = openconn(self.server_host, self.server_port, None, 0, 10)
+    # Open the connection to the server
+    socket = openconn(self.server_host, self.server_port)
 
     # Send HTTP headers.
     socket.send("POST %s HTTP/1.1\r\n" % self.server_path)
@@ -142,7 +140,7 @@ class xmlrpc_client_Client(object):
     xml_response = raw_content[0:content_size]
 
     # Parse the XML response body into Python values.
-    response_value = xmlrpc_common_method_response_to_python(xml_response)
+    response_value = xmlrpc_common_response2python(xml_response)
 
     # Close the socket.  Connection: keep-alive is not yet supported.
     socket.close()

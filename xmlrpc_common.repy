@@ -114,7 +114,7 @@ class xmlrpc_common_XMLParseError(ValueError):
 
 
 
-def xmlrpc_common_method_call_to_xml(method_name, params):
+def xmlrpc_common_call2xml(method_name, params):
   """
   <Purpose>
     Build a XML-RPC method call to send to a XML-RPC server.
@@ -139,13 +139,13 @@ def xmlrpc_common_method_call_to_xml(method_name, params):
   """
   xml_string = ['<?xml version="1.0"?>',
     "<methodCall><methodName>%s</methodName>" % method_name,
-    xmlrpc_common_params_to_xml(params),
+    _xmlrpc_common_params2xml(params),
     "</methodCall>"]
 
   return "".join(xml_string)
 
 
-def xmlrpc_common_method_response_to_xml(param):
+def xmlrpc_common_response2xml(param):
   """
   <Purpose>
     Build a XML-RPC method response to send to a XML-RPC client.  This
@@ -167,13 +167,13 @@ def xmlrpc_common_method_response_to_xml(param):
 
   """
   xml_string = ['<?xml version="1.0"?><methodResponse>',
-    xmlrpc_common_params_to_xml((param,)),
+    _xmlrpc_common_params2xml((param,)),
     "</methodResponse>"]
 
   return "".join(xml_string)
 
 
-def xmlrpc_common_method_fault_to_xml(message, code):
+def xmlrpc_common_fault2xml(message, code):
   """
   <Purpose>
     Build a XML-RPC fault response to send to a XML-RPC client.  A fault
@@ -199,13 +199,13 @@ def xmlrpc_common_method_fault_to_xml(message, code):
   """
   struct = {"faultCode": code, "faultString": message}
   xml_string = ['<?xml version="1.0"?><methodResponse><fault>',
-    xmlrpc_common_value_to_xml(struct),
+    _xmlrpc_common_value2xml(struct),
     "</fault></methodResponse>"]
 
   return "".join(xml_string)
 
 
-def xmlrpc_common_params_to_xml(params):
+def _xmlrpc_common_params2xml(params):
   """
   <Purpose>
     Translate Python parameter values to XML-RPC for use in building a
@@ -232,14 +232,14 @@ def xmlrpc_common_params_to_xml(params):
   xml_string = ["<params>"]
 
   for param in params:
-    xml_string.append("<param>%s</param>" % xmlrpc_common_value_to_xml(param))
+    xml_string.append("<param>%s</param>" % _xmlrpc_common_value2xml(param))
 
   xml_string.append("</params>")
 
   return "".join(xml_string)
 
 
-def xmlrpc_common_value_to_xml(obj):
+def _xmlrpc_common_value2xml(obj):
   """
   <Purpose>
     Translate a Python value to XML-RPC for use in building the params
@@ -281,14 +281,14 @@ def xmlrpc_common_value_to_xml(obj):
   elif object_type in (list, tuple, xrange, set, frozenset):
     xml_string.append("<array><data>")
     for value in obj:
-      xml_string.append(xmlrpc_common_value_to_xml(value))
+      xml_string.append(_xmlrpc_common_value2xml(value))
     xml_string.append("</data></array>")
 
   elif object_type is dict:
     xml_string.append("<struct>")
     for key, value in obj.iteritems():
       xml_string.append("<member><name>%s</name>" % key)
-      xml_string.append(xmlrpc_common_value_to_xml(value))
+      xml_string.append(_xmlrpc_common_value2xml(value))
       xml_string.append("</member>")
     xml_string.append("</struct>")
 
@@ -307,7 +307,7 @@ def xmlrpc_common_value_to_xml(obj):
   return "".join(xml_string)
 
 
-def xmlrpc_common_method_call_to_python(xml):
+def xmlrpc_common_call2python(xml):
   """
   <Purpose>
     Convert a XML-RPC method call to its Python equivalent.
@@ -352,7 +352,7 @@ def xmlrpc_common_method_call_to_python(xml):
     raise xmlrpc_common_XMLParseError("No method name found")
 
   try:
-    params = xmlrpc_common_params_to_python(xml_node.children[1])
+    params = _xmlrpc_common_params2python(xml_node.children[1])
   except IndexError:
     return (method_name, ())
 
@@ -362,7 +362,7 @@ def xmlrpc_common_method_call_to_python(xml):
   return (method_name, params)
 
 
-def xmlrpc_common_method_response_to_python(xml):
+def xmlrpc_common_response2python(xml):
   """
   <Purpose>
     Convert a XML-RPC method response to its Python equivalent.
@@ -401,14 +401,14 @@ def xmlrpc_common_method_response_to_python(xml):
       raise xmlrpc_common_XMLParseError("No children found for 'fault'")
     elif len(fault_node.children) != 1:
       raise xmlrpc_common_XMLParseError("Too many children for 'fault'")
-    params = xmlrpc_common_value_to_python(fault_node.children[0])
+    params = _xmlrpc_common_value2python(fault_node.children[0])
     try:
       return xmlrpc_common_Fault(params["faultString"], params["faultCode"])
     except KeyError:
       raise xmlrpc_common_XMLParseError("Invalid fault object")
 
   try:
-    params = xmlrpc_common_params_to_python(xml_node.children[0])
+    params = _xmlrpc_common_params2python(xml_node.children[0])
   except KeyError:
     raise xmlrpc_common_XMLParseError("No parameters found")
 
@@ -418,7 +418,7 @@ def xmlrpc_common_method_response_to_python(xml):
   return params[0]
 
 
-def xmlrpc_common_params_to_python(xml_node):
+def _xmlrpc_common_params2python(xml_node):
   """
   <Purpose>
     Convert XML-RPC params the Python equivalent.
@@ -458,12 +458,12 @@ def xmlrpc_common_params_to_python(xml_node):
       raise xmlrpc_common_XMLParseError("Unexpected empty param node")
     elif len(param_node.children) > 1:
       raise xmlrpc_common_XMLParseError("Too many children for 'param'")
-    params.append(xmlrpc_common_value_to_python(param_node.children[0]))
+    params.append(_xmlrpc_common_value2python(param_node.children[0]))
 
   return params
 
 
-def xmlrpc_common_value_to_python(xml_node):
+def _xmlrpc_common_value2python(xml_node):
   """
   <Purpose>
     Convert a XML-RPC value the Python equivalent.
@@ -515,8 +515,9 @@ def xmlrpc_common_value_to_python(xml_node):
       raise xmlrpc_common_XMLParseError("Too many children for 'array'")
     data_node = value_node.children[0]
     result = []
-    for item_node in data_node.children:
-      result.append(xmlrpc_common_value_to_python(item_node))
+    if data_node.children:
+      for item_node in data_node.children:
+        result.append(_xmlrpc_common_value2python(item_node))
     return result
 
   elif tag == "struct":
@@ -528,7 +529,7 @@ def xmlrpc_common_value_to_python(xml_node):
         raise xmlrpc_common_XMLParseError(message)
 
       key = member_node.children[0].content
-      value = xmlrpc_common_value_to_python(member_node.children[1])
+      value = _xmlrpc_common_value2python(member_node.children[1])
 
       result[key] = value
 

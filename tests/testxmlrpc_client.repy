@@ -22,7 +22,7 @@ include xmlrpc_client.repy
 
 if callfunc == 'initialize':
 
-  client = xmlrpc_client_Client("localhost", server_port=8000)
+  client = xmlrpc_client_Client("http://localhost:8000/")
 
   # Test the client for functionality with scalars.
 
