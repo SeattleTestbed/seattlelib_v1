@@ -1,3 +1,18 @@
+"""
+<Program Name>
+  xmlparse.repy
+
+<Started>
+  April 2009
+
+<Author>
+  Conrad Meyer <cemeyer@u.washington.edu>
+
+<Purpose>
+  Provide a relatively simplistic but usable xml parsing library for
+  RePy.
+"""
+
 class xmlparse_XMLParseError(Exception):
   """Exception raised when an error is encountered parsing the XML."""
   pass

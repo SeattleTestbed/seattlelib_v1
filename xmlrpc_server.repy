@@ -1,3 +1,19 @@
+"""
+<Program Name>
+  xmlrpc_server.repy
+
+<Started>
+  April 2009
+
+<Author>
+  Conrad Meyer <cemeyer@u.washington.edu>
+
+<Purpose>
+  Provide a usable XML-RPC server interface for RePy code. This module
+  aims to be as similar in behavior to the Python SimpleXMLRPCServer as
+  is possible with RePy.
+"""
+
 include xmlparse.repy
 include xmlrpc_common.repy
 include urllib.repy
@@ -58,6 +74,37 @@ class xmlrpc_server_SimpleXMLRPCServer:
 
 
   def __init__(self, addr):
+    """
+    <Purpose>
+      Provide a simple server-side API for programs wishing to expose their
+      functions to an XMLRPC client.
+
+    <Side Effects>
+      None.
+
+    <Exceptions>
+      ArgumentError if the host part of the address passed to the
+      constructor is a hostname that resolves to more than one ip.
+
+      TypeError if the passed variable addr isn't a container (list,
+      tuple, etc) of length 2.
+
+    <Example Use>
+      # create a server object
+      server = xmlrpc_server_SimpleXMLRPCServer(("localhost", 12345))
+      # register a function
+      server.register_function(pow)
+      # wait for clients to connect and call the function
+      server.serve_forever()
+    """   
+
+    try:
+      if len(addr) != 2:
+        raise TypeError()
+    except TypeError, e:
+      raise TypeError("SimpleXMLRPCServer(): addr must be a 2-tuple " + \
+          "containing the hostname and port to listen on.")
+
     self._listen_ip = _xmlrpc_server_lookup_ip(addr[0])
     self._listen_port = addr[1]
 
