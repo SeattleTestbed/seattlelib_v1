@@ -17,14 +17,18 @@
 
   * Initial release
 
+  2009-05-24  Michael Phan-Ba  <mdphanba@gmail.com>
+
+  * (repyunit_TestResult) Updated documentation per request from Justin Cappos
+
 """
 
 
 class repyunit_TestResult(object):
   """
   <Purpose>
-    Hold test result statistics and processes test outcomes. Subclasses may
-    extend this class to provide additional functionality, like printing output.
+    Hold test result statistics and process test outcomes. Subclasses may extend
+    this class to provide additional functionality, like printing output.
 
     The test_count instance member holds the number of tests executed;
     success_count holds the number of tests executed that were successful,
@@ -60,14 +64,14 @@ class repyunit_TestResult(object):
     self.error_count = 0
 
 
-  def start_test(self, test):
+  def start_test(self, test_case):
     """
     <Purpose>
       Indicate that a test has been started; called before each test run. This
       is a useful method to print test header information.
 
     <Arguments>
-      test:
+      test_case:
         The repyunit_TestCase instance about to be executed.
 
     <Exceptions>
@@ -83,14 +87,14 @@ class repyunit_TestResult(object):
     pass
 
 
-  def stop_test(self, test):
+  def stop_test(self, test_case):
     """
     <Purpose>
       Indicate that the test has finished; called after each test run. This is
       a useful method to print post-test information.
 
     <Arguments>
-      test:
+      test_case:
         The repyunit_TestCase instance just finished executing.
 
     <Exceptions>
@@ -106,14 +110,14 @@ class repyunit_TestResult(object):
     pass
 
 
-  def add_success(self, test):
+  def add_success(self, test_case):
     """
     <Purpose>
       Add a successful statistic to the results; called whenever a test exists
       successfully. Subclasses must call the parent method for proper function. 
 
     <Arguments>
-      test:
+      test_case:
         The repyunit_TestCase instance executing.
 
     <Exceptions>
@@ -130,14 +134,14 @@ class repyunit_TestResult(object):
     self.success_count += 1
 
 
-  def add_failure(self, test, error=None):
+  def add_failure(self, test_case, error=None):
     """
     <Purpose>
       Add a failure statistic to the results; called whenever a test exists with
       a failure. Subclasses must call the parent method for proper function. 
 
     <Arguments>
-      test:
+      test_case:
         The repyunit_TestCase instance executing.
 
     <Exceptions>
@@ -154,14 +158,14 @@ class repyunit_TestResult(object):
     self.failure_count += 1
 
 
-  def add_error(self, test, error):
+  def add_error(self, test_case, error):
     """
     <Purpose>
       Add an error statistic to the results; called whenever a test exists with
       an error. Subclasses must call the parent method for proper function. 
 
     <Arguments>
-      test:
+      test_case:
         The repyunit_TestCase instance executing.
 
     <Exceptions>
@@ -259,7 +263,8 @@ class repyunit_TestCase(object):
       constructor.
 
     <Arguments>
-      None.
+      result:
+        Optional repyunit_TestResult object to use to collect test statistics.
 
     <Exceptions>
       None.
@@ -275,30 +280,40 @@ class repyunit_TestCase(object):
     if result is None:
       result = repyunit_TestResult()
 
+    # notify that the test has started
     result.start_test(self)
 
+    # set up the test environment
     try:
       self.set_up()
+    # fail with an error; consider this an unrecoverable error and abort
     except Exception, inst:
-      result.add_error(self, inst)
+      result.add_error(self, inst, "unrecoverable error: set_up failed")
       return
 
+    # run the test
     try:
       self.run_method()
+    # fail with a failure if there are any assertion errors
     except AssertionError, inst:
       result.add_failure(self, inst)
+    # fail with an error if any other exceptions are raised
     except Exception, inst:
       result.add_error(self, inst)
       return
+    # end with a success
     else:
       result.add_success(self)
 
+    # clean up the test environment
     try:
       self.tear_down()
+    # fail with an error; consider this an unrecoverable error and abort
     except Exception, inst:
-      result.add_error(self, inst)
+      result.add_error(self, inst, "unrecoverable error: tear_down failed")
       return
 
+    # notify that the test has ended
     result.stop_test(self)
 
 
@@ -445,8 +460,10 @@ class repyunit_TestCase(object):
 
     """
     if expected != actual:
-      raise AssertionError(msg or "expected %s, but got '%s' instead" % \
-                           (expected, actual))
+      # raise an AssertionError with the given message or the default message
+      if not msg is None:
+        msg = "expected %s, but got '%s' instead" % (expected, actual)
+      raise AssertionError(msg)
 
 
   def assert_false(self, expr, msg=None):
@@ -473,8 +490,10 @@ class repyunit_TestCase(object):
 
     """
     if expr:
-      raise AssertionError(msg or "expected false, but got '%s' instead" % \
-                           expr)
+      # raise an AssertionError with the given message or the default message
+      if not msg is None:
+        msg = "expected false, but got '%s' instead" % expr
+      raise AssertionError(msg)
 
 
   def assert_true(self, expr, msg=None):
@@ -501,8 +520,10 @@ class repyunit_TestCase(object):
 
     """
     if not expr:
-      raise AssertionError(msg or "expected true, but got '%s' instead" % \
-                           expr)
+      # raise an AssertionError with the given message or the default message
+      if not msg is None:
+        msg = "expected true, but got '%s' instead" % expr
+      raise AssertionError(msg)
 
 
   def assert_error(self, except_class, func, msg=None, *args, **kwargs):
@@ -543,8 +564,10 @@ class repyunit_TestCase(object):
     except except_class:
       return
     else:
-      raise AssertionError(msg or "expected exception %s not raised" % \
-                           except_class)
+      # raise an AssertionError with the given message or the default message
+      if not msg is None:
+        msg = "expected exception %s not raised" % except_class
+      raise AssertionError(msg)
 
 
   def fail(self, msg=None):
@@ -606,7 +629,7 @@ class repyunit_TestSuite(object):
 
 
 
-  def add_test(self, test):
+  def add_test(self, test_case):
     """
     <Purpose>
       Add test to the test suite. These tests are run together using the run
@@ -625,28 +648,39 @@ class repyunit_TestSuite(object):
       None.
 
     """
+    # if test_case is a class and subclasses repyunit_TestCase, the test cases
+    # will need to be loaded 
     try:
-      load_tests = issubclass(test, repyunit_TestCase)
+      load_tests = issubclass(test_case, repyunit_TestCase)
     except TypeError:
       load_tests = False
 
+    # if test_case is a class and subclasses repyunit_TestCase, it needs to be
+    # instantiated
     try:
-      instantiate = issubclass(test, repyunit_TestSuite)
+      instantiate = issubclass(test_case, repyunit_TestSuite)
     except TypeError:
       instantiate = False
 
+    # load test cases from the class if necessary
     if load_tests:
-      test = repyunit_load_tests_from_test_case(test)
+      test_case = repyunit_load_tests_from_test_case(test_case)
+    # instantiate the class if necessary
     elif instantiate:
-      test = test()
-    elif not isinstance(test, (repyunit_TestCase, repyunit_TestSuite)):
+      test_case = test_case()
+    # otherwise, check that test_case is either a repyunit_TestCase or
+    # repyunit_TestSuite
+    elif not isinstance(test_case,
+                        (repyunit_TestCase, repyunit_TestSuite)):
         raise TypeError("%s must be of type %s or %s" % \
-                        (test, "repyunit_TestCase", "repyunit_TestSuite"))
+                        (test_case, "repyunit_TestCase",
+                         "repyunit_TestSuite"))
 
-    self.tests.append(test)
+    # add this test case
+    self.tests.append(test_case)
 
 
-  def add_tests(self, tests):
+  def add_tests(self, test_cases):
     """
     <Purpose>
       Add many tests to the test suite. These tests are run together using the
@@ -665,8 +699,8 @@ class repyunit_TestSuite(object):
       None.
 
     """
-    for test in tests:
-      self.add_test(test)
+    for test_case in test_cases:
+      self.add_test(test_case)
 
 
   def run(self, result):
@@ -709,13 +743,13 @@ class _repyunit_TextTestResult(repyunit_TestResult):
   """
 
 
-  def start_test(self, test):
+  def start_test(self, test_case):
     """
     <Purpose>
       Override the parent method to print the test name.
 
     <Arguments>
-      test:
+      test_case:
         The repyunit_TestCase instance about to be executed.
 
     <Exceptions>
@@ -728,16 +762,17 @@ class _repyunit_TextTestResult(repyunit_TestResult):
       None.
 
     """
-    print "%s (%s)" % (test.run_method_name, test.get_class_name()),
+    print "%s (%s)" % (test_case.run_method_name,
+                       test_case.get_class_name()),
 
 
-  def add_success(self, test):
+  def add_success(self, test_case):
     """
     <Purpose>
       Extend the parent method to print a success status.
 
     <Arguments>
-      test:
+      test_case:
         The repyunit_TestCase instance executing.
 
     <Exceptions>
@@ -750,17 +785,17 @@ class _repyunit_TextTestResult(repyunit_TestResult):
       None.
 
     """
-    repyunit_TestResult.add_success(self, test)
+    repyunit_TestResult.add_success(self, test_case)
     print "... success"
 
 
-  def add_failure(self, test, error=None):
+  def add_failure(self, test_case, error=None):
     """
     <Purpose>
       Extend the parent method to print a failure status.
 
     <Arguments>
-      test:
+      test_case:
         The repyunit_TestCase instance executing.
 
     <Exceptions>
@@ -774,18 +809,18 @@ class _repyunit_TextTestResult(repyunit_TestResult):
 
 
     """
-    repyunit_TestResult.add_failure(self, test, error)
+    repyunit_TestResult.add_failure(self, test_case, error)
     print "... failed"
     print "\t", error.message
 
 
-  def add_error(self, test, error):
+  def add_error(self, test_case, error):
     """
     <Purpose>
       Extend the parent method to print an error status.
 
     <Arguments>
-      test:
+      test_case:
         The repyunit_TestCase instance executing.
 
     <Exceptions>
@@ -799,7 +834,7 @@ class _repyunit_TextTestResult(repyunit_TestResult):
 
 
     """
-    repyunit_TestResult.add_error(self, test, error)
+    repyunit_TestResult.add_error(self, test_case, error)
     print "... error"
     print "\t", error.message
 
@@ -827,24 +862,31 @@ def repyunit_load_tests_from_test_case(test_case):
     A repyunit_TestSuite loaded with all the tests from the given test case.
 
   """
+  # prepare a new test suite to add test cases
   suite = repyunit_TestSuite()
+
+  # retrieve the test method names
   test = test_case()
-  for test_method_name in test.get_test_method_names():
+  test_method_names = test.get_test_method_names()
+
+  # add the test cases
+  for test_method_name in test_method_names:
     suite.add_test(test_case(test_method_name))
+
   return suite
 
 
 
 
 
-def repyunit_text_test_run(test):
+def repyunit_text_test_run(test_case):
   """
   <Purpose>
     Run all tests given in test and print statistical information in textual
     format.
 
   <Arguments>
-    test:
+    test_case:
       A repyunit_TestCase or repyunit_TestSuite to run the test(s).
 
   <Exceptions>
@@ -857,10 +899,15 @@ def repyunit_text_test_run(test):
     None.
 
   """
+  # use a custom text output result object
   result = _repyunit_TextTestResult()
+
+  # create a new test suite to populate and run
   suite = repyunit_TestSuite()
-  suite.add_test(test)
+  suite.add_test(test_case)
   suite.run(result)
+
+  # print test statistics
   print "----------------"
   print "Ran %d tests: %d successes, %d failures, %d errors" % \
     (result.test_count, result.success_count, result.failure_count,
