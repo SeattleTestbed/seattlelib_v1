@@ -1,6 +1,6 @@
 """
 <Program Name>
-  xmlrpc_common.py
+  $Id$
 
 <Started>
   April 26, 2009
@@ -12,6 +12,18 @@
   Provides common methods related to XML-RPC.
 
   Encoding dateTime.iso8601 are not currently supported.
+
+<Changes>
+
+  2009-04-26  Michael Phan-Ba  <mdphanba@gmail.com>
+
+  * Initial release
+
+  2009-05-24  Michael Phan-Ba  <mdphanba@gmail.com>
+
+  * Added change log
+  * Fixed base64 name error
+  * Set property svn:keyword to "Id" 
 
 """
 
@@ -297,7 +309,7 @@ def _xmlrpc_common_value2xml(obj):
   # rather than
   #   class Foo: pass
   elif object_type is xmlrpc_common_Binary:
-    xml_string.append("<base64>%s</base64>" % standard_b64encode(obj.data))
+    xml_string.append("<base64>%s</base64>" % base64_standard_b64encode(obj.data))
 
   else:
     raise ValueError("Marshaller: Unsupported type '%s'" % type(obj))
@@ -536,7 +548,7 @@ def _xmlrpc_common_value2python(xml_node):
     return result
 
   elif tag == "base64":
-    return xmlrpc_common_Binary(standard_b64decode(value_node.content))
+    return xmlrpc_common_Binary(base64_standard_b64decode(value_node.content))
 
   else:
     message = "Demashaller: Unsupported value type: %s" % value_node.tag_name

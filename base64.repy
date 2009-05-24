@@ -1,6 +1,6 @@
 """
 <Program Name>
-  base64.py
+  $Id$
 
 <Started>
   April 12, 2009
@@ -26,6 +26,10 @@
 
   * (b64encode, b64decode, standard_b64encode, standard_b64decode,
     urlsafe_encode, urlsafe_decode): Renamed functions with base64 prefix
+
+  2009-05-24  Michael Phan-Ba  <mdphanba@gmail.com>
+
+  * Set property svn:keyword to "Id" 
 
 """
 

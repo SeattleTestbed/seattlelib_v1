@@ -1,6 +1,6 @@
 """
 <Program Name>
-  testxmlrpc_common.py
+  $Id$
 
 <Started>
   May 3, 2009
@@ -10,6 +10,17 @@
 
 <Purpose>
   Runs unit tests on xmlrpc_common.repy.
+
+<Changes>
+
+  2009-05-03  Michael Phan-Ba  <mdphanba@gmail.com>
+
+  * Initial release
+
+  2009-05-24  Michael Phan-Ba  <mdphanba@gmail.com>
+
+  * Added change log
+  * Set property svn:keyword to "Id" 
 
 """
 
@@ -84,7 +95,7 @@ if callfunc == 'initialize':
 
   error_raised = False
   try:
-    _xmlrpc_common_value2xml(complex(1,1))
+    _xmlrpc_common_value2xml(complex(1, 1))
   except ValueError, inst:
     error_raised = True
   assert(error_raised)
