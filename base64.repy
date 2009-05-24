@@ -16,13 +16,24 @@
   decodestring(), encode(), and encodestring() are not currently
   implemented.
 
+<Changes>
+
+  2009-04-12  Michael Phan-Ba  <mdphanba@gmail.com>
+
+  * Initial release
+
+  2009-05-23  Michael Phan-Ba  <mdphanba@gmail.com>
+
+  * (b64encode, b64decode, standard_b64encode, standard_b64decode,
+    urlsafe_encode, urlsafe_decode): Renamed functions with base64 prefix
+
 """
 
 # The Base64 for use in encoding
 BASE64_ALPHABET = \
   "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 
-def b64encode(s, altchars=None):
+def base64_b64encode(s, altchars=None):
   """
   <Purpose>
     Encode a string using Base64.
@@ -75,7 +86,7 @@ def b64encode(s, altchars=None):
 
     # Encode the next 8 bits.
     try:
-      x8bits = bytes[index+1]
+      x8bits = bytes[index + 1]
     except IndexError:
       x6bits = leftover_bits << 4
       x6bit_words.extend([base64_alphabet[x6bits], "=="])
@@ -87,7 +98,7 @@ def b64encode(s, altchars=None):
 
     # Encode the final 8 bits.
     try:
-      x8bits = bytes[index+2]
+      x8bits = bytes[index + 2]
     except IndexError:
       x6bits = leftover_bits << 2
       x6bit_words.extend([base64_alphabet[x6bits], "="])
@@ -102,7 +113,7 @@ def b64encode(s, altchars=None):
 
   return "".join(x6bit_words)
 
-def b64decode(s, altchars=None):
+def base64_b64decode(s, altchars=None):
   """
   <Purpose>
     Decode a Base64 encoded string.  The decoder ignores all non
@@ -191,7 +202,7 @@ def b64decode(s, altchars=None):
     # Work on four 6-bit quantities at a time.  End when no more data is
     # available.
     try:
-      (x6bits1, x6bits2, x6bits3, x6bits4) = x6bit_words[index:index+4]
+      (x6bits1, x6bits2, x6bits3, x6bits4) = x6bit_words[index:index + 4]
     except ValueError:
       break
 
@@ -217,7 +228,7 @@ def b64decode(s, altchars=None):
 
   return "".join([chr(x) for x in bytes])
 
-def standard_b64encode(s):
+def base64_standard_b64encode(s):
   """
   <Purpose>
     Encode a string using the standard Base64 alphabet.
@@ -236,9 +247,9 @@ def standard_b64encode(s):
     The encoded string.
 
   """
-  return b64encode(s)
+  return base64_b64encode(s)
 
-def standard_b64decode(s):
+def base64_standard_b64decode(s):
   """
   <Purpose>
     Decode a Base64 encoded string using the standard Base64 alphabet.
@@ -257,10 +268,10 @@ def standard_b64decode(s):
     The decoded string.
 
   """
-  return b64decode(s)
+  return base64_b64decode(s)
 
 
-def urlsafe_b64encode(s):
+def base64_urlsafe_b64encode(s):
   """
   <Purpose>
     Encode a string using a URL-safe alphabet, which substitutes -
@@ -280,10 +291,10 @@ def urlsafe_b64encode(s):
     The encoded string.
 
   """
-  return b64encode(s, "-_")
+  return base64_b64encode(s, "-_")
 
 
-def urlsafe_b64decode(s):
+def base64_urlsafe_b64decode(s):
   """
   <Purpose>
     Decode a Base64 encoded string using a URL-safe alphabet, which
@@ -304,4 +315,4 @@ def urlsafe_b64decode(s):
     The decoded string.
 
   """
-  return b64decode(s, "-_")
+  return base64_b64decode(s, "-_")

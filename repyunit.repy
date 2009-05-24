@@ -1,0 +1,867 @@
+"""
+<Program Name>
+  $Id$
+
+<Started>
+  May 23, 2009
+
+<Author>
+  Michael Phan-Ba <mdphanba@gmail.com>
+
+<Purpose>
+  Unit testing framework based on JUnit and the Python unittest module.
+
+<Changes>
+
+  2009-05-23  Michael Phan-Ba  <mdphanba@gmail.com>  (#431)
+
+  * Initial release
+
+"""
+
+
+class repyunit_TestResult(object):
+  """
+  <Purpose>
+    Hold test result statistics and processes test outcomes. Subclasses may
+    extend this class to provide additional functionality, like printing output.
+
+    The test_count instance member holds the number of tests executed;
+    success_count holds the number of tests executed that were successful,
+    failure_count holds the number of tests executed that have failed,
+    error_count holds the number of tests executed that resulted in an error.
+
+  <Side Effects>
+    None.
+
+  <Example Use>
+    test = FoobarTestSuite()
+    test.run(repyunit_TestResult())
+
+  """
+
+
+  def __init__(self):
+    """
+    <Purpose>
+      Initialize the statistics variables. Subclasses must call the parent
+      constructor for proper function.
+
+    <Arguments>
+      None.
+
+    <Exceptions>
+      None.
+
+    """
+    self.test_count = 0
+    self.success_count = 0
+    self.failure_count = 0
+    self.error_count = 0
+
+
+  def start_test(self, test):
+    """
+    <Purpose>
+      Indicate that a test has been started; called before each test run. This
+      is a useful method to print test header information.
+
+    <Arguments>
+      test:
+        The repyunit_TestCase instance about to be executed.
+
+    <Exceptions>
+      None.
+
+    <Side Effects>
+      None.
+
+    <Returns>
+      None.
+
+    """
+    pass
+
+
+  def stop_test(self, test):
+    """
+    <Purpose>
+      Indicate that the test has finished; called after each test run. This is
+      a useful method to print post-test information.
+
+    <Arguments>
+      test:
+        The repyunit_TestCase instance just finished executing.
+
+    <Exceptions>
+      None.
+
+    <Side Effects>
+      None.
+
+    <Returns>
+      None.
+
+    """
+    pass
+
+
+  def add_success(self, test):
+    """
+    <Purpose>
+      Add a successful statistic to the results; called whenever a test exists
+      successfully. Subclasses must call the parent method for proper function. 
+
+    <Arguments>
+      test:
+        The repyunit_TestCase instance executing.
+
+    <Exceptions>
+      None.
+
+    <Side Effects>
+      None.
+
+    <Returns>
+      None.
+
+    """
+    self.test_count += 1
+    self.success_count += 1
+
+
+  def add_failure(self, test, error=None):
+    """
+    <Purpose>
+      Add a failure statistic to the results; called whenever a test exists with
+      a failure. Subclasses must call the parent method for proper function. 
+
+    <Arguments>
+      test:
+        The repyunit_TestCase instance executing.
+
+    <Exceptions>
+      None.
+
+    <Side Effects>
+      None.
+
+    <Returns>
+      None.
+
+    """
+    self.test_count += 1
+    self.failure_count += 1
+
+
+  def add_error(self, test, error):
+    """
+    <Purpose>
+      Add an error statistic to the results; called whenever a test exists with
+      an error. Subclasses must call the parent method for proper function. 
+
+    <Arguments>
+      test:
+        The repyunit_TestCase instance executing.
+
+    <Exceptions>
+      None.
+
+    <Side Effects>
+      None.
+
+    <Returns>
+      None.
+
+    """
+    self.test_count += 1
+    self.error_count += 1
+
+
+
+
+
+class repyunit_TestCase(object):
+  """
+  <Purpose>
+    Encapsulate a test case. This class is the workhorse of the module. It
+    defines the methods required to run tests by extending the class. 
+
+    Under regular Python, the class name would be extracted automatically, but
+    this is not possible in Repy. Thus, subclasses must override the
+    get_class_name method. For the same reasons, subclasses must also override
+    the get_test_method_names method if run_test is not overwritten or when
+    additional tests are defined.
+
+  <Side Effects>
+    None.
+
+  <Example Use>
+    class FooTestCase(repyunit_TestCase):
+      def get_class_name(self):
+        return "FooTestCase"
+      def run_test(self):
+        self.assert_true(True)
+
+    test = FooTestCase()
+    test.run()
+  """
+
+
+  def __init__(self, test_method_name="run_test"):
+    """
+    <Purpose>
+      Initiate a new test case running a particular test.
+
+    <Arguments>
+      test_method_name:
+        The name of the method to call when running the test.
+
+    <Exceptions>
+      None.
+
+    """
+    try:
+      self.run_method = getattr(self, test_method_name)
+      self.run_method_name = test_method_name
+    except AttributeError:
+      raise ValueError, "Invalid test method %s.%s" % \
+        (self.get_class_name(), test_method_name)
+
+
+  def id(self):
+    """
+    <Purpose>
+      Return the string class_name.method_name where class_name is the name of
+      the class of this instance and method_name is the name of the test
+      function passed to the constructor.
+
+    <Arguments>
+      None.
+
+    <Exceptions>
+      None.
+
+    <Side Effects>
+      None.
+
+    <Returns>
+      A unique identifier for this test.
+
+    """
+    return "%s.%s" % (self.get_class_name(), test_method_name)
+
+
+  def run(self, result=None):
+    """
+    <Purpose>
+      Run this instance of the test case using the test method name given in the
+      constructor.
+
+    <Arguments>
+      None.
+
+    <Exceptions>
+      None.
+
+    <Side Effects>
+      The instance is modified by the test method and should not be used to run
+      another test.
+
+    <Returns>
+      None.
+
+    """
+    if result is None:
+      result = repyunit_TestResult()
+
+    result.start_test(self)
+
+    try:
+      self.set_up()
+    except Exception, inst:
+      result.add_error(self, inst)
+      return
+
+    try:
+      self.run_method()
+    except AssertionError, inst:
+      result.add_failure(self, inst)
+    except Exception, inst:
+      result.add_error(self, inst)
+      return
+    else:
+      result.add_success(self)
+
+    try:
+      self.tear_down()
+    except Exception, inst:
+      result.add_error(self, inst)
+      return
+
+    result.stop_test(self)
+
+
+  def set_up(self):
+    """
+    <Purpose>
+      Set up the instance variables used by all tests in this test case. This
+      method is called before each test run.
+
+    <Arguments>
+      None.
+
+    <Exceptions>
+      None.
+
+    <Side Effects>
+      None.
+
+    <Returns>
+      None.
+
+    """
+    pass
+
+
+  def run_test(self):
+    """
+    <Purpose>
+      Run a test. This is the default test method. Subclasses must override this
+      method if it is used, otherwise this test will always fail with an error.
+
+    <Arguments>
+      None.
+
+    <Exceptions>
+      None.
+
+    <Side Effects>
+      None.
+
+    <Returns>
+      None.
+
+    """
+    raise NotImplementedError("run_test is not implemented")
+
+
+  def tear_down(self):
+    """
+    <Purpose>
+      Clean up resources set up by set_up. If there are persistent resources
+      that have been allocated for the test, clean up here. This method is
+      called after each test run.
+
+    <Arguments>
+      None.
+
+    <Exceptions>
+      None.
+
+    <Side Effects>
+      None.
+
+    <Returns>
+      None.
+
+    """
+    pass
+
+
+  def get_test_method_names(self):
+    """
+    <Purpose>
+      Return a list of method names that implement tests. This list is used to
+      determine which methods to run as tests. Under regular Python, this
+      information would be extracted automatically, but access is restricted in
+      Repy. Thus, subclasses must override this method if methods other than
+      run_test are used.
+
+    <Arguments>
+      None.
+
+    <Exceptions>
+      None.
+
+    <Side Effects>
+      None.
+
+    <Returns>
+      A list of test method names.
+
+    """
+    return ("run_test",)
+
+
+  def get_class_name(self):
+    """
+    <Purpose>
+      Return the name of this class. Under regular Python, this information
+      would be extracted automatically, but access is restricted in Repy. Thus,
+      subclasses must override this for proper function.
+
+    <Arguments>
+      None.
+
+    <Exceptions>
+      None.
+
+    <Side Effects>
+      None.
+
+    <Returns>
+      The name of this class.
+
+    """
+    raise NotImplementedError("get_class_name method is not implemented")
+
+
+  def assert_equals(self, expected, actual, msg=None):
+    """
+    <Purpose>
+      Assert that the actual value is the same as the expected value. Use this
+      method to assert equality rather than assert(a == b) to print more useful
+      information on a failure.
+
+    <Arguments>
+      expected:
+        The expected value.
+
+      actual:
+        The actual value.
+
+      msg:
+        An optional message describing the failure.
+
+    <Exceptions>
+      AssertionError when the values do not match.
+
+    <Side Effects>
+      None.
+
+    <Returns>
+      None.
+
+    """
+    if expected != actual:
+      raise AssertionError(msg or "expected %s, but got '%s' instead" % \
+                           (expected, actual))
+
+
+  def assert_false(self, expr, msg=None):
+    """
+    <Purpose>
+      Assert that the actual value is false. Use this method to assert equality
+      rather than assert(!a) to print more useful information on a failure.
+
+    <Arguments>
+      expr:
+        The expression to consider for assertion.
+
+      msg:
+        An optional message describing the failure.
+
+    <Exceptions>
+      AssertionError when the expression is not false.
+
+    <Side Effects>
+      None.
+
+    <Returns>
+      None.
+
+    """
+    if expr:
+      raise AssertionError(msg or "expected false, but got '%s' instead" % \
+                           expr)
+
+
+  def assert_true(self, expr, msg=None):
+    """
+    <Purpose>
+      Assert that the actual value is true. Use this method to assert equality
+      rather than assert(a) to print more useful information on a failure.
+
+    <Arguments>
+      expr:
+        The expression to consider for assertion.
+
+      msg:
+        An optional message describing the failure.
+
+    <Exceptions>
+      AssertionError when the expression is not true.
+
+    <Side Effects>
+      None.
+
+    <Returns>
+      None.
+
+    """
+    if not expr:
+      raise AssertionError(msg or "expected true, but got '%s' instead" % \
+                           expr)
+
+
+  def assert_error(self, except_class, func, msg=None, *args, **kwargs):
+    """
+    <Purpose>
+      Assert that the callable object func raises an exception of type
+      except_class.
+
+    <Arguments>
+      except_class:
+        The exception class expected to be raised.
+
+      func:
+        The callable object to execute and test for the appropriate exception.
+
+      *args:
+        Additional arguments to pass to func.
+
+      *kwargs:
+        Additional keyword arguments to pass to func.
+
+      msg:
+        An optional message describing the error.
+
+    <Exceptions>
+      AssertionError when func does not raise the appropriate exception.
+      Exception when any other exception is raised.
+
+    <Side Effects>
+      None.
+
+    <Returns>
+      None.
+
+    """
+    try:
+      func(*args, **kwargs)
+    except except_class:
+      return
+    else:
+      raise AssertionError(msg or "expected exception %s not raised" % \
+                           except_class)
+
+
+  def fail(self, msg=None):
+    """
+    <Purpose>
+      Unconditionally fail the test with an optional message.
+
+    <Arguments>
+      msg:
+        An optional message describing the failure.
+
+    <Exceptions>
+      AssertionError always raised.
+
+    <Side Effects>
+      None.
+
+    <Returns>
+      None.
+
+    """
+    raise AssertionError(msg)
+
+
+
+
+
+class repyunit_TestSuite(object):
+  """
+  <Purpose>
+    Encapsulate a collection of unit tests. This class is used to group together
+    repyunit_TestCase instances for execution.
+
+  <Side Effects>
+    None.
+
+  <Example Use>
+    suite = repyunit_TestSuite().
+    suite.add_test(FoobarTest())
+    suite.add_test(FoobarTest("test_baz"))
+    suite.run(CustomTestResult())
+
+  """
+
+  def __init__(self):
+    """
+    <Purpose>
+      Initialize the test suite with zero tests. Subclasses must call the parent
+      constructor for proper function.
+
+    <Arguments>
+      None.
+
+    <Exceptions>
+      None.
+
+    """
+    self.tests = []
+
+
+
+  def add_test(self, test):
+    """
+    <Purpose>
+      Add test to the test suite. These tests are run together using the run
+      method.
+
+    <Arguments>
+      None.
+
+    <Exceptions>
+      TypeError when test is not a repyunit_TestCase or repyunit_TestSuite.
+
+    <Side Effects>
+      None.
+
+    <Returns>
+      None.
+
+    """
+    try:
+      load_tests = issubclass(test, repyunit_TestCase)
+    except TypeError:
+      load_tests = False
+
+    try:
+      instantiate = issubclass(test, repyunit_TestSuite)
+    except TypeError:
+      instantiate = False
+
+    if load_tests:
+      test = repyunit_load_tests_from_test_case(test)
+    elif instantiate:
+      test = test()
+    elif not isinstance(test, (repyunit_TestCase, repyunit_TestSuite)):
+        raise TypeError("%s must be of type %s or %s" % \
+                        (test, "repyunit_TestCase", "repyunit_TestSuite"))
+
+    self.tests.append(test)
+
+
+  def add_tests(self, tests):
+    """
+    <Purpose>
+      Add many tests to the test suite. These tests are run together using the
+      run method.
+
+    <Arguments>
+      None.
+
+    <Exceptions>
+      TypeError when test is not a repyunit_TestCase or repyunit_TestSuite.
+
+    <Side Effects>
+      None.
+
+    <Returns>
+      None.
+
+    """
+    for test in tests:
+      self.add_test(test)
+
+
+  def run(self, result):
+    """
+    <Purpose>
+      Run the tests in the suite.
+
+    <Arguments>
+      result:
+        The repyunit_TestResult object to use to collect test statistics.
+
+    <Exceptions>
+      None.
+
+    <Side Effects>
+      None.
+
+    <Returns>
+      None.
+
+    """
+    for test in self.tests:
+      test.run(result)
+
+
+
+
+
+class _repyunit_TextTestResult(repyunit_TestResult):
+  """
+  <Purpose>
+    Extend repyunit_TestResult to provide text output facilities.
+
+  <Side Effects>
+    None.
+
+  <Example Use>
+    See repyunit_TestResult.
+
+  """
+
+
+  def start_test(self, test):
+    """
+    <Purpose>
+      Override the parent method to print the test name.
+
+    <Arguments>
+      test:
+        The repyunit_TestCase instance about to be executed.
+
+    <Exceptions>
+      None.
+
+    <Side Effects>
+      None.
+
+    <Returns>
+      None.
+
+    """
+    print "%s (%s)" % (test.run_method_name, test.get_class_name()),
+
+
+  def add_success(self, test):
+    """
+    <Purpose>
+      Extend the parent method to print a success status.
+
+    <Arguments>
+      test:
+        The repyunit_TestCase instance executing.
+
+    <Exceptions>
+      None.
+
+    <Side Effects>
+      None.
+
+    <Returns>
+      None.
+
+    """
+    repyunit_TestResult.add_success(self, test)
+    print "... success"
+
+
+  def add_failure(self, test, error=None):
+    """
+    <Purpose>
+      Extend the parent method to print a failure status.
+
+    <Arguments>
+      test:
+        The repyunit_TestCase instance executing.
+
+    <Exceptions>
+      None.
+
+    <Side Effects>
+      None.
+
+    <Returns>
+      None.
+
+
+    """
+    repyunit_TestResult.add_failure(self, test, error)
+    print "... failed"
+    print "\t", error.message
+
+
+  def add_error(self, test, error):
+    """
+    <Purpose>
+      Extend the parent method to print an error status.
+
+    <Arguments>
+      test:
+        The repyunit_TestCase instance executing.
+
+    <Exceptions>
+      None.
+
+    <Side Effects>
+      None.
+
+    <Returns>
+      None.
+
+
+    """
+    repyunit_TestResult.add_error(self, test, error)
+    print "... error"
+    print "\t", error.message
+
+
+
+
+
+def repyunit_load_tests_from_test_case(test_case):
+  """
+  <Purpose>
+    Populate a repyunit_TestSuite with all tests from a repyunit_TestCase to run
+    all the tests automatically.
+
+  <Arguments>
+    test_case:
+      The repyunit_TestCase from which to populate the repyunit_TestSuite.
+
+  <Exceptions>
+    None.
+
+  <Side Effects>
+    None.
+
+  <Returns>
+    A repyunit_TestSuite loaded with all the tests from the given test case.
+
+  """
+  suite = repyunit_TestSuite()
+  test = test_case()
+  for test_method_name in test.get_test_method_names():
+    suite.add_test(test_case(test_method_name))
+  return suite
+
+
+
+
+
+def repyunit_text_test_run(test):
+  """
+  <Purpose>
+    Run all tests given in test and print statistical information in textual
+    format.
+
+  <Arguments>
+    test:
+      A repyunit_TestCase or repyunit_TestSuite to run the test(s).
+
+  <Exceptions>
+    None.
+
+  <Side Effects>
+    None.
+
+  <Returns>
+    None.
+
+  """
+  result = _repyunit_TextTestResult()
+  suite = repyunit_TestSuite()
+  suite.add_test(test)
+  suite.run(result)
+  print "----------------"
+  print "Ran %d tests: %d successes, %d failures, %d errors" % \
+    (result.test_count, result.success_count, result.failure_count,
+     result.error_count)
