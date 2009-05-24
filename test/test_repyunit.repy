@@ -16,6 +16,7 @@
   2009-05-24  Michael Phan-Ba  <mdphanba@gmail.com>  (#431)
 
   * Initial release
+  * (test_repyunit_TestTextTestRun) Edited output strings
 
 """
 
@@ -743,28 +744,34 @@ if callfunc == 'initialize':
     print "\t... success"
 
 
-  print "test_testsuite_class (test_repyunit_TestTextTestRun)",
+  print "test_testsuite_class (test_repyunit_TestTextTestRun)"
+  print "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
   try:
     repyunit_text_test_run(repyunit_TestSuite)
   except Exception, inst:
     test_repyunit_error_count += 1
-    print "... error"
+    print "==>+++++++++++++++++++++++++++++++++++++++++++++++++++++++"
+    print "\t... error"
     print inst.message
   else:
     test_repyunit_success_count += 1
-    print "... success"
+    print "==>+++++++++++++++++++++++++++++++++++++++++++++++++++++++"
+    print "\t... success"
 
 
-  print "test_testsuite_instance (test_repyunit_TestTextTestRun)",
+  print "test_testsuite_instance (test_repyunit_TestTextTestRun)"
+  print "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
   try:
     repyunit_text_test_run(repyunit_TestSuite())
   except Exception, inst:
     test_repyunit_error_count += 1
-    print "... error"
+    print "==>+++++++++++++++++++++++++++++++++++++++++++++++++++++++"
+    print "\t... error"
     print inst.message
   else:
     test_repyunit_success_count += 1
-    print "... success"
+    print "==>+++++++++++++++++++++++++++++++++++++++++++++++++++++++"
+    print "\t... success"
 
 
   print "test_testcase_failure (test_repyunit_TestTextTestRun)",
