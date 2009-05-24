@@ -21,6 +21,11 @@
 
   * Refactored to use unittest.repy module
 
+  2009-05-23  Michael Phan-Ba  <mdphanba@gmail.com>
+
+  * Set property svn:keyword to "Id" 
+  * Updated documentation 
+
 """
 
 include repyunit.repy
@@ -368,7 +373,7 @@ class test_base64_TestDecodeBadData(repyunit_TestCase):
 class test_base64_TestMisalignment1(test_base64_TestDecodeBadData):
   """
   <Purpose>
-    Test the base64 module with bad data.
+    Test the base64 module with misaligned data.
 
   <Side Effects>
     None.
@@ -391,7 +396,7 @@ class test_base64_TestMisalignment1(test_base64_TestDecodeBadData):
 class test_base64_TestMisalignment2(test_base64_TestDecodeBadData):
   """
   <Purpose>
-    Test the base64 module with bad data.
+    Test the base64 module with misaligned data.
 
   <Side Effects>
     None.

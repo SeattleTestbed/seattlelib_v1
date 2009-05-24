@@ -78,6 +78,7 @@ def urlparse_urlsplit(urlstring, default_scheme="", allow_fragments=True):
   if allow_fragments:
     (rpart, components["fragment"]) = _urlparse_splitfragment(rpart)
 
+
   # Extract the query.
   (components["path"], components["query"]) = _urlparse_splitquery(rpart)
 
