@@ -106,23 +106,12 @@ def get_vesselname_resources(vesselname, ipaddr=getmyip(), portval=1224):
 	  
       #if its a new type of resource then add it in the dictionary as an empty list
       if not resource_name in resultdict[vesselname].keys():
-      resultdict[vesselname][resource_name]=[]
+        resultdict[vesselname][resource_name]=[]
 	  
       #adds the resrouce value in the list for the resource
       resultdict[vesselname][resource_name].append(resource_value)
 	  
   return resultdict
-					
-if callfunc == 'initialize':
-
-  tempDict=get_vesselname_resources('v4')
-  print tempDict.keys()
-  print tempDict.values()
-  
-  tempDict=get_vesselport_resources(63159)
-
-  print tempDict.keys()
-  print tempDict.values()
 	
 	
 
