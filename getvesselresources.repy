@@ -87,22 +87,31 @@ def getvesselresources_vesselname(vesselname, ipaddr=getmyip(), portval=1224):
   #initialize the list for the vessel that the user is looking for  
   resultdict[vesselname]={}
 	
-  #if vessel name is invalid, throw an error
+  #if vessel name is invalid, throw a value error
   try:
-    resource_list = nmclient_rawsay(nmhandle, "GetVesselResources",vesselname)
-  except InvalidVessel:
-    print "Invalid vessel name:", vesselname 
-    raise ValueError 
+    fullresource_string = nmclient_rawsay(nmhandle, "GetVesselResources",vesselname)
+  except Exception, e:
+    if 'No such vessel' in str(e):
+      raise ValueError("Invalid vessel name: '"+str(vesselname)+"'") 
+    else: 
+      raise e
 
-  for cur_resource in resource_list.split('\n'):
+  for cur_resource in fullresource_string('\n'):
     #if the line is a comment line or if the line has some kind of comment in it, the comment is stripped out.  
     cur_resource=cur_resource.split('#')[0]
-    if 'resource' in cur_resource:
+	
+	#make sure that the line begins with 'resource' and the line is well formatted 
+    if ('resource' in cur_resource) and (len(cur_resource.split('resource ')) == 2):
       #gets rid of the keyword 'resource ' and then seperates the resource name and the resource value
       partial_resource_line = cur_resource.split('resource ')[1]
-      resource_name = partial_resource_line.split(' ')[0]
-      resource_value = partial_resource_line.split(' ')[1]
 	  
+	  #checks to see that the line is in the format: <resource_name> <resource_value> or else it throws an error if the format is wrong.
+      if(len(partial_resource_line.split(' ')) == 2):
+        resource_name = partial_resource_line.split(' ')[0]
+        resource_value = partial_resource_line.split(' ')[1]
+      else:
+        raise ValueError("Invalid format for resource file:")	  
+        	  
       #if its a new type of resource then add it in the dictionary as an empty list
       if not resource_name in resultdict[vesselname].keys():
         resultdict[vesselname][resource_name]=[]
