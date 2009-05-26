@@ -17,11 +17,11 @@ def getvesselresources_portnum(portnum, ipaddr=getmyip(), portval=1224):
 	
   <Arguments>
     portnum(int) - the port number that the user is looking for
-    ipaddr-the ip address for which to get the vessels for. By default its local ip address
-    portval-the port number for which to find vessels. By defaults its 1224	
+    ipaddr-the ip address for which to get the vessels for. By default it is local ip address
+    portval-the port number for which to find vessels. By defaults it is 1224	
 	
   <Exceptions>
-    No exceptions
+    Throws a ValueError exception if the resource file is not formatted well.
 	
   <Side Effects>
     No side effects
@@ -60,15 +60,17 @@ def getvesselresources_portnum(portnum, ipaddr=getmyip(), portval=1224):
 def getvesselresources_vesselname(vesselname, ipaddr=getmyip(), portval=1224):
   """
   <Purpose>
-    Given a vessel name, find all the resources available for that vessel and return a dictionary of the resources for that vessel
+    Given a vessel name (and maybe ip address and the port value), find all the resources available for that vessel 
+	and return a dictionary of the resources for that vessel
 	
   <Arguments>
     vesselname(string) - the vessel that the user wants the resource for
-    ipaddr-the ip address for which to get the vessels for. By default its local ip address
-    portval-the port number for which to find vessels. By defaults its 1224
+    ipaddr-the ip address for which to get the vessels for. By default it is local ip address
+    portval-the port number for which to find vessels. By defaults it is 1224
 
   <Exceptions>
-    Throws InvalidVessel exception on an invalide vessel name input
+    Throws ValueError exception on an invalide vessel name input
+	Throws a ValueError exception if the resource file is not formatted well.
 	
   <Side Effects>
     No side effects
@@ -90,20 +92,22 @@ def getvesselresources_vesselname(vesselname, ipaddr=getmyip(), portval=1224):
   #if vessel name is invalid, throw a value error
   try:
     fullresource_string = nmclient_rawsay(nmhandle, "GetVesselResources",vesselname)
+
   except Exception, e:
     if 'No such vessel' in str(e):
       raise ValueError("Invalid vessel name: '"+str(vesselname)+"'") 
     else: 
-      raise e
+      raise
 
-  for cur_resource in fullresource_string('\n'):
+  #go through all the lines in fullresource_string and make a dictionary of the resources
+  for cur_resource in fullresource_string.split('\n'):
     #if the line is a comment line or if the line has some kind of comment in it, the comment is stripped out.  
     cur_resource=cur_resource.split('#')[0]
 	
 	#make sure that the line begins with 'resource' and the line is well formatted 
     if ('resource' in cur_resource) and (len(cur_resource.split('resource ')) == 2):
-      #gets rid of the keyword 'resource ' and then seperates the resource name and the resource value
-      partial_resource_line = cur_resource.split('resource ')[1]
+      #gets rid of the keyword 'resource ' and then seperates the resource name and the resource value. Then gets rid of trailing white space
+      partial_resource_line = cur_resource.split('resource ')[1].rstrip()
 	  
 	  #checks to see that the line is in the format: <resource_name> <resource_value> or else it throws an error if the format is wrong.
       if(len(partial_resource_line.split(' ')) == 2):
@@ -112,7 +116,7 @@ def getvesselresources_vesselname(vesselname, ipaddr=getmyip(), portval=1224):
       else:
         raise ValueError("Invalid format for resource file:")	  
         	  
-      #if its a new type of resource then add it in the dictionary as an empty list
+      #if it is a new type of resource then add it in the dictionary as an empty list
       if not resource_name in resultdict[vesselname].keys():
         resultdict[vesselname][resource_name]=[]
 	  
@@ -120,6 +124,8 @@ def getvesselresources_vesselname(vesselname, ipaddr=getmyip(), portval=1224):
       resultdict[vesselname][resource_name].append(resource_value)
 	  
   return resultdict
+  
+
 	
 
 	
