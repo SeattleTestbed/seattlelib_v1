@@ -228,10 +228,18 @@ class TimeoutSocket:
     if self.sockobj:
       self.sockobj.close()
     self.sockobj = None #  the Repy socket
-    stopcomm(self.commhandle)
-    self.commhandle = None # the current comm
-    stopcomm(self.listencommhandle)
-    self.listencommhandle = None # the listener comm
+    
+    # Armon: As part of the semantics, stopcomm will raise an 
+    # exception given an invalid handle, e.g. None. Thus,
+    # we need to check for this.
+    if self.commhandle: 
+      stopcomm(self.commhandle)
+      self.commhandle = None # the current comm
+    
+    # Armon: Same as above.
+    if self.listencommhandle:
+      stopcomm(self.listencommhandle)
+      self.listencommhandle = None # the listener comm
 
 
   ########################
