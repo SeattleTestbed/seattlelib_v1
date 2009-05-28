@@ -36,6 +36,7 @@ def cv_test_notify_all():
   for count in range(limit):
     settimer(0.0, _cv_functor, (condition, count, container,))
   
+  sleep(1)
   cv_notify_all(condition)
   sleep(1)
   
