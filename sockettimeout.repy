@@ -131,6 +131,11 @@ class TimeoutSocket:
     self.commhandle = None # the current comm
     self.listencommhandle = None # the listener comm
 
+    #error tracking vars
+    
+    #if any exceptions are thrown in the separate thread executing _send_and_release, 
+    #they are caught and stored in this variable, then raised in _send_or_close
+    self.TCPSendError = None
 
   ################
   # Mutator methods
@@ -285,8 +290,14 @@ class TimeoutSocket:
 
   def _send_and_release(self, data):
     """Send data then release the timeout lock"""
-    self.bytes_sent = self._send(data)
- 
+    
+    #Bug Fix (Cosmin): exceptions thrown in separate thread _send_and_release could not be caught
+    #now we store the exception if it is thrown and raise it back in send_or_close
+    try:
+      self.bytes_sent = self._send(data)
+    except Exception, e:
+      self.TCPSendError = e
+    
     self._quietly_release() # release the lock
  
   def _quietly_release(self):
@@ -318,6 +329,13 @@ class TimeoutSocket:
       retdata = self.bytes_sent
       self.bytes_sent = None
       return retdata
+    elif self.TCPSendError != None:
+      #Bug Fix (Cosmin): exceptions thrown in separate thread _send_and_release could not be caught
+      
+      #we got an error within the separate thread that performed the send operation
+      exception_to_throw = self.TCPSendError
+      self.TCPSendError = None
+      raise exception_to_throw
     else: # it timed out
       self.close()
       raise SocketTimeoutError
