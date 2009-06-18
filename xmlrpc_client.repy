@@ -27,8 +27,7 @@ class xmlrpc_client_Client(object):
     None.
 
   <Example Use>
-    client = xmlrpc_client_Client("phpxmlrpc.sourceforge.net",
-      server_path="/server.php")
+    client = xmlrpc_client_Client("http://phpxmlrpc.sourceforge.net/server.php")
     print client.send_request("examples.getStateName", (1,))
 
   """
@@ -42,9 +41,9 @@ class xmlrpc_client_Client(object):
       server.
 
     <Arguments>
-      address:
-        A pair containing 1. the server name or ip address and 2. the
-        server port (optional, defaults to 80).
+      url:
+        A url containing the hostname, port, and path of the xmlrpc
+        server. For example, "http://phpxmlrpc.soureforge.net/server.php".
 
     <Exceptions>
       None.
