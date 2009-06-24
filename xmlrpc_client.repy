@@ -93,56 +93,58 @@ class xmlrpc_client_Client(object):
     # Prepare the XML request.
     request_xml = xmlrpc_common_call2xml(method_name, params)
 
-    # Open the connection to the server
-    socket = openconn(self.server_host, self.server_port)
+    try:
+      # Open the connection to the server
+      socket = openconn(self.server_host, self.server_port)
 
-    # Send HTTP headers.
-    socket.send("POST %s HTTP/1.1\r\n" % self.server_path)
-    socket.send("User-Agent: %s\r\n" % self.USER_AGENT)
-    socket.send("Host: %s\r\n" % self.server_host)
-    socket.send("Content-Type: text/xml\r\n")
-    socket.send("Content-Length: %d\r\n" % len(request_xml))
-    socket.send("\r\n")
+      # Send HTTP headers.
+      socket.send("POST %s HTTP/1.1\r\n" % self.server_path)
+      socket.send("User-Agent: %s\r\n" % self.USER_AGENT)
+      socket.send("Host: %s\r\n" % self.server_host)
+      socket.send("Content-Type: text/xml\r\n")
+      socket.send("Content-Length: %d\r\n" % len(request_xml))
+      socket.send("\r\n")
 
-    # Send the XML request.
-    socket.send(request_xml)
+      # Send the XML request.
+      socket.send(request_xml)
 
-    # Receive the raw response.  If the server does not respond before
-    # the timeout, a socket.error exception will be raised.
-    response = socket.recv(4096)
-    while response.find("\r\n\r\n") < 0:
-      response += socket.recv(4096)
+      # Receive the raw response.  If the server does not respond before
+      # the timeout, a socket.error exception will be raised.
+      response = socket.recv(4096)
+      while response.find("\r\n\r\n") < 0:
+        response += socket.recv(4096)
 
-    # Separate the header from the response body.
-    raw_header, raw_content = response.split("\r\n\r\n", 1)
-    raw_header_lines = raw_header.split("\r\n")
+      # Separate the header from the response body.
+      raw_header, raw_content = response.split("\r\n\r\n", 1)
+      raw_header_lines = raw_header.split("\r\n")
 
-    # Parse headers for the appropriate server response.
-    if raw_header_lines[0] != "HTTP/1.1 200 OK" and \
-      raw_header_lines[0] != "HTTP/1.0 200 OK":
-      raise ValueError("Invalid response protocol: %s" % raw_header_lines[0])
+      # Parse headers for the appropriate server response.
+      if raw_header_lines[0] != "HTTP/1.1 200 OK" and \
+        raw_header_lines[0] != "HTTP/1.0 200 OK":
+        raise ValueError("Invalid response protocol: %s" % raw_header_lines[0])
 
-    # The response content size is initially 0.
-    content_size = 0
+      # The response content size is initially 0.
+      content_size = 0
 
-    # Extract the response content size from the headers.
-    for line in raw_header_lines[1:]:
-      header_tag, header_value = line.split(":", 1)
-      if header_tag.strip().lower() == "content-length":
-        content_size = int(header_value.strip())
+      # Extract the response content size from the headers.
+      for line in raw_header_lines[1:]:
+        header_tag, header_value = line.split(":", 1)
+        if header_tag.strip().lower() == "content-length":
+          content_size = int(header_value.strip())
 
-    # Get the rest of the response body.
-    while len(raw_content) < content_size:
-      raw_content += socket.recv(4096)
+      # Get the rest of the response body.
+      while len(raw_content) < content_size:
+        raw_content += socket.recv(4096)
+
+    finally:
+      # Close the socket.  Connection: keep-alive is not yet supported.
+      socket.close()
 
     # Trim the response body and save it as the XML response.
     xml_response = raw_content[0:content_size]
 
     # Parse the XML response body into Python values.
     response_value = xmlrpc_common_response2python(xml_response)
-
-    # Close the socket.  Connection: keep-alive is not yet supported.
-    socket.close()
 
     # If a fault was decoded, raise the exception.
     if isinstance(response_value, xmlrpc_common_Fault):
