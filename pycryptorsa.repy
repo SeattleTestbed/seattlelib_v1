@@ -78,6 +78,9 @@
 #from number import *
 #import number  #stage 2
 
+#JAC: Need to include random.repy because random_nbit_int() is used...
+include random.repy
+
 # Basic public key class
 class pubkey_pubkey:
     def __init__(self):
