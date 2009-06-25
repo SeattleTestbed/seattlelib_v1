@@ -116,7 +116,7 @@ class xmlrpc_server_SimpleXMLRPCServer:
     self._stoplock = getlock()
 
 
-  def register_function(self, function, name=None):
+  def register_function(self, function, name):
     """
     <Purpose>
       Register a callback function with this XMLRPC server.
@@ -125,13 +125,11 @@ class xmlrpc_server_SimpleXMLRPCServer:
       function:
              The function to expose to the XMLRPC client.
 
-      name (optional):
-             The name for this function that the client will call. Defaults
-             to the name of the function.
+      name:
+             The name for this function that the client will call.
 
     <Exceptions>
-      AttributeError if something other than a function is passed and no
-      name is given.
+      None.
 
     <Side Effects>
       Adds this function to this server's function lookup table.
@@ -139,9 +137,6 @@ class xmlrpc_server_SimpleXMLRPCServer:
     <Returns>
       None.
     """
-
-    if name is None:
-      name = function.__name__
 
     self._callback_functions[name] = function
 
