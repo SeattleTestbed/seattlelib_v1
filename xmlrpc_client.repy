@@ -81,6 +81,7 @@ class xmlrpc_client_Client(object):
       xmlrpc_common_Fault on a XML-RPC response fault.
       xmlrpc_common_XMLParseError on a XML-RPC structural parse error.
       xmlparse_XMLParseError on a general XML parse error.
+      xmlrpc_common_ConnectionError on unexpected disconnects.
 
     <Side Effects>
       None.
@@ -112,7 +113,11 @@ class xmlrpc_client_Client(object):
       # the timeout, a socket.error exception will be raised.
       response = socket.recv(4096)
       while response.find("\r\n\r\n") < 0:
-        response += socket.recv(4096)
+        recvdata = socket.recv(4096)
+        if len(recvdata) == 0:
+          raise xmlrpc_common_ConnectionError( \
+              "Server closed connection before completing response.")
+        response += recvdata
 
       # Separate the header from the response body.
       raw_header, raw_content = response.split("\r\n\r\n", 1)

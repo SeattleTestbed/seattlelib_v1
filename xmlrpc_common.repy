@@ -126,6 +126,24 @@ class xmlrpc_common_XMLParseError(ValueError):
 
 
 
+class xmlrpc_common_ConnectionError(ValueError):
+  """
+  <Purpose>
+    Exception representing an error in the connection to an XMLRPC server.
+    Thrown when the server closes the connection unexpectedly.
+
+  <Side Effects>
+    None.
+
+  <Example Use>
+    raise xmlrpc_common_ConnectionError()
+
+  """
+
+
+
+
+
 def xmlrpc_common_call2xml(method_name, params):
   """
   <Purpose>
