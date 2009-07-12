@@ -198,7 +198,9 @@ def nmclient_safelygethandle():
 # public key, private key, and vesselids are left uninitialized unless 
 # specified elsewhere.   Regardless, the keys and vesselid are not used to 
 # create the handle and so are merely transfered to the created handle.
-def nmclient_createhandle(nmIP, nmport, sequenceid = None, timestamp=True, identity = True, expirationtime = 60*60, publickey = None, privatekey = None, vesselid = None, timeout=10):
+# Per #537, the default timeout (15) should be greater than the wait period 
+# for starting a vessel.
+def nmclient_createhandle(nmIP, nmport, sequenceid = None, timestamp=True, identity = True, expirationtime = 60*60, publickey = None, privatekey = None, vesselid = None, timeout=15):
 
   thisentry = {}
 
