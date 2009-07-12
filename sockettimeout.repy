@@ -338,7 +338,7 @@ class TimeoutSocket:
       raise exception_to_throw
     else: # it timed out
       self.close()
-      raise SocketTimeoutError
+      raise SocketTimeoutError("Socket Timeout")
 
   def _recv_or_close(self, amount):
     """Raise the Timeout Error if no receipt.  Keep track by timeout_lock."""
@@ -349,7 +349,7 @@ class TimeoutSocket:
       # if it's not the timeout, reraise...
       if self.timeout_lock.acquire(False):
         raise
-      raise SocketTimeoutError
+      raise SocketTimeoutError("Socket Timeout")
     
     # I acquired the lock, I should stop the timer because I succeeded...
     if self.timeout_lock.acquire(False):
@@ -359,7 +359,7 @@ class TimeoutSocket:
       self.timeout_lock.release() # Alper's bug 3/10/09
       return retdata
     else:
-      raise SocketTimeoutError
+      raise SocketTimeoutError("Socket Timeout")
 
   def _clobbersocket(self):
     """If I can acquire the lock without blocking, then close the socket to abort"""
@@ -389,7 +389,7 @@ def sockettimeout_recv_or_close(sockobj, amount, timeout):
     # if it's not the timeout, reraise...
     if mylock.acquire(False):
       raise
-    raise SocketTimeout
+    raise SocketTimeout("Socket Timeout")
     
   # I acquired the lock, I should stop the timer because I succeeded...
   if mylock.acquire(False):
@@ -398,5 +398,5 @@ def sockettimeout_recv_or_close(sockobj, amount, timeout):
     canceltimer(timerhandle)
     return retdata
   else:
-    raise SocketTimeout
+    raise SocketTimeout("Socket Timeout")
 
