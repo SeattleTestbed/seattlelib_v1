@@ -171,8 +171,12 @@ def signeddata_split_signature(data):
 # the file...
 def signeddata_issignedcorrectly(data, publickey=None):
   # I'll check signature over all of thesigneddata
-  thesigneddata, signature = data.rsplit('!',1)
-  junk, rawpublickey, junktimestamp, junkexpiration, junksequenceno, junkdestination = thesigneddata.rsplit('!',5)
+  try:
+    thesigneddata, signature = data.rsplit('!',1)
+    junk, rawpublickey, junktimestamp, junkexpiration, junksequenceno, junkdestination = thesigneddata.rsplit('!',5)
+  except ValueError:
+    # error splitting the data means it isn't valid...
+    return False
   
   if publickey != None and rsa_string_to_publickey(rawpublickey) != publickey:
     return False
