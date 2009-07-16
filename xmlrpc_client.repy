@@ -111,9 +111,13 @@ class xmlrpc_client_Client(object):
 
       # Receive the raw response.  If the server does not respond before
       # the timeout, a socket.error exception will be raised.
-      response = socket.recv(4096)
+      response = ""
       while response.find("\r\n\r\n") < 0:
-        recvdata = socket.recv(4096)
+        try:
+          recvdata = socket.recv(4096)
+        except Exception, e:
+          raise xmlrpc_common_ConnectionError("A connection error occurred.")
+
         if len(recvdata) == 0:
           raise xmlrpc_common_ConnectionError( \
               "Server closed connection before completing response.")
