@@ -1,9 +1,10 @@
 include openDHTadvertise.repy
 
-# Not throwing an exception means we're happy.
-mycontext["proxylist"] = openDHTadvertise_get_proxy_list()
-openDHTadvertise_announce("some_really_super_random_value?", "valuehere", 40)
-vals = openDHTadvertise_lookup("some_really_super_random_value?")
+if callfunc == "initialize":
 
-if not "valuehere" in vals:
-  print "This shouldn't happen!"
+  # Not throwing an exception means we're happy.
+  openDHTadvertise_announce("some_really_super_random_value?", "valuehere", 40)
+  vals = openDHTadvertise_lookup("some_really_super_random_value?")
+
+  if not "valuehere" in vals:
+    print "This shouldn't happen!"

@@ -15,10 +15,11 @@ include sha.repy
 include xmlrpc_client.repy
 
 
-mycontext["proxylist"] = []
-mycontext["currentproxy"] = None
-mycontext["serverlist"] = []
-mycontext["serverlistlock"] = getlock()
+openDHTadvertise_context = {}
+openDHTadvertise_context["proxylist"] = []
+openDHTadvertise_context["currentproxy"] = None
+openDHTadvertise_context["serverlist"] = []
+openDHTadvertise_context["serverlistlock"] = getlock()
 
 def openDHTadvertise_announce(key, value, ttlval):
   """
@@ -56,21 +57,21 @@ def openDHTadvertise_announce(key, value, ttlval):
 #  print "Announce key:",key,"value:",value, "ttl:",ttl
   while True:
     # if we have an empty proxy list and no proxy, get more
-    if mycontext["currentproxy"] == None and mycontext["proxylist"] == []:
-      mycontext["proxylist"] = openDHTadvertise_get_proxy_list()
+    if openDHTadvertise_context["currentproxy"] == None and openDHTadvertise_context["proxylist"] == []:
+      openDHTadvertise_context["proxylist"] = openDHTadvertise_get_proxy_list()
       # we couldn't get any proxies
-      if mycontext["proxylist"] == []:
+      if openDHTadvertise_context["proxylist"] == []:
         return False
 
 
     # if there isn't a proxy we should use, get one from our list
-    if mycontext["currentproxy"] == None and mycontext["proxylist"] != []:
-      mycontext["currentproxy"] = mycontext["proxylist"][0]
-      del mycontext["proxylist"][0]
+    if openDHTadvertise_context["currentproxy"] == None and openDHTadvertise_context["proxylist"] != []:
+      openDHTadvertise_context["currentproxy"] = openDHTadvertise_context["proxylist"][0]
+      del openDHTadvertise_context["proxylist"][0]
 
 
     # This code block is adopted from put.py from OpenDHT
-    pxy = xmlrpc_client_Client(mycontext["currentproxy"])
+    pxy = xmlrpc_client_Client(openDHTadvertise_context["currentproxy"])
     keytosend = xmlrpc_common_Binary(sha_new(str(key)).digest())
     valtosend = xmlrpc_common_Binary(value)
 
@@ -80,7 +81,7 @@ def openDHTadvertise_announce(key, value, ttlval):
       break
     except xmlrpc_common_ConnectionError:
       # Let's avoid this proxy.   It seems broken
-      mycontext["currentproxy"] = None
+      openDHTadvertise_context["currentproxy"] = None
 
   return True
 
@@ -112,21 +113,21 @@ def openDHTadvertise_lookup(key, maxvals=100):
 
   while True:
     # if we have an empty proxy list and no proxy, get more
-    if mycontext["currentproxy"] == None and mycontext["proxylist"] == []:
-      mycontext["proxylist"] = openDHTadvertise_get_proxy_list()
+    if openDHTadvertise_context["currentproxy"] == None and openDHTadvertise_context["proxylist"] == []:
+      openDHTadvertise_context["proxylist"] = openDHTadvertise_get_proxy_list()
       # we couldn't get any proxies
-      if mycontext["proxylist"] == []:
+      if openDHTadvertise_context["proxylist"] == []:
         raise Exception, "Lookup failed"
 
 
     # if there isn't a proxy we should use, get one from our list
-    if mycontext["currentproxy"] == None and mycontext["proxylist"] != []:
-      mycontext["currentproxy"] = mycontext["proxylist"][0]
-      del mycontext["proxylist"][0]
+    if openDHTadvertise_context["currentproxy"] == None and openDHTadvertise_context["proxylist"] != []:
+      openDHTadvertise_context["currentproxy"] = openDHTadvertise_context["proxylist"][0]
+      del openDHTadvertise_context["proxylist"][0]
 
 
     # This code block is adopted from get.py from OpenDHT
-    pxy = xmlrpc_client_Client(mycontext["currentproxy"])
+    pxy = xmlrpc_client_Client(openDHTadvertise_context["currentproxy"])
     maxvalhash = int(maxvals)
     # I don't know what pm is for but I assume it's some sort of generator / 
     # running counter
@@ -136,7 +137,7 @@ def openDHTadvertise_lookup(key, maxvals=100):
 
     listofitems = []
     # If the proxy fails, then we will go to the next one...
-    while mycontext["currentproxy"]:
+    while openDHTadvertise_context["currentproxy"]:
       try:
         try:
           vals, pm = pxy.send_request("get", (keyhash, maxvalhash, pm, "get.py"))
@@ -155,7 +156,7 @@ def openDHTadvertise_lookup(key, maxvals=100):
 
       except xmlrpc_common_ConnectionError:
         # Let's avoid this proxy.   It seems broken
-        mycontext["currentproxy"] = None
+        openDHTadvertise_context["currentproxy"] = None
 
 
 
@@ -178,11 +179,11 @@ class openDHTadvertise_ServerTest:
         s.close()
 
       # this list is the "return value".   Add ourselves if no problems...
-      mycontext["serverlistlock"].acquire()
+      openDHTadvertise_context["serverlistlock"].acquire()
       try:
-        mycontext["serverlist"].append(self.servername)
+        openDHTadvertise_context["serverlist"].append(self.servername)
       finally:
-        mycontext["serverlistlock"].release()
+        openDHTadvertise_context["serverlistlock"].release()
     except:
       pass
     finally:
@@ -261,7 +262,7 @@ def openDHTadvertise_get_proxy_list(maxnumberofattempts=30):
 
 
   # empty the server list
-  mycontext["serverlist"] = []
+  openDHTadvertise_context["serverlist"] = []
 
   # start checking...
   for thread in serverthreads:
@@ -273,7 +274,7 @@ def openDHTadvertise_get_proxy_list(maxnumberofattempts=30):
 
 
   retlist = []
-  for serverip in mycontext["serverlist"]:
+  for serverip in openDHTadvertise_context["serverlist"]:
     # make it look like the right sort of url...
     retlist.append("http://"+serverip+":5851/")
 
