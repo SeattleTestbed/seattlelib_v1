@@ -13,6 +13,7 @@ This code is partially adapted from the example openDHT code.
 include random.repy
 include sha.repy
 include xmlrpc_client.repy
+include parallelize.repy
 
 
 openDHTadvertise_context = {}
@@ -162,43 +163,20 @@ def openDHTadvertise_lookup(key, maxvals=100):
 
 
 # check to see if a server is up and ready for OpenDHT...
-class openDHTadvertise_ServerTest:
-  def __init__(self, servername):
-    self.servername = servername
+def openDHTadvertise_checkserver(servername):
+  # try three times.   Why three?   Arbitrary value
+  for junkcount in range(3):
+    s = openconn(servername, 5851, timeout=2.0)
+    s.close()
 
-    # The thread takes this lock as soon as it is started; it releases it
-    # when the thread finishes. I am using it to implement join().
-    self._runlock = getlock()
-    self._used = False
+  # this list is the "return value".   Add ourselves if no problems...
+  openDHTadvertise_context["serverlistlock"].acquire()
+  try:
+    openDHTadvertise_context["serverlist"].append(servername)
+  finally:
+    openDHTadvertise_context["serverlistlock"].release()
 
-  def run(self):
-    try:
-      # try three times.   Why three?   Arbitrary value
-      for junkcount in range(3):
-        s = openconn(self.servername, 5851, timeout=2.0)
-        s.close()
 
-      # this list is the "return value".   Add ourselves if no problems...
-      openDHTadvertise_context["serverlistlock"].acquire()
-      try:
-        openDHTadvertise_context["serverlist"].append(self.servername)
-      finally:
-        openDHTadvertise_context["serverlistlock"].release()
-    except:
-      pass
-    finally:
-      self._runlock.release()
-
-  def start(self):
-    if self._used:
-      raise Exception("Threads may only be started once")
-    self._used = True
-    self._runlock.acquire()
-    settimer(0, self.run, ())
-
-  def join(self):
-    self._runlock.acquire()
-    self._runlock.release()
 
 
 # Loosely based on find-gateway.py from the OpenDHT project...
@@ -256,21 +234,16 @@ def openDHTadvertise_get_proxy_list(maxnumberofattempts=30):
   numberofattempts = min(len(servers), maxnumberofattempts)
   serverstocheck = random_sample(servers, numberofattempts)
 
-  serverthreads = []
-  for server in serverstocheck:
-    serverthreads.append(openDHTadvertise_ServerTest(server))
-
-
   # empty the server list
   openDHTadvertise_context["serverlist"] = []
 
-  # start checking...
-  for thread in serverthreads:
-    thread.start()
+  # start checking... one at a time by default, as restrictions.default has
+  # an extremely low default outgoing socket count.
+  parhandle = parallelize_initfunction(serverstocheck, openDHTadvertise_checkserver, concurrentevents=1)
 
   # wait until all are finished
-  for thread in serverthreads:
-    thread.join()
+  while not parallelize_isfunctionfinished(parhandle):
+    sleep(0.2)
 
 
   retlist = []
