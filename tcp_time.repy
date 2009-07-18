@@ -8,26 +8,24 @@
 
   Description:
 
-    NOT INTENDED AS A STAND ALONE MODULE, this module is an extension to
-    time.repy
+    This module is an implementation of time_interface.repy
 
     Contacts a server running time_server.repy to get the current time from an
     NTP because only the server can communicate with an NTP.
 
-    To use this module, make one call to tcp_time_updatetime() to get the
+    To use this module, make one call to time_updatetime() to get the
     time from the server.  This function also implicitly sets the time.  Then
-    call tcp_time_gettime() every time the current time is needed.
+    call time_gettime() every time the current time is needed.
 
 """
 
+include time_interface.repy
 
 include centralizedadvertise.repy
 
 include random.repy
 
 include sockettimeout.repy
-
-
 
 
 
@@ -47,7 +45,7 @@ def tcp_time_updatetime(localport):
       for compatibility issues with time.repy.
 
   <Exceptions>
-    Exception raised if centralizedadvertise_lookup("time_server") fails after
+    Exception raised if advertise_lookup("time_server") fails after
     ten tries.
 
     Exception raised when a connection is not able to be established with any of
@@ -65,12 +63,12 @@ def tcp_time_updatetime(localport):
   # times if there is an exception.
   gotval = False
   attemptretrieval = 0
-  while attemptretrieval < 10:
+  while attemptretrieval < 2:
     try:
       serveraddresses = centralizedadvertise_lookup("time_server")
     except Exception:
       attemptretrieval = attemptretrieval + 1
-      sleep(10)                 # Look up the value again in 10 seconds
+      sleep(2)                 # Look up the value again in 10 seconds
     else:
       if serveraddresses != [] and serveraddresses[0] != '':
         gotval = True	        # Successfully obtained the value
@@ -84,7 +82,7 @@ def tcp_time_updatetime(localport):
 
 
   timelength = 25  # Max length of string, representing the time, to be received
-  shuffledserveraddresses = random_sample(serveraddresses,len(serveraddresses))
+  shuffledserveraddresses = random_sample(serveraddresses,min(len(serveraddresses),5))
 
   # Open a connection with a random server hosting time_server.repy
   timeobtained = False
@@ -97,7 +95,7 @@ def tcp_time_updatetime(localport):
     try:
       sockobject = timeout_openconn(remoteip,remoteport)
     except Exception:
-      pass  # stay in the while loop to try a different server
+      serverindex +=1
     else:
       timeobtained = True
       break
@@ -116,9 +114,11 @@ def tcp_time_updatetime(localport):
   currenttime = float(currenttime[:-1])
 
   # finally, set the time
-  mycontext['TIME_IMP_DICT']['time']['set'](currenttime)
+  time_settime(currenttime)
+  
 
 
 
-# set information about this implementation in the time.repy IMP_DICT
-mycontext['TIME_IMP_DICT']['tcp'] = {'update':tcp_time_updatetime}
+
+#register the update method
+time_register_method('tcp',tcp_time_updatetime)
