@@ -150,8 +150,11 @@ def argparse_scan_int(args_array, flag_name, default_value = False):
       port = temp_port
       ... your code ...
   """
+  # scan through all the arguments
   for i in range(0, len(args_array)):
+    # case insensitive compare the flag to what we're looking
     if args_array[i].lower() == flag_name:
+      # the try loop checks that it's capable of being cast to an int
       try:
         return_value = int(callargs[i + 1])
       except IndexError, e:
