@@ -22,7 +22,7 @@ openDHTadvertise_context["currentproxy"] = None
 openDHTadvertise_context["serverlist"] = []
 openDHTadvertise_context["serverlistlock"] = getlock()
 
-def openDHTadvertise_announce(key, value, ttlval):
+def openDHTadvertise_announce(key, value, ttlval, concurrentevents=5, proxiestocheck=5):
   """
   <Purpose>
     Announce a (key, value) pair to openDHT.
@@ -37,6 +37,13 @@ def openDHTadvertise_announce(key, value, ttlval):
     ttlval:
             The length of time (in seconds) to persist this key <-> value
             association in DHT.
+
+    concurrentevents:
+            The number of concurrent events to use when checking for
+            functional openDHT proxies. Defaults to 5.
+
+    proxiestocheck:
+            The number of openDHT proxies to check. Defaults to 5.
 
   <Exceptions>
     Exception if the xmlrpc server behaves erratically.
@@ -59,7 +66,8 @@ def openDHTadvertise_announce(key, value, ttlval):
   while True:
     # if we have an empty proxy list and no proxy, get more
     if openDHTadvertise_context["currentproxy"] == None and openDHTadvertise_context["proxylist"] == []:
-      openDHTadvertise_context["proxylist"] = openDHTadvertise_get_proxy_list()
+      openDHTadvertise_context["proxylist"] = openDHTadvertise_get_proxy_list( \
+          concurrentevents=concurrentevents, maxnumberofattempts=proxiestocheck)
       # we couldn't get any proxies
       if openDHTadvertise_context["proxylist"] == []:
         return False
@@ -89,7 +97,7 @@ def openDHTadvertise_announce(key, value, ttlval):
 
 
 
-def openDHTadvertise_lookup(key, maxvals=100):
+def openDHTadvertise_lookup(key, maxvals=100, concurrentevents=5, proxiestocheck=5):
   """
   <Purpose>
     Retrieve a stored value from openDHT.
@@ -101,6 +109,13 @@ def openDHTadvertise_lookup(key, maxvals=100):
     maxvals:
             The maximum number of values stored under this key to
             return to the caller.
+
+    concurrentevents:
+            The number of concurrent events to use when checking for
+            functional openDHT proxies. Defaults to 5.
+
+    proxiestocheck:
+            The number of openDHT proxies to check. Defaults to 5.
 
   <Exceptions>
     Exception if the xmlrpc server behaves erratically.
@@ -115,7 +130,8 @@ def openDHTadvertise_lookup(key, maxvals=100):
   while True:
     # if we have an empty proxy list and no proxy, get more
     if openDHTadvertise_context["currentproxy"] == None and openDHTadvertise_context["proxylist"] == []:
-      openDHTadvertise_context["proxylist"] = openDHTadvertise_get_proxy_list()
+      openDHTadvertise_context["proxylist"] = openDHTadvertise_get_proxy_list( \
+          concurrentevents=concurrentevents, maxnumberofattempts=proxiestocheck)
       # we couldn't get any proxies
       if openDHTadvertise_context["proxylist"] == []:
         raise Exception, "Lookup failed"
@@ -180,14 +196,17 @@ def openDHTadvertise_checkserver(servername):
 
 
 # Loosely based on find-gateway.py from the OpenDHT project...
-def openDHTadvertise_get_proxy_list(maxnumberofattempts=30):
+def openDHTadvertise_get_proxy_list(maxnumberofattempts=5, concurrentevents=5):
   """
   <Purpose>
     Gets a list of active openDHT proxies.
 
   <Arguments>
     maxnumberofattemps:
-           Maximum number of servers to attempt to connect to.
+            Maximum number of servers to attempt to connect to.
+
+    concurrentevents:
+            Maximum number of events to use.
 
   <Exceptions>
     Exception if there are no servers in the server list.
@@ -237,9 +256,8 @@ def openDHTadvertise_get_proxy_list(maxnumberofattempts=30):
   # empty the server list
   openDHTadvertise_context["serverlist"] = []
 
-  # start checking... one at a time by default, as restrictions.default has
-  # an extremely low default outgoing socket count.
-  parhandle = parallelize_initfunction(serverstocheck, openDHTadvertise_checkserver, concurrentevents=1)
+  # start checking...
+  parhandle = parallelize_initfunction(serverstocheck, openDHTadvertise_checkserver, concurrentevents=concurrentevents)
 
   # wait until all are finished
   while not parallelize_isfunctionfinished(parhandle):
