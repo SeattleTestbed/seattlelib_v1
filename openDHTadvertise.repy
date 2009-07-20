@@ -233,6 +233,11 @@ def openDHTadvertise_get_proxy_list(maxnumberofattempts=5, concurrentevents=5):
       break   # Server finished sending us the response.
     body += newdata
 
+  try:
+    socket.close()
+  except:
+    pass
+
   headers, payload = body.split("\r\n\r\n", 1)
   lines = payload.split("\n")
   # throw away the header line
