@@ -96,7 +96,7 @@ def parallelize_abortfunction(parallelizehandle):
           
 
    <Exceptions>
-      ParallelizeException is raised if the handle is unrecognized
+      ParallelizeError is raised if the handle is unrecognized
 
    <Side Effects>
       None
@@ -114,7 +114,7 @@ def parallelize_abortfunction(parallelizehandle):
     else:
       return False
   except KeyError:
-    raise ParallelizeException("Cannot abort the parallel execution of a non-existent handle:"+str(parallelizehandle))
+    raise ParallelizeError("Cannot abort the parallel execution of a non-existent handle:"+str(parallelizehandle))
 
 
 
@@ -129,7 +129,7 @@ def parallelize_isfunctionfinished(parallelizehandle):
           
 
    <Exceptions>
-      ParallelizeException is raised if the handle is unrecognized
+      ParallelizeError is raised if the handle is unrecognized
 
    <Side Effects>
       None
@@ -145,7 +145,7 @@ def parallelize_isfunctionfinished(parallelizehandle):
     else:
       return True
   except KeyError:
-    raise ParallelizeException("Cannot get status for the parallel execution of a non-existent handle:"+str(parallelizehandle))
+    raise ParallelizeError("Cannot get status for the parallel execution of a non-existent handle:"+str(parallelizehandle))
 
 
 
@@ -161,7 +161,7 @@ def parallelize_getresults(parallelizehandle):
          The handle returned by parallelize_initfunction
           
    <Exceptions>
-      ParallelizeException is raised if the handle is unrecognized
+      ParallelizeError is raised if the handle is unrecognized
 
    <Side Effects>
       None
@@ -179,7 +179,7 @@ def parallelize_getresults(parallelizehandle):
     # be modifying it
     return parallelize_info_dict[parallelizehandle]['result'].copy()
   except KeyError:
-    raise ParallelizeException("Cannot get results for the parallel execution of a non-existent handle:"+str(parallelizehandle))
+    raise ParallelizeError("Cannot get results for the parallel execution of a non-existent handle:"+str(parallelizehandle))
 
 
 
@@ -213,7 +213,7 @@ def parallelize_initfunction(targetlist, callerfunc,concurrentevents=5, *extrafu
           is passed the same extra args).
 
    <Exceptions>
-      ParallelizeException is raised if there isn't at least one free event.   
+      ParallelizeError is raised if there isn't at least one free event.   
       However, if there aren't at least concurrentevents number of free events,
       this is not an error (instead this is reflected in parallelize_getstatus)
       in the status information.
