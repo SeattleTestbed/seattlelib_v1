@@ -95,6 +95,10 @@ class xmlrpc_client_Client(object):
     request_xml = xmlrpc_common_call2xml(method_name, params)
 
     try:
+      # Assign None to socket so that socket will always be assigned
+      # for the finally: block.
+      socket = None
+
       # Open the connection to the server
       socket = openconn(self.server_host, self.server_port)
 
@@ -147,7 +151,8 @@ class xmlrpc_client_Client(object):
 
     finally:
       # Close the socket.  Connection: keep-alive is not yet supported.
-      socket.close()
+      if socket is not None:  # socket will be None if openconn() threw an exception.
+        socket.close()
 
     # Trim the response body and save it as the XML response.
     xml_response = raw_content[0:content_size]

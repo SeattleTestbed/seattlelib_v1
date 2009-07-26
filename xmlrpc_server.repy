@@ -29,7 +29,7 @@ def _xmlrpc_server_lookup_ip(hostname):
   # If the host to listen on resolves to more than one ip, we can't behave
   # in a deterministic manner.  So, we except.
   if len(listen_ips) != 1:
-    raise ArgumentError()
+    raise ValueError()
 
   return listen_ips[0]
 
@@ -60,7 +60,7 @@ class xmlrpc_server_SimpleXMLRPCServer:
     None.
 
   <Exceptions>
-    ArgumentError if the host part of the address passed to the
+    ValueError if the host part of the address passed to the
     constructor is a hostname that resolves to more than one ip.
 
   <Example Use>
@@ -83,7 +83,7 @@ class xmlrpc_server_SimpleXMLRPCServer:
       None.
 
     <Exceptions>
-      ArgumentError if the host part of the address passed to the
+      ValueError if the host part of the address passed to the
       constructor is a hostname that resolves to more than one ip.
 
       TypeError if the passed variable addr isn't a container (list,
