@@ -188,8 +188,12 @@ def base64_b64decode(s, altchars=None):
   # Determine correct alignment by calculating the number of padding
   # characters needed for compliance to the specification.
   align = (4 - (len(s) & 3)) & 3
-  if align == 3 or align > num_pad:
-    raise TypeError("Incorrect padding")
+  if align == 3:
+    raise TypeError("Incorrectly encoded base64 data (has 6 bits of trailing garbage)")
+  if align > num_pad:
+    # Technically, this isn't correctly padded. But it's recoverable, so let's
+    # not care.
+    pass
 
   # Change from characters to integers for binary operations.
   x6bit_words = []
