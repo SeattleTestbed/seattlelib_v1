@@ -220,18 +220,21 @@ def openDHTadvertise_get_proxy_list(maxnumberofattempts=5, concurrentevents=5):
 
   # populate server list
   socket = openconn('opendht.org', 80)
-  socket.send("GET /servers.txt HTTP/1.0\r\nHost: opendht.org\r\n\r\n")
+  try: 
+    socket.send("GET /servers.txt HTTP/1.0\r\nHost: opendht.org\r\n\r\n")
   
-  body = ""
-  while True:
-    try:
-      newdata = socket.recv(4096)
-    except:
-      # Server decided it is done.
-      break
-    if len(newdata) == 0:
-      break   # Server finished sending us the response.
-    body += newdata
+    body = ""
+    while True:
+      try:
+        newdata = socket.recv(4096)
+      except:
+        # Server decided it is done.
+        break
+      if len(newdata) == 0:
+        break   # Server finished sending us the response.
+      body += newdata
+  finally:
+    socket.close()
 
   try:
     socket.close()
