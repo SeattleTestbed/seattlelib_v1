@@ -21,7 +21,7 @@
 
 include time_interface.repy
 
-include centralizedadvertise.repy
+include advertise.repy
 
 include random.repy
 
@@ -65,7 +65,7 @@ def tcp_time_updatetime(localport):
   attemptretrieval = 0
   while attemptretrieval < 2:
     try:
-      serveraddresses = centralizedadvertise_lookup("time_server")
+      serveraddresses = advertise_lookup("time_server")
     except Exception:
       attemptretrieval = attemptretrieval + 1
       sleep(2)                 # Look up the value again in 10 seconds
@@ -105,13 +105,9 @@ def tcp_time_updatetime(localport):
     raise Exception("Unable to open connection with any of the ",len(shuffledserveraddresses),"servers running time_server.repy.")
 
 
-  # the timeserver appends a $ at the end of the time to ensure
-  # we got the whole message  
-  currenttime = ''
-  while '$' not in currenttime:
-    currenttime += sockobject.recv(timelength)
+  currenttime = session_recvmessage(sockobject)
   sockobject.close()
-  currenttime = float(currenttime[:-1])
+  currenttime = float(currenttime)
 
   # finally, set the time
   time_settime(currenttime)
