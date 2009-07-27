@@ -105,9 +105,11 @@ def tcp_time_updatetime(localport):
     raise Exception("Unable to open connection with any of the ",len(shuffledserveraddresses),"servers running time_server.repy.")
 
 
-  currenttime = session_recvmessage(sockobject)
+  currenttime =''
+  while '$' not in currenttime:
+    currenttime += sockobject.recv(20)
   sockobject.close()
-  currenttime = float(currenttime)
+  currenttime = float(currenttime[:-1])
 
   # finally, set the time
   time_settime(currenttime)
