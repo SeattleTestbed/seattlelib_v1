@@ -29,7 +29,7 @@ def _xmlrpc_server_lookup_ip(hostname):
   # If the host to listen on resolves to more than one ip, we can't behave
   # in a deterministic manner.  So, we except.
   if len(listen_ips) != 1:
-    raise ValueError()
+    raise ValueError("Host '%s' resolved to more than one ip (or zero ips)" % hostname)
 
   return listen_ips[0]
 
