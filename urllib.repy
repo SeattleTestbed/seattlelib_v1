@@ -107,7 +107,7 @@ def urllib_unquote(string):
 
     wrappedoctetstr = string[lastpercentlocation+1:lastpercentlocation+3]
     if len(wrappedoctetstr) != 2:
-      raise ValueError()
+      raise ValueError("Quoted string is poorly formed")
 
     resultstr = \
         chr(int(wrappedoctetstr, 16)) + \

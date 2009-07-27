@@ -267,7 +267,8 @@ class xmlrpc_server_SimpleXMLRPCServer:
       return self._callback_functions[function_name](*args)
 
     # If we haven't gotten a result yet, the function doesn't exist.
-    raise xmlrpc_server_ClientError()
+    raise xmlrpc_server_ClientError("xmlrpc_server error: client tried" + \
+        " to call a function that does not exist")
 
 
   def _connect(self, remoteip, remoteport, socket, commhandle, listen_commhandle):
@@ -287,7 +288,8 @@ class xmlrpc_server_SimpleXMLRPCServer:
 
     http_command, http_path, http_protocol = http_commandline.split(None, 2)
     if not (http_path == "/RPC2" or http_path == "/") or http_command != "POST":
-      raise xmlrpc_server_ClientError()
+      raise xmlrpc_server_ClientError("xmlrpc_server error: client " + \
+          "sent invalid request (wrong path or wrong HTTP method)")
 
     # Ignore protocol for now, we'll close connections from HTTP/1.1 clients
     # that want keep-alive for now.
