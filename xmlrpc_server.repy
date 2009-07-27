@@ -98,6 +98,8 @@ class xmlrpc_server_SimpleXMLRPCServer:
       server.serve_forever()
     """   
 
+    # This is to ensure 'addr' is the correct type (something that has a
+    # length) and is the correct length, 2.
     try:
       if len(addr) != 2:
         raise TypeError()
