@@ -70,7 +70,7 @@ class test_repyunit_GoodTestCase(repyunit_TestCase):
     self.fail()
 
   def test_error(self):
-    raise ValueError()
+    raise ValueError("Test error")
 
 
 
@@ -262,7 +262,7 @@ if callfunc == 'initialize':
   print "test_adderror (test_repyunit_TestResult)",
   try:
     result = repyunit_TestResult()
-    result.add_error(test_repyunit_GoodTestCase(), ValueError())
+    result.add_error(test_repyunit_GoodTestCase(), ValueError("test error"))
     assert(result.test_count == 1)
     assert(result.success_count == 0)
     assert(result.failure_count == 0)
@@ -513,7 +513,7 @@ if callfunc == 'initialize':
   print "test_error (test_repyunit_TestCase)",
   try:
     def func():
-      raise ValueError()
+      raise ValueError("test error")
     testcase = repyunit_TestCase()
     testcase.assert_error(ValueError, func)
   except AssertionError, inst:
@@ -550,7 +550,7 @@ if callfunc == 'initialize':
   print "test_error_error (test_repyunit_TestCase)",
   try:
     def func():
-      raise TypeError()
+      raise TypeError("test error")
     testcase = repyunit_TestCase()
     testcase.assert_error(ValueError, func)
   except TypeError:
