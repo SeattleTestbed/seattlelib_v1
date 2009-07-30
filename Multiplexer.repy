@@ -446,7 +446,11 @@ class Multiplexer():
     # connection refused instead of timed out
     for refID, info in self.pendingSockets.items():
       # Cancel the timeout timer
-      canceltimer(info[2])
+      try:
+        canceltimer(info[2])
+      except:
+        # There might have not been any timer set
+        pass
     
       # Set the handle to None, so that Connection Refused is infered
       info[2] = None
@@ -833,7 +837,12 @@ class Multiplexer():
       return
     
     # Cancel the timeout timer
-    canceltimer(self.pendingSockets[refID][2])
+    try:
+      canceltimer(self.pendingSockets[refID][2])
+    except:
+      # Be careful of race condition where the timer is cleaned up
+      # before we run.
+      pass
     
     # Set the handle to None
     self.pendingSockets[refID][2] = None

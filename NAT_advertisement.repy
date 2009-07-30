@@ -116,7 +116,6 @@ def nat_server_lookup(key):
   num = len(lst)
   
   # Safety check...
-  assert(num <= 1)
   if num == 0 or (num == 1 and lst[0] == ''):
     raise Exception, "Host could not be found!"
 
@@ -141,7 +140,6 @@ def nat_server_list_lookup(key):
   num = len(servers)
 
   # Safety check...
-  assert(num <= 1)
   if num == 0 or (num == 1 and servers[0] == ''):
     raise Exception, "Host could not be found!"
   

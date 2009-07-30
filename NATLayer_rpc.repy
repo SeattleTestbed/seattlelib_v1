@@ -138,6 +138,10 @@ NAT_STATUS_FAILED = "FAILED"
 NAT_STATE_DATA = {}
 NAT_STATE_DATA["mux"] = None # Initialize to nothing
 
+
+NAT_SRV_CACHE = {}
+NAT_FORWARDER_CACHE = {}
+
 # Holds the ports we are listening on
 NAT_LISTEN_PORTS = {}
 
@@ -181,58 +185,97 @@ def nat_openconn(destmac, destport, localip=None, localport=None, timeout = 5, f
      A socket-like object that can be used for communication. 
      Use send, recv, and close just like you would an actual socket object in python.
   """ 
-  # If we don't get an ip/port explicitly, then locate the server
-  if forwarderIP == None or forwarderPort == None:
+  # use the forwarderIP and port provided
+  if forwarderIP != None and forwarderPort != None:
+    return _nat_try_connection_list([(forwarderIP,forwarderPort)],
+                                            localip,localport,timeout,destmac,destport)  
+    
+  
+  # lookup the destmac if forwarderIP and port are not provided
+  else:  
+    # check the cache
+    if destmac in NAT_SRV_CACHE:
+      forwarders = NAT_SRV_CACHE[destmac]
+      
+      try:
+        return _nat_try_connection_list(forwarders,localip,localport,timeout,destmac,destport)
+        
+      except:  # remove this entry from the cache
+        del NAT_SRV_CACHE[destmac]        
+      
+    # the cache failed, so do a fresh lookup
     forwarders = nat_server_list_lookup(destmac)
-  else:
-    forwarders = [(forwarderIP, forwarderPort)]
+    socket = _nat_try_connection_list(forwarders,localip,localport,timeout,destmac,destport)
+    
+    #this list succeded so add it to the cache
+    NAT_SRV_CACHE[destmac] = forwarders
+ 
+    return socket
 
 
+
+
+def _nat_try_connection_list(forwarders,localip,localport,timeout,destmac,destport):
   # try to connect to every forwarder listed until we suceed
   # or run out of forwarders
   connected = False
+  exception_list = [] # we might accumulate several exceptions trying to connect
+                      # to various forwarders to find the destmac
+  
   for (ip,port) in forwarders:
 
     # Create a real connection to the forwarder
     try:
       socket = openconn(ip, int(port), localip, localport, timeout)
-    except:
-      pass # try the next forwarder listed
+    except Exception, e:
+      # try the next forwarder listed
+      exception_list.append(str(e))
     else:
+      # we connected to a forwarder
       connected = True
-      socket.send('C') #tell the forwarder this is a client
-      break
-
-  if not connected:
-    raise EnvironmentError, "Could not connect to forwarder"
-
-  
-  # Create an RPC request to connect to the desired server
-  rpc_dict = {RPC_FUNCTION:RPC_CLIENT_INIT,
-              RPC_PARAM:{"server":destmac,"port":destport}}
-
-  # Send the RPC request
-  socket.send(RPC_encode(rpc_dict)) 
-
-  # Get the response
-  response = RPC_decode(socket)
-  
-  # Check the response 
-  if response[RPC_RESULT] == NAT_STATUS_CONFIRMED:
-    # Everything is good to go
-    return socket
-  
-  # Handle no server at the forwarder  
-  elif response[RPC_RESULT] == NAT_STATUS_NO_SERVER:
-    raise EnvironmentError, "Connection Refused! No server at the forwarder!"
+      
+      try:  #Catch any exceptions and try the next forwarder if we fail
+        socket.send('C') #tell the forwarder this is a client
     
-  # Handle busy forwarder
-  elif response[RPC_RESULT] == NAT_STATUS_BSY_SERVER:
-    raise EnvironmentError, "Connection Refused! Forwarder Busy."
+        # Create an RPC request to connect to the desired server
+        rpc_dict = {RPC_FUNCTION:RPC_CLIENT_INIT,
+                    RPC_PARAM:{"server":destmac,"port":destport}}
+
+        # Send the RPC request
+        socket.send(RPC_encode(rpc_dict)) 
+
+        # Get the response
+        response = RPC_decode(socket)
   
-  # General error    
-  else:  
-    raise EnvironmentError, "Connection Refused!"
+        # Check the response 
+        if response[RPC_RESULT] == NAT_STATUS_CONFIRMED:
+          # Everything is good to go
+          return socket
+  
+        # Handle no server at the forwarder  
+        elif response[RPC_RESULT] == NAT_STATUS_NO_SERVER:
+            raise EnvironmentError, "Connection Refused! No server at the forwarder!"
+    
+        # Handle busy forwarder
+        elif response[RPC_RESULT] == NAT_STATUS_BSY_SERVER:
+            raise EnvironmentError, "Connection Refused! Forwarder Busy."
+      
+      except Exception, e:
+        exception_list.append(str(e))
+          
+
+  # General error     
+  raise EnvironmentError, "Connection Refused! "+str(exception_list)  
+
+
+
+
+ 
+
+
+ 
+
+
 
 
 
