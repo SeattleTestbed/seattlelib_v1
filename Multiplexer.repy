@@ -1021,7 +1021,13 @@ class MultiplexerSocket():
     self.socketInfo = None
     self.buffer = None
     self.bufferInfo = None
+    # we may be blocked on recv
+    try:
+      self.socketLocks["nodata"].release()
+    except:
+      pass
     self.socketLocks = None
+    
   
   # Checks if the socket is closed, and handles it
   def _handleClosed(self):
