@@ -82,7 +82,8 @@ def nmclient_rawcommunicate(nmhandle, *args):
   # the node is behind a nat and using nat layer
   if 'natlayermac' in nmclient_handledict[nmhandle]:
     try:
-      thisconnobject = nat_openconn(nmclient_handledict[nmhandle]['natlayermac'],nmclient_handledict[nmhandle]['port']) 
+      # add 5 to timeout for nat delay
+      thisconnobject = nat_openconn(nmclient_handledict[nmhandle]['natlayermac'],nmclient_handledict[nmhandle]['port'],timeout=nmclient_handledict[nmhandle]['timeout']+5,usetimeoutsock=True) 
     except Exception, e:
       raise NMClientException, str(e)
   
@@ -166,7 +167,8 @@ def nmclient_signedcommunicate(nmhandle, *args):
   # the node is behind a nat
   if 'natlayermac' in nmclient_handledict[nmhandle]:
     try:
-      thisconnobject = nat_openconn(nmclient_handledict[nmhandle]['natlayermac'], nmclient_handledict[nmhandle]['port']) 
+      # add 5 to timeout for nat delay
+      thisconnobject = nat_openconn(nmclient_handledict[nmhandle]['natlayermac'], nmclient_handledict[nmhandle]['port'],timeout=nmclient_handledict[nmhandle]['timeout']+5,usetimeoutsock=True) 
     except Exception, e:
       raise NMClientException, str(e)
   

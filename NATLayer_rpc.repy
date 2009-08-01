@@ -152,7 +152,7 @@ NAT_STOP_LOCK = getlock()
 #########################################################################
 
 # Wrapper function around the NATLayer for clients        
-def nat_openconn(destmac, destport, localip=None, localport=None, timeout = 5, forwarderIP=None,forwarderPort=None):
+def nat_openconn(destmac, destport, localip=None, localport=None, timeout = 5, forwarderIP=None,forwarderPort=None,usetimeoutsock=False):
   """
   <Purpose>
     Opens a connection to a server behind a NAT.
@@ -180,6 +180,12 @@ def nat_openconn(destmac, destport, localip=None, localport=None, timeout = 5, f
     forwarderPort:
       Force a forwarder port to connect to. This will be automatically resolved if None.
       forwarderIP must be specified if this is not None.
+    
+     usetimeoutsock:
+       use a timeout_openconn instead of openconn to connect
+       to the forwarder
+       WARNING you must include sockettimeout.repy to use this
+
       
   <Returns>
      A socket-like object that can be used for communication. 
@@ -188,7 +194,7 @@ def nat_openconn(destmac, destport, localip=None, localport=None, timeout = 5, f
   # use the forwarderIP and port provided
   if forwarderIP != None and forwarderPort != None:
     return _nat_try_connection_list([(forwarderIP,forwarderPort)],
-                                            localip,localport,timeout,destmac,destport)  
+                                            localip,localport,timeout,destmac,destport,usetimeoutsock)  
     
   
   # lookup the destmac if forwarderIP and port are not provided
@@ -198,14 +204,14 @@ def nat_openconn(destmac, destport, localip=None, localport=None, timeout = 5, f
       forwarders = NAT_SRV_CACHE[destmac]
       
       try:
-        return _nat_try_connection_list(forwarders,localip,localport,timeout,destmac,destport)
+        return _nat_try_connection_list(forwarders,localip,localport,timeout,destmac,destport,usetimeoutsock)
         
       except:  # remove this entry from the cache
         del NAT_SRV_CACHE[destmac]        
       
     # the cache failed, so do a fresh lookup
     forwarders = nat_server_list_lookup(destmac)
-    socket = _nat_try_connection_list(forwarders,localip,localport,timeout,destmac,destport)
+    socket = _nat_try_connection_list(forwarders,localip,localport,timeout,destmac,destport,usetimeoutsock)
     
     #this list succeded so add it to the cache
     NAT_SRV_CACHE[destmac] = forwarders
@@ -215,7 +221,7 @@ def nat_openconn(destmac, destport, localip=None, localport=None, timeout = 5, f
 
 
 
-def _nat_try_connection_list(forwarders,localip,localport,timeout,destmac,destport):
+def _nat_try_connection_list(forwarders,localip,localport,timeout,destmac,destport,usetimeoutsock):
   # try to connect to every forwarder listed until we suceed
   # or run out of forwarders
   connected = False
@@ -226,7 +232,10 @@ def _nat_try_connection_list(forwarders,localip,localport,timeout,destmac,destpo
 
     # Create a real connection to the forwarder
     try:
-      socket = openconn(ip, int(port), localip, localport, timeout)
+      if usetimeoutsock:
+        socket = timeout_openconn(ip, int(port), localip, localport, timeout)
+      else:
+        socket = openconn(ip, int(port), localip, localport, timeout)
     except Exception, e:
       # try the next forwarder listed
       exception_list.append(str(e))
