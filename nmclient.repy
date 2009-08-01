@@ -20,6 +20,11 @@ include signeddata.repy
 include session.repy
 
 
+
+#allow nat layer
+include NATLayer_rpc.repy
+
+
 # makes connections time out
 include sockettimeout.repy
 
@@ -74,11 +79,22 @@ nmclient_handledictlock = getlock()
 # the result)...
 def nmclient_rawcommunicate(nmhandle, *args):
 
-  try:
-    thisconnobject = timeout_openconn(nmclient_handledict[nmhandle]['IP'], nmclient_handledict[nmhandle]['port'],timeout=nmclient_handledict[nmhandle]['timeout']) 
-  except Exception, e:
-    raise NMClientException, str(e)
+  # the node is behind a nat and using nat layer
+  if 'natlayermac' in nmclient_handledict[nmhandle]:
+    try:
+      thisconnobject = nat_openconn(nmclient_handledict[nmhandle]['natlayermac'],nmclient_handledict[nmhandle]['port']) 
+    except Exception, e:
+      raise NMClientException, str(e)
+  
+  # not a NATLayer connection
+  else:
+    # do the normal openconn
+    try:
+      thisconnobject = timeout_openconn(nmclient_handledict[nmhandle]['IP'], nmclient_handledict[nmhandle]['port'],timeout=nmclient_handledict[nmhandle]['timeout']) 
+    except Exception, e:
+      raise NMClientException, str(e)
 
+  
   # always close the connobject
   try:
 
@@ -97,7 +113,7 @@ def nmclient_rawcommunicate(nmhandle, *args):
 # communication header, sends all the data, receives the result, and returns
 # the result)...
 def nmclient_signedcommunicate(nmhandle, *args):
-
+  
   # need to check lots of the nmhandle settings...
 
   if nmclient_handledict[nmhandle]['timestamp'] == True:
@@ -144,13 +160,25 @@ def nmclient_signedcommunicate(nmhandle, *args):
   datatosend = args[0]
   for arg in args[1:]:
     datatosend = datatosend + '|' + str(arg)
-    
+  
 
-  try:
-    thisconnobject = timeout_openconn(nmclient_handledict[nmhandle]['IP'], nmclient_handledict[nmhandle]['port'], timeout=nmclient_handledict[nmhandle]['timeout'])
-  except Exception, e:
-    raise NMClientException, str(e)
 
+  # the node is behind a nat
+  if 'natlayermac' in nmclient_handledict[nmhandle]:
+    try:
+      thisconnobject = nat_openconn(nmclient_handledict[nmhandle]['natlayermac'], nmclient_handledict[nmhandle]['port']) 
+    except Exception, e:
+      raise NMClientException, str(e)
+  
+  # not a natlayer conn
+  else:  
+
+    try:
+      thisconnobject = timeout_openconn(nmclient_handledict[nmhandle]['IP'], nmclient_handledict[nmhandle]['port'], timeout=nmclient_handledict[nmhandle]['timeout'])
+    except Exception, e:
+      raise NMClientException, str(e)
+
+  
   # always close the connobject afterwards...
   try:
     try:
@@ -203,6 +231,12 @@ def nmclient_safelygethandle():
 def nmclient_createhandle(nmIP, nmport, sequenceid = None, timestamp=True, identity = True, expirationtime = 60*60, publickey = None, privatekey = None, vesselid = None, timeout=15):
 
   thisentry = {}
+
+  # is this using the nat layer  NAT$MAC
+  if 'NAT' in nmIP:
+    (_,mac) = nmIP.split('$')
+    thisentry['natlayermac'] = mac 
+
 
   thisentry['IP'] = nmIP
   thisentry['port'] = nmport
