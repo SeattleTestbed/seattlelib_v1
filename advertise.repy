@@ -12,6 +12,7 @@ Raises an AdvertiseError expcetion if there is a problem advertising with either
 
 """
 
+include listops.repy
 include openDHTadvertise.repy
 include centralizedadvertise.repy
 
@@ -60,14 +61,6 @@ def advertise_announce(key, value, ttlval):
     raise AdvertiseError, exceptions
 
 
-def advertise_uniq(a):
-  retlist = []
-  for item in a:
-    if item not in retlist:
-      retlist.append(item)
-
-  return retlist
-
 
 
 def advertise_lookup(key, maxvals=100, lookuptype=['central','opendht']):
@@ -88,5 +81,5 @@ def advertise_lookup(key, maxvals=100, lookuptype=['central','opendht']):
   else:
     dhtans = []
 
-  return advertise_uniq(centralans + dhtans)
+  return listops_uniq(centralans + dhtans)
 
