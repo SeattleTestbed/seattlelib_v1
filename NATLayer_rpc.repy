@@ -378,7 +378,7 @@ def nat_waitforconn(localmac, localport, function, forwarderIP=None, forwarderPo
       
     persist:
       If set to true the natlayer will reconnect to another forwarder in the
-      case of failure 
+      case of failure, this is the recommeneded default 
 
   <Side Effects>
     An event will be used to monitor new connections
@@ -391,41 +391,58 @@ def nat_waitforconn(localmac, localport, function, forwarderIP=None, forwarderPo
   if NAT_STATE_DATA["mux"] != None and not NAT_STATE_DATA["mux"].isAlive():
     # Delete the mux
     NAT_STATE_DATA["mux"] = None
+    nat_isalive() # deletes all mux state
   
-  #save the user specified values in case we have to redo the waitforconn
-  orig_forwarderIP = forwarderIP
-  orig_forwarderPort = forwarderPort
-  orig_forwarderCltPort = forwarderCltPort
 
 
-  # Do we already have a mux? If not create a new one
-  if NAT_STATE_DATA["mux"] == None:
+  # Use the exisiting mux (if there is one)
+  if NAT_STATE_DATA["mux"] != None:
+    try:
+      # try to connectin with the existing mux
+      return _nat_register_server_with_forwarder(localmac,
+                            localport,function,errdel,persist)
+    except:
+      # the mux is dead, so we need to drop it and make a new one  
+      NAT_STATE_DATA['mux'] = None
+      nat_isalive() # deletes all mux state
 
-    # Get a forwarder to use
-    if forwarderIP == None or forwarderPort == None or forwarderCltPort == None:
-      forwarders_list = nat_forwarder_list_lookup()
-    else:
-      forwarders_list = [(forwarderIP, forwarderPort, forwarderCltPort)]
+  
+  # make a new forwarder connection and a new mux
 
-    # do this until we get a connection or run out of forwarders
-    connected = False
-    for (forwarderIP, forwarderPort, forwarderCltPort) in forwarders_list:
+  # Get a forwarder to use
+  if forwarderIP == None or forwarderPort == None or forwarderCltPort == None:
+    forwarders_list = nat_forwarder_list_lookup()
+  else:
+    forwarders_list = [(forwarderIP, forwarderPort, forwarderCltPort)]
+
+  # do this until we get a connection or run out of forwarders
+  connected = False
+  for (forwarderIP, forwarderPort, forwarderCltPort) in forwarders_list:
         
+    try:  
+      # Create a real connection to the forwarder
+      socket = openconn(forwarderIP, int(forwarderPort))
+      socket.send('S') # tell the forwarder this is a server
+      _nat_wait_establish_mux(socket,forwarderIP,forwarderPort,
+                                 forwarderCltPort,localport)
+      return _nat_register_server_with_forwarder(localmac,
+                             localport,function,errdel,persist)
+    except:
+      pass # do nothing and try the next forwarder
+    else:
+      # we got a connection so stop looping
+     connected = True      
+     break
     
-      try:  
-        # Create a real connection to the forwarder
-        socket = openconn(forwarderIP, int(forwarderPort))
-      except:
-        pass # do nothing and try the next forwarder
-      else:
-        # we got a connection so stop looping
-        connected = True
-        socket.send('S') # tell the forwarder this is a server
-        break
-
-    if not connected:
-      raise EnvironmentError, "Failed to connect to a forwarder."
+  if not connected:
+    raise EnvironmentError, "Failed to connect to a forwarder."
      
+  
+    
+def _nat_wait_establish_mux(socket,forwarderIP,forwarderPort,
+                            forwarderCltPort,localport):
+# create a new mux with the forwarder
+    
     # Save this information
     NAT_STATE_DATA["forwarderIP"] = forwarderIP
     NAT_STATE_DATA["forwarderPort"] = forwarderPort
@@ -445,9 +462,14 @@ def nat_waitforconn(localmac, localport, function, forwarderIP=None, forwarderPo
     # Add the multiplexer to our state
     NAT_STATE_DATA["mux"] = mux
   
-  else:
-    # Get the mux
-    mux = NAT_STATE_DATA["mux"]
+    
+    
+
+
+def _nat_register_server_with_forwarder(localmac,localport,function,
+                                        errdel,persist):
+# register a server with the forwarder on an existing mux
+  mux = NAT_STATE_DATA["mux"]
 
   # If the error delegate is assigned, set up error delegation
   if errdel != None:
@@ -485,8 +507,7 @@ def nat_waitforconn(localmac, localport, function, forwarderIP=None, forwarderPo
   # Setup a function to check that the waitforconn is still
   # functioning, and peroform a new waitforconn if its now
   if persist:
-    settimer(10,nat_persist,[localmac, localport, function, orig_forwarderIP, 
-              orig_forwarderPort, orig_forwarderCltPort, errdel])
+    settimer(10,nat_persist,[localmac, localport, function, errdel])
  
  
   # Return the localmac and localport, for stopcomm
@@ -497,8 +518,7 @@ def nat_waitforconn(localmac, localport, function, forwarderIP=None, forwarderPo
 # forwarder errors.
 # if the forwarder or mux fails redo the waitforconn unless
 # stopcomm has been called   
-def nat_persist(localmac, localport, function, forwarderIP, 
-              forwarderPort, forwarderCltPort, errdel):
+def nat_persist(localmac, localport, function, errdel):
   
   # WHILE STOPCOMM HAS NOT BEEN CALLED 
   while True:
@@ -509,8 +529,7 @@ def nat_persist(localmac, localport, function, forwarderIP,
       return
 
     if not nat_isalive():
-      nat_waitforconn(localmac, localport, function, forwarderIP, 
-              forwarderPort, forwarderCltPort, errdel)
+      nat_waitforconn(localmac, localport, function,errdel)
     NAT_STOP_LOCK.release() 
     sleep(10)
   
