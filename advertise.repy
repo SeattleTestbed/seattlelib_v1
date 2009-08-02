@@ -1,0 +1,92 @@
+"""
+Author: Justin Cappos
+
+Start Date: October 14, 2008
+
+Description:
+A stub that allows different announcement types.   I'd make this smarter, but
+the user won't configure it, right?
+
+
+Raises an AdvertiseError expcetion if there is a problem advertising with either service
+
+"""
+
+include openDHTadvertise.repy
+include centralizedadvertise.repy
+
+nodemanager_announce_context = {}
+nodemanager_announce_context["skipDHT"] = 0
+nodemanager_announce_context["previousDHTskip"] = 1
+nodemanager_announce_context["skipcentral"] = 0
+nodemanager_announce_context["previouscentralskip"] = 1
+
+
+# an exepction to indicate an error occured while advertising
+class AdvertiseError(Exception):
+  pass
+
+
+
+
+def advertise_announce(key, value, ttlval):
+  exceptions = '' # track excpetions that occur and raise them at the end
+
+  if nodemanager_announce_context["skipcentral"] == 0:
+    try:
+      centralizedadvertise_announce(key, value, ttlval)
+      nodemanager_announce_context["previouscentralskip"] = 1
+    except Exception, e:
+      exceptions += 'centralized announce error: '+str(e),
+      nodemanager_announce_context["skipcentral"] = nodemanager_announce_context["previouscentralskip"] + 1
+      nodemanager_announce_context["previouscentralskip"] = min(nodemanager_announce_context["previouscentralskip"] * 2, 16)
+
+  else:
+    nodemanager_announce_context["skipcentral"] = nodemanager_announce_context["skipcentral"] - 1
+
+
+  if nodemanager_announce_context["skipDHT"]==0:
+    try:
+      openDHTadvertise_announce(key, value, ttlval)
+      nodemanager_announce_context["previousDHTskip"] = 1
+    except Exception, e:
+      exceptions += 'openDHT announce error: '+str(e)
+      nodemanager_announce_context["skipDHT"] = nodemanager_announce_context["previousDHTskip"] + 1
+      nodemanager_announce_context["previousDHTskip"] = min(nodemanager_announce_context["previousDHTskip"] * 2, 16)
+  else:
+    nodemanager_announce_context["skipDHT"] = nodemanager_announce_context["skipDHT"] - 1
+
+  if exceptions != '':
+    raise AdvertiseError, exceptions
+
+
+def advertise_uniq(a):
+  retlist = []
+  for item in a:
+    if item not in retlist:
+      retlist.append(item)
+
+  return retlist
+
+
+
+def advertise_lookup(key, maxvals=100, lookuptype=['central','opendht']):
+  if 'central' in lookuptype:
+    try:
+      centralans = centralizedadvertise_lookup(key, maxvals)
+    except Exception, e:
+      centralans = []
+  else:
+    centralans = []
+
+  if 'opendht' in lookuptype:
+    try:
+      dhtans = openDHTadvertise_lookup(key, maxvals)
+    except Exception, e:
+      dhtans = []
+
+  else:
+    dhtans = []
+
+  return advertise_uniq(centralans + dhtans)
+
