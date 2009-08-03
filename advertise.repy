@@ -38,7 +38,7 @@ def advertise_announce(key, value, ttlval):
       centralizedadvertise_announce(key, value, ttlval)
       nodemanager_announce_context["previouscentralskip"] = 1
     except Exception, e:
-      exceptions += 'centralized announce error: '+str(e),
+      exceptions += 'centralized announce error: '+str(e)
       nodemanager_announce_context["skipcentral"] = nodemanager_announce_context["previouscentralskip"] + 1
       nodemanager_announce_context["previouscentralskip"] = min(nodemanager_announce_context["previouscentralskip"] * 2, 16)
 
