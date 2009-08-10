@@ -51,7 +51,7 @@ def textops_rawtexttolines(text, linedelimiter="\n"):
 
 
 
-def textops_grep(match, lines, exclude=False):
+def textops_grep(match, lines, exclude=False, case_sensitive=True):
   """
   <Purpose>
     Return a subset of lines matching (or not matching) a given string.
@@ -67,6 +67,9 @@ def textops_grep(match, lines, exclude=False):
             If false, include lines matching 'match'. If true, include lines
             not matching 'match'.
 
+    case_sensitive (optional, defaults to true):
+            If false, ignore case when comparing 'match' to the lines.
+
   <Exceptions>
     TypeError on bad parameters.
 
@@ -77,12 +80,20 @@ def textops_grep(match, lines, exclude=False):
     A subset of the original lines.
 
   """
+  
+  if not case_sensitive:
+    match = match.lower()
 
   result = []
   for line in lines:
-    if not exclude and line.find(match) >= 0:
+    if not case_sensitive:
+      mline = line.lower()
+    else:
+      mline = line
+
+    if not exclude and mline.find(match) >= 0:
       result.append(line)
-    elif exclude and line.find(match) < 0:
+    elif exclude and mline.find(match) < 0:
       result.append(line)
 
   return result
