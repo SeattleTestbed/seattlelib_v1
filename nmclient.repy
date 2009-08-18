@@ -273,6 +273,7 @@ def nmclient_createhandle(nmIP, nmport, sequenceid = None, timestamp=True, ident
         break
         
     else:
+      del nmclient_handledict[newhandle]
       raise NMClientException, "Do not understand node manager identity in identification"
 
   else:
