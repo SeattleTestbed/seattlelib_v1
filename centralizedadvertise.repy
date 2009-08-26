@@ -51,6 +51,7 @@ def centralizedadvertise_lookup(key, maxvals=100):
       for encoded_value in encoded_values:
         value = encoded_value.replace("\\c", ",")
         value = value.replace("\\\\", "\\")
+        values.append(value)
 
       return values
     raise Exception, "Centralized lookup failed"
