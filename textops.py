@@ -1,6 +1,6 @@
 """
 <Program Name>
-  textops.repy
+  textops.py
 
 <Started>
   July 24, 2009
