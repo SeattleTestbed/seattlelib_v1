@@ -191,6 +191,9 @@ def nat_openconn(destmac, destport, localip=None, localport=None, timeout = 5, f
      A socket-like object that can be used for communication. 
      Use send, recv, and close just like you would an actual socket object in python.
   """ 
+  # cast the destmac to a string, internal methods may fail otherwise
+  destmac = str(destmac)
+
   # use the forwarderIP and port provided
   if forwarderIP != None and forwarderPort != None:
     return _nat_try_connection_list([(forwarderIP,forwarderPort)],
@@ -387,6 +390,9 @@ def nat_waitforconn(localmac, localport, function, forwarderIP=None, forwarderPo
   <Returns>
     A handle, this can be used with nat_stopcomm to stop listening.      
   """  
+  # cast the localmac to a str, internal methods may fail otherwise
+  localmac = str(localmac)
+
   # Check if our current mux is dead (if it exists)
   if NAT_STATE_DATA["mux"] != None and not NAT_STATE_DATA["mux"].isAlive():
     # Delete the mux
