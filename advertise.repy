@@ -8,7 +8,7 @@ A stub that allows different announcement types.   I'd make this smarter, but
 the user won't configure it, right?
 
 
-Raises an AdvertiseError expcetion if there is a problem advertising with either service
+Raises an AdvertiseError exception if there is a problem advertising with either service
 
 """
 
@@ -16,70 +16,211 @@ include listops.repy
 include openDHTadvertise.repy
 include centralizedadvertise.repy
 
+include parallelize.repy
+
 nodemanager_announce_context = {}
 nodemanager_announce_context["skipDHT"] = 0
 nodemanager_announce_context["previousDHTskip"] = 1
 nodemanager_announce_context["skipcentral"] = 0
 nodemanager_announce_context["previouscentralskip"] = 1
+nodemanager_announce_context_lock = getlock()
 
 
-# an exepction to indicate an error occured while advertising
+# an exception to indicate an error occured while advertising
 class AdvertiseError(Exception):
   pass
 
 
 
 
-def advertise_announce(key, value, ttlval):
-  exceptions = '' # track excpetions that occur and raise them at the end
+def _try_advertise_announce(args):
+  # Helper function used by advertise_announce(). This is the worker process
+  # run in parallel for DHT and central announces.
+  which_service, key, value, ttlval, exceptions = args
 
-  if nodemanager_announce_context["skipcentral"] == 0:
-    try:
+  if which_service not in ("central", "DHT"):
+    raise AdvertiseError("Incorrect service type used in internal function _try_advertise_announce.")
+
+  try:
+    if which_service == "central":
       centralizedadvertise_announce(key, value, ttlval)
-      nodemanager_announce_context["previouscentralskip"] = 1
-    except Exception, e:
-      exceptions += 'centralized announce error: '+str(e)
-      nodemanager_announce_context["skipcentral"] = nodemanager_announce_context["previouscentralskip"] + 1
-      nodemanager_announce_context["previouscentralskip"] = min(nodemanager_announce_context["previouscentralskip"] * 2, 16)
-
-  else:
-    nodemanager_announce_context["skipcentral"] = nodemanager_announce_context["skipcentral"] - 1
-
-
-  if nodemanager_announce_context["skipDHT"]==0:
-    try:
+    else:
       openDHTadvertise_announce(key, value, ttlval)
-      nodemanager_announce_context["previousDHTskip"] = 1
-    except Exception, e:
-      exceptions += 'openDHT announce error: '+str(e)
-      nodemanager_announce_context["skipDHT"] = nodemanager_announce_context["previousDHTskip"] + 1
-      nodemanager_announce_context["previousDHTskip"] = min(nodemanager_announce_context["previousDHTskip"] * 2, 16)
-  else:
-    nodemanager_announce_context["skipDHT"] = nodemanager_announce_context["skipDHT"] - 1
 
-  if exceptions != '':
+    nodemanager_announce_context_lock.acquire()
+    try:
+      nodemanager_announce_context["previous" + which_service + "skip"] = 1
+    finally:
+      nodemanager_announce_context_lock.release()
+
+  except Exception, e:
+    nodemanager_announce_context_lock.acquire()
+    try:
+      exceptions[0] += 'announce error (type: ' + which_service + '): ' + str(e)
+      nodemanager_announce_context["skip" + which_service] = \
+          nodemanager_announce_context["previous" + which_service + "skip"] + 1
+      nodemanager_announce_context["previous" + which_service + "skip"] = \
+          min(nodemanager_announce_context["previous" + which_service + "skip"] * 2, 16)
+    finally:
+      nodemanager_announce_context_lock.release()
+
+
+
+
+
+def advertise_announce(key, value, ttlval, concurrentevents=2, timeout=60):
+  """
+  <Purpose>
+    Announce (PUT) a value at the given key in the central advertise service,
+    openDHT, or both.
+
+  <Arguments>
+    key:
+            The key to store the value at.
+
+    value:
+            The value to store.
+
+    ttlval:
+            Time in seconds to persist the associated key<->value pair.
+    
+    concurrentevents (optional, defaults to 2):
+            How many services to announce on in parallel.
+
+    timeout (optional, defaults to 60):
+            After this many seconds (can be a float or int type), give up.
+
+  <Exceptions>
+    AdvertiseError if something goes wrong.
+
+  <Side Effects>
+    Spawns as many worker events as concurrentevents specifies, limited by the
+    number of services available (currently 2).
+
+  <Returns>
+    None.
+  """
+
+  # Wrapped in an array so we can modify the reference (python strings are immutable).
+  exceptions = [''] # track exceptions that occur and raise them at the end
+
+  parallize_worksets = []
+  start_time = getruntime()
+
+  for service_type in ("central", "DHT"):
+    if nodemanager_announce_context["skip" + service_type] == 0:
+      parallize_worksets.append((service_type, key, value, ttlval, exceptions))
+
+    else:
+      nodemanager_announce_context_lock.acquire()
+      try:
+        nodemanager_announce_context["skip" + service_type] = \
+            nodemanager_announce_context["skip" + service_type] - 1
+      finally:
+        nodemanager_announce_context_lock.release()
+
+  ph = parallelize_initfunction(parallize_worksets, _try_advertise_announce, \
+      concurrentevents=concurrentevents)
+
+  while not parallelize_isfunctionfinished(ph):
+    sleep(0.2)
+    if getruntime() - start_time > timeout:
+      parallelize_abortfunction(ph)
+      break
+
+  # Note: closefunction() doesn't actually abort future functions like
+  # it says it will.
+  parallelize_closefunction(ph)
+
+  if exceptions[0] != '':
     raise AdvertiseError, exceptions
 
+  return None
 
 
 
-def advertise_lookup(key, maxvals=100, lookuptype=['central','opendht']):
-  if 'central' in lookuptype:
-    try:
-      centralans = centralizedadvertise_lookup(key, maxvals)
-    except Exception, e:
-      centralans = []
-  else:
-    centralans = []
 
-  if 'opendht' in lookuptype:
-    try:
-      dhtans = openDHTadvertise_lookup(key, maxvals)
-    except Exception, e:
-      dhtans = []
+def _try_advertise_lookup(args):
+  # Helper function used by advertise_lookup(). This is the worker process
+  # run in parallel for DHT and central lookups.
+  which_service, key, maxvals = args
 
-  else:
-    dhtans = []
+  if which_service not in ("central", "DHT"):
+    raise AdvertiseError("Incorrect service type used in internal function _try_advertise_lookup.")
 
-  return listops_uniq(centralans + dhtans)
+  try:
+    if which_service == "central":
+      return centralizedadvertise_lookup(key, maxvals)
+    else:
+      return openDHTadvertise_lookup(key, maxvals)
+  
+  except Exception, e:
+    return []
 
+
+
+
+def advertise_lookup(key, maxvals=100, lookuptype=['central','opendht'], \
+    concurrentevents=2, timeout=60):
+  """
+  <Purpose>
+    Lookup (GET) (a) value(s) stored at the given key in the central advertise
+    server, openDHT, or both.
+
+  <Arguments>
+    key:
+            The key used to lookup values.
+
+    maxvals (optional, defaults to 100):
+            Maximum number of values to return.
+
+    lookuptype (optional, defaults to ['central', 'opendht']):
+            Which services to employ looking up values.
+    
+    concurrentevents (optional, defaults to 2):
+            How many services to lookup on in parallel.
+
+    timeout (optional, defaults to 60):
+            After this many seconds (can be a float or int type), give up.
+
+  <Exceptions>
+    AdvertiseError if something goes wrong.
+
+  <Side Effects>
+    Spawns as many worker events as concurrentevents specifies, limited by the
+    number of services in lookuptype.
+
+  <Returns>
+    All unique values stored at the key.
+  """
+
+  parallel_worksets = []
+  start_time = getruntime()
+
+  for type in lookuptype:
+    if type == "central":
+      parallel_worksets.append(("central", key, maxvals))
+    elif type == "opendht":
+      parallel_worksets.append(("DHT", key, maxvals))
+    else:
+      raise AdvertiseError("Incorrect service type '" + type + "' passed to advertise_lookup().")
+
+  ph = parallelize_initfunction(parallel_worksets, _try_advertise_lookup, \
+      concurrentevents=concurrentevents)
+
+  while not parallelize_isfunctionfinished(ph):
+    sleep(0.2)
+    if getruntime() - start_time > timeout:
+      parallelize_abortfunction(ph)
+      break
+
+  parallel_results = parallelize_getresults(ph)['returned']
+  results = []
+
+  for parallel_result in parallel_results:
+    _, return_value = parallel_result
+    results += return_value
+
+  parallelize_closefunction(ph)
+
+  return listops_uniq(results)
