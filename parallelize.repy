@@ -311,7 +311,7 @@ def parallelize_execute_function(handle, myid):
     # remove my entry from the list of running worker threads...
     try:
       parallelize_info_dict[handle]['runninglist'].remove(myid)
-    except ValueError:
+    except (ValueError, KeyError):
       pass
     
 
