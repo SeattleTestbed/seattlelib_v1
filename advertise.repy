@@ -36,7 +36,7 @@ class AdvertiseError(Exception):
 def _try_advertise_announce(args):
   # Helper function used by advertise_announce(). This is the worker process
   # run in parallel for DHT and central announces.
-  which_service, key, value, ttlval, exceptions = args
+  which_service, key, value, ttlval, exceptions, finishedref = args
 
   if which_service not in ("central", "DHT"):
     raise AdvertiseError("Incorrect service type used in internal function _try_advertise_announce.")
@@ -47,6 +47,8 @@ def _try_advertise_announce(args):
     else:
       openDHTadvertise_announce(key, value, ttlval)
 
+    finishedref[0] = True     # Signal that at least one service has finished.
+    
     nodemanager_announce_context_lock.acquire()
     try:
       nodemanager_announce_context["previous" + which_service + "skip"] = 1
@@ -68,7 +70,8 @@ def _try_advertise_announce(args):
 
 
 
-def advertise_announce(key, value, ttlval, concurrentevents=2, timeout=60):
+def advertise_announce(key, value, ttlval, concurrentevents=2, \
+    graceperiod=10, timeout=60):
   """
   <Purpose>
     Announce (PUT) a value at the given key in the central advertise service,
@@ -86,6 +89,10 @@ def advertise_announce(key, value, ttlval, concurrentevents=2, timeout=60):
     
     concurrentevents (optional, defaults to 2):
             How many services to announce on in parallel.
+
+    graceperiod (optional, defaults to 10):
+            After this many seconds (can be a float or int type), if we have
+            successfully announced on at least one service, return.
 
     timeout (optional, defaults to 60):
             After this many seconds (can be a float or int type), give up.
@@ -107,9 +114,12 @@ def advertise_announce(key, value, ttlval, concurrentevents=2, timeout=60):
   parallize_worksets = []
   start_time = getruntime()
 
+  onefinished = [False]
+
   for service_type in ("central", "DHT"):
     if nodemanager_announce_context["skip" + service_type] == 0:
-      parallize_worksets.append((service_type, key, value, ttlval, exceptions))
+      parallize_worksets.append((service_type, key, value, ttlval, \
+          exceptions, onefinished))
 
     else:
       nodemanager_announce_context_lock.acquire()
@@ -123,8 +133,9 @@ def advertise_announce(key, value, ttlval, concurrentevents=2, timeout=60):
       concurrentevents=concurrentevents)
 
   while not parallelize_isfunctionfinished(ph):
-    sleep(0.2)
-    if getruntime() - start_time > timeout:
+    sleep(0.1)
+    if getruntime() - start_time > timeout or \
+        (getruntime() - start_time > graceperiod and onefinished[0]):
       parallelize_abortfunction(ph)
       break
 
@@ -143,16 +154,19 @@ def advertise_announce(key, value, ttlval, concurrentevents=2, timeout=60):
 def _try_advertise_lookup(args):
   # Helper function used by advertise_lookup(). This is the worker process
   # run in parallel for DHT and central lookups.
-  which_service, key, maxvals = args
+  which_service, key, maxvals, finishedref = args
 
   if which_service not in ("central", "DHT"):
     raise AdvertiseError("Incorrect service type used in internal function _try_advertise_lookup.")
 
   try:
     if which_service == "central":
-      return centralizedadvertise_lookup(key, maxvals)
+      results = centralizedadvertise_lookup(key, maxvals)
     else:
-      return openDHTadvertise_lookup(key, maxvals)
+      results = openDHTadvertise_lookup(key, maxvals)
+
+    finishedref[0] = True
+    return results
   
   except Exception, e:
     return []
@@ -161,7 +175,7 @@ def _try_advertise_lookup(args):
 
 
 def advertise_lookup(key, maxvals=100, lookuptype=['central','opendht'], \
-    concurrentevents=2, timeout=60):
+    concurrentevents=2, graceperiod=10, timeout=60):
   """
   <Purpose>
     Lookup (GET) (a) value(s) stored at the given key in the central advertise
@@ -180,6 +194,10 @@ def advertise_lookup(key, maxvals=100, lookuptype=['central','opendht'], \
     concurrentevents (optional, defaults to 2):
             How many services to lookup on in parallel.
 
+    graceperiod (optional, defaults to 10):
+            After this many seconds (can be a float or int type), return the
+            results if one service was reached successfully.
+
     timeout (optional, defaults to 60):
             After this many seconds (can be a float or int type), give up.
 
@@ -197,11 +215,13 @@ def advertise_lookup(key, maxvals=100, lookuptype=['central','opendht'], \
   parallel_worksets = []
   start_time = getruntime()
 
+  onefinished = [False]
+
   for type in lookuptype:
     if type == "central":
-      parallel_worksets.append(("central", key, maxvals))
+      parallel_worksets.append(("central", key, maxvals, onefinished))
     elif type == "opendht":
-      parallel_worksets.append(("DHT", key, maxvals))
+      parallel_worksets.append(("DHT", key, maxvals, onefinished))
     else:
       raise AdvertiseError("Incorrect service type '" + type + "' passed to advertise_lookup().")
 
@@ -209,8 +229,9 @@ def advertise_lookup(key, maxvals=100, lookuptype=['central','opendht'], \
       concurrentevents=concurrentevents)
 
   while not parallelize_isfunctionfinished(ph):
-    sleep(0.2)
-    if getruntime() - start_time > timeout:
+    sleep(0.1)
+    if getruntime() - start_time > timeout or \
+        (getruntime() - start_time > graceperiod and onefinished[0]):
       parallelize_abortfunction(ph)
       break
 
