@@ -37,9 +37,15 @@ def getvesselresources_portnum(portnum, ipaddr=getmyip(), portval=1224):
   #dictionary that contains all the resources for the vessel
   resultdict={}
 	
-  #get a list of all the vessels 
-  vessel_list = nmclient_getvesseldict(nmhandle)
-	
+  #get a list of all the vessels
+
+  try: 
+    vessel_list = nmclient_getvesseldict(nmhandle)
+  except Exception, e:
+    raise
+  finally:
+    nmclient_destroyhandle(nmhandle)	
+
   #go through all the vessels 
   for cur_vessel in vessel_list['vessels']:
     resource_dict=getvesselresources_vesselname(cur_vessel, ipaddr, portval)
@@ -98,6 +104,8 @@ def getvesselresources_vesselname(vesselname, ipaddr=getmyip(), portval=1224):
       raise ValueError("Invalid vessel name: '"+str(vesselname)+"'") 
     else: 
       raise
+  finally:
+    nmclient_destroyhandle(nmhandle)
 
   #go through all the lines in fullresource_string and make a dictionary of the resources
   for cur_resource in fullresource_string.split('\n'):
