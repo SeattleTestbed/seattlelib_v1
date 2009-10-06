@@ -10,7 +10,7 @@
     PyCrypto which is authored by Dwayne C. Litzenberger
     
 <Purpose>
-  This file provides the encryption functionality for rsa.repy.
+  This file provides the encryption functionality for rsa.repy. 
   This code has been left as close to origional as possible with
   the notes about changes made to enable for easier modification
   if pycrypto is updated. 
@@ -77,9 +77,6 @@
 # Anthony stage1
 #from number import *
 #import number  #stage 2
-
-#JAC: Need to include random.repy because random_nbit_int() is used...
-include random.repy
 
 # Basic public key class
 class pubkey_pubkey:
@@ -318,7 +315,11 @@ class pubkey_pubkey:
     Large change, dropped out behavior for taking tuples, since
     it will never be used in this way for RSA, pubkey has that 
     behavior because of DSA and ElGamal.
-
+  Oct 5 2009:
+    Modified RSA-RSAobj.__init__ to correctly reload the required
+    key values, the code was using getattr but this is no longer
+    allowed by repy.
+  
 """
 # Anthony stage 1
 #__revision__ = "$Id$"
@@ -351,29 +352,31 @@ class RSA_RSAobj(pubkey_pubkey):
         self.key = key
     
     # Anthony - these were assigned in place of the behavior provided
-    # by the __getattr__ function which is not supported in repy.    
+    # by the __getattr__ function which is not supported in repy. 
+    # Anthony Oct 5 2009: Modified again because getattr was no
+    # longer allowed by repy.   
         try:
-            self.n = getattr(self.key, 'n')
+            self.n = self.key.n
         except AttributeError:
             pass
         try:
-            self.e = getattr(self.key, 'e')
+            self.e = self.key.e
         except AttributeError:
             pass
         try:
-            self.d = getattr(self.key, 'd')
+            self.d = self.key.d
         except AttributeError:
             pass
         try:
-            self.p = getattr(self.key, 'p')
+            self.p = self.key.p
         except AttributeError:
             pass
         try:
-            self.q = getattr(self.key, 'q')
+            self.q = self.key.q
         except AttributeError:
             pass
         try:
-            self.u = getattr(self.key, 'u')
+            self.u = self.key.u
         except AttributeError:
             pass
         
@@ -950,17 +953,23 @@ def _import_Random():
 
 """
 <Modified> 
-  Anthony - Feb 9 
+  Anthony - Feb 9 2009
     removed the import of Crypto.Util.python_compat, dont need 
     to support python 2.1 ..
-  Anthony - April 7
+  Anthony - April 7 2009
     Changed return of _verify to coincide with seattle's origional rsa behavior.
-  Anthony - April 30
+  Anthony - April 30 2009
     Changed _slowmath_rsa_construct to allow user to create
     a _slowmath_RSAKey without a public key
-  Anthony - May 9
+  Anthony - May 9 2009
     Modified _slowmath_rsa_construct to allow type int in 
     addition to long.
+  Anthony - Oct 5 2009
+    Modified _slowmath_RSAKey.has_private and  _slowmath_RSAKey.has_public
+    to no longer use hasattr because repy no longer allows hasattr.
+    The code was borrowed from the fix for RSA.py (Note: RSA.py is
+    lumped together with the other modules to get pycryptorsa.repy
+    before distribution.
 """
 
 # Anthony removing globals, looks like this one can go.
@@ -1024,13 +1033,48 @@ class _slowmath_RSAKey(object):
         # do no have public key data, an additional requirement
         # was added.
         #return hasattr(self, 'd')
-        return hasattr(self, 'd') and hasattr(self, 'n')
+        
+        # Anthony Oct 5 2009: This is no longer supported under repy
+        #return hasattr(self, 'd') and hasattr(self, 'n')
+        has_n = False
+        has_d = False
+        try:
+            self.n
+            has_n = True
+        except AttributeError:
+            pass
+          
+        try:
+            self.d
+            has_d = True
+        except AttributeError:
+            pass
+        
+        return has_d and has_n
       
     def has_public(self):
         # Anthony because repy builds private keys that
         # do no have public key data, an additional requirement
         # was added.
-        return hasattr(self, 'n') and hasattr(self, 'e')  
+        
+        # Anthony Oct 5 2009: This is no longer supported under repy
+        #return hasattr(self, 'n') and hasattr(self, 'e') 
+        has_n = False
+        has_e = False
+        try:
+            self.n
+            has_n = True
+        except AttributeError:
+            pass
+          
+        try:
+            self.e
+            has_e = True
+        except AttributeError:
+            pass
+          
+        return has_e and has_n
+ 
 
     def size(self):
         """Return the maximum number of bits that can be encrypted"""
