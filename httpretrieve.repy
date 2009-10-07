@@ -1,0 +1,560 @@
+"""
+<Program Name>
+  httpretrieve.repy
+
+<Started>
+  August 19, 2009
+
+<Author>
+  Yafete Yemuru
+
+<Purpose>
+  provides a http content from a web server using http protocol. It sends a http request to
+  any http server through socket connection to get the http content. Then once the http server
+  replies with http header and content, the http header is checked for any error message.
+  Then provides http content in a format of string, saved in a file or as a file like object. 
+"""
+
+
+
+
+include urlparse.repy  
+include sockettimeout.repy
+include http_hierarchy_error.repy
+
+
+
+
+
+def httpretrieve_open(url):
+  """
+  <Purpose>
+     Returns file like object that that can read the http content form a http server. The file like
+     object gets string from http server using read method.  
+
+  <Arguments>
+    url:
+           String of a http web server-URL 
+ 
+  <Exceptions>
+        HttpUserInputError
+            ->  If given a invalid URL 
+            ->  If given a none http protocol server
+            ->  if file like object read is given a negative number or a none int as a limit
+            ->  if the file like object is called after it is closed
+
+        HttpConnectionError
+            ->  if opening connection with server fails      
+            ->  if sending http request to http server fails  
+
+        HttpHeaderReceivingError
+            ->  If the timeout(default timeout set to 5 seconds) for receiving exceeds   
+            ->  If the http header length exceeds (default 
+            
+        HttpHeaderFormatError
+            ->  If The http header is too long(default set to 8 kb(8192 charactors))
+            ->  If the http header statuscode format is invalid. The right http header
+                    status code includes HTTP<version> http_status_number http_status_msg                 
+            ->  If the http server gives a http header with a invalid content length
+                    or invalid redirect location
+            
+        HttpContentReceivingError:
+            ->  if the http server fails to send http content 
+            ->  if the timeout(default timeout set to 5 seconds) for receiving exceeds
+            ->  if the server socket connection fails for any reason besides connection closing
+                    during receiving http content
+                        
+        HttpContentLengthError:
+            ->  if content length exceeds(default set to 4096 kb(4194304 charactors)) 
+                    (ONLY WORKS CONTENT LENGTH IS GIVEN BY THE HTTP SERVER)
+            ->  If the total received length is not the same as the content length(this check will fail
+                     if the content length isnt given)
+            ->  If read is called with limits and it returns a empty string but the total read is                                      
+                     not equal to the content length(this check will fail if the content length isnt given)                
+                                            
+        HttpStatuscodeError:
+            -> if the http response status code isnt ok or redirect, it will raise an exception
+                   depending up on the http protocol status number  
+        
+
+  <Side Effects>
+    None 
+
+  <Returns>
+    Returns file like obj which can read the http content from http web server. 
+  """
+
+  # check if url is valid and get host, path, and port from the given url
+  (host, port, path) = _httpretrieve_get_host_port_path(url)
+
+  # get connection to the http web server
+  try:
+    sock = timeout_openconn(host, port)
+    # some servers might need time to proccess dynamic pages so default timeout to receiev is set to 20 secounds
+    sock.settimeout(20)
+    
+  except Exception, e:
+    raise HttpConnectionError('Error: opening a connection failed with given http server, Given: ' + str(url) + str(e))
+
+  # send http request to http web server  
+  _httpretrieve_sendhttprequest(sock, host, path) 
+
+  # receive the http header lines in a form of list from the http web server
+  httpheaderlines = _httpretrieve_receive_httpheader(sock)
+  
+  # get the http status number and http status msg from http header response
+  (http_status_number, http_status_msg) = _httpretrieve_get_httpstatuscode(httpheaderlines)
+
+  if http_status_number == '200':# ok message
+    # gets the content length if given.
+    contentlength = _httpretrieve_get_contentlength(httpheaderlines)
+    # return a filelikeobj to read the http content from the http server 
+    return _httpretrieve_filelikeobject(sock, contentlength) 
+  
+  elif http_status_number == '301' or http_status_number == '302': # redirect
+    # redirect to the new location via recursion  
+    sock.close()
+    # get the redirection location
+    redirect_location = _httpretrieve_httpredirect(httpheaderlines) 
+    # redirect to the new location using recursion
+    return httpretrieve_open(redirect_location)     
+
+  else:
+    # raise exception depending up on the http status number 
+    sock.close()
+    _httpretrieve_raise_httpstatuscode_error(http_status_number, http_status_msg)   
+
+  
+
+
+
+def httpretrieve_save_file(url, filename):
+  """
+  <Purpose>
+     Saves http content of the given URL to current directory  
+
+  <Arguments>
+    url:
+           String of a http web server URL
+
+    filename:
+           The file name for the http content to be saved in
+           
+  <Exceptions>
+  
+    HttpRetrieveClientError: cant create a file to save the http content too
+    Also includes:  all the exception from httpretrieve_open 
+
+  <Side Effects>
+    same as httpretrieve_open  
+
+  <Returns>
+    None 
+  """
+  
+  httpcontent = ''
+  try:
+    # create a new file with the given filename
+    newfile = open(filename, 'w')
+  except Exception, e:
+    raise HttpRetrieveClientError('Error on creating a file to saving http content' + str(e))
+
+  http_obj = httpretrieve_open(url)
+
+  # keep on reading 1024 and writing it into a file, until it receives an empty string
+  # which means the http server content is completely read 
+  while True:
+    httpcontent = http_obj.read(1024)
+    if httpcontent == '':
+      # done reading close file and file like obj and exit loop 
+      newfile.close()  
+      http_obj.close()
+      break
+    newfile.write(httpcontent)
+
+
+  
+def httpretrieve_get_string(url):
+  """
+  <Purpose>
+     retruns string of the http content from a given URL
+
+  <Arguments>
+     url:
+           string of a http web server URL
+ 
+  <Exceptions>
+     same as httpretrieve_open
+
+  <Side Effects>
+     same as httpretrieve_open 
+
+  <Returns>
+     returns a string of the http content. 
+  """       
+  
+  http_obj = httpretrieve_open(url)
+  # retrieve the http content from server using httpretrieve file like object
+  httpcontent = http_obj.read()
+  http_obj.close()
+  # return the http content in a form of string
+  return httpcontent
+
+
+
+class _httpretrieve_filelikeobject:
+  # file like object used to receive the http content with a length limit   
+  def __init__(self, sock, contentlength):
+    self.sock = sock
+    if contentlength == None:
+      self.contentlengthisknown = False
+    else:
+      self.contentlengthisknown = True
+      self.contentlength = contentlength
+    self.fileobjclosed = False
+    self.totalcontentisreceived = False 
+    self.totalread = 0
+    
+
+  def read(self, limit = None):
+    """
+    <Purpose>
+        reads the http content from http server using the file like object   
+
+    <Arguments>
+        limit(optional):
+             maximum number of bytes to read. If not specified the whole file is read.
+             Can be 0 or any positive int
+   
+    <Exceptions>
+
+        HttpContentReceivingError:
+            ->  if the http server fails to send http content 
+            ->  if the timeout(default timeout set to 5 seconds) for receiving exceeds
+            ->  if the server socket connection fails for any reason besides connection closing
+                    during receiving http content
+        HttpContentLengthError:
+            ->  if content length exceeds(default set to 4096 kb(4194304 charactors))
+                    (ONLY WORKS CONTENT LENGTH IS GIVEN BY THE HTTP SERVER)
+            ->  If the total received length is not the same as the content length(this check will fail
+                     if the content length isnt given)
+            ->  If read is called with limits and it returns a empty string but the total read is                                      
+                     not equal to the content length(this check will fail if the content length isnt given)
+                     
+        HttpStatuscodeError:
+            if the http response status code isnt ok or redirect, it will raise an exception
+            depending up on the http protocol status number  
+
+
+    <Side Effects>
+       None
+
+
+    <Returns>
+      returns the content of http server in a form of string or an empty string if the content is completely read.
+    """
+    
+    # raises an exception, if read is called after the filelikeobj is closed 
+    if self.fileobjclosed == True:
+      raise HttpUserInputError('Http Error: filelikeobj is closed')
+
+    # if read is called after all http content received return an empty string
+    if self.totalcontentisreceived:
+      return ''
+   
+    # check if limit is given
+    if limit == None: 
+      readhaslimit = False 
+      left_to_read = 1024
+    else: 
+    # check if limit is a valid number
+      try: # none int check
+        int(limit)
+      except ValueError, e:
+        raise HttpUserInputError('User input Error: given a none int to receive' + str(e))  
+      else:
+        # raise an exception if limit is a negative number
+        if limit < 0: 
+          raise HttpUserInputError('User input Error: given a negative number to receive, given: ' + str(limit))
+      readhaslimit = True
+      left_to_read = limit  
+
+
+    # if limit is given it will receiveby subtracting what is left until the limit is reached 
+    # if limit isnt given it will receive1024 until the server closes connection       
+    httpcontent = ''
+    while True:
+      try:
+        content = self.sock.recv(left_to_read)
+
+      except SocketTimeoutError:
+        # raise an exception if receiveis taking too long to respond
+        self.sock.close()  
+        raise HttpContentReceivingError('Timeout Error on receiving content: server taking too long to send content')  
+
+      except Exception , e:
+        # socket closed - signal for when the server is done sending content
+        # if there is any other exceptions close connection and raise an error  
+        if 'Socket closed' not in str(e): 
+          self.sock.close()            
+          raise HttpContentReceivingError('Error on recieving content:' + str(e))
+        self.sock.close()
+        self.totalcontentisreceived = True
+        break
+
+      else:
+        # By default, httpretrieve permits content length to be less than 4,096 kilobytes(4194304 charactors)
+        if len(content) >= 4194304:
+          raise HttpContentLengthError('content length exceeded 4096 kb')
+
+        # add what is received
+        httpcontent += content
+        if readhaslimit:
+          # keep subtracting what is left to receieve until it reachs the given limit amount
+          self.totalread += len(content)
+          if len(content) == left_to_read:
+            break
+          else:
+            left_to_read -= len(content)
+
+    # check if there was an error during reciving http content
+    self._check_recieving_error(readhaslimit, httpcontent)
+
+    return httpcontent
+  
+
+  def close(self):
+    """
+    <Purpose>
+      close the file like object 
+
+    <Arguments>
+      None
+   
+    <Exceptions>
+      None 
+
+    <Side Effects>
+      closes socket connection for the http client to http server
+
+    <Returns>
+      Nothing 
+    """   
+    self.fileobjclosed = True# flag used to raise an exception if the file like object is called after closed
+    self.sock.close()
+
+
+  def _check_recieving_error(self, readhaslimit, httpcontent):
+    if len(httpcontent) == 0:
+      self.sock.close()
+      raise HttpContentLengthError('Error on recieving content: received a http header but didnt receive any http content')
+    
+    if self.contentlengthisknown:                    
+      # if limit is given and content length is given and total content is received, check the total read equals the content length    
+      if readhaslimit and self.totalcontentisreceived:
+        if self.totalread != self.contentlength:
+          self.sock.close()                
+          raise HttpContentLengthError('Total length read with limit did not match the content length: total read: ' + str(self.totalread) + ' content length: ' + str(self.contentlength))
+
+      # if called read without limit and content length is given; check if the received length is the same as the content length       
+      if readhaslimit == False:
+        if len(httpcontent) != self.contentlength:
+          self.sock.close()
+          raise HttpContentLengthError('Total received length did not match the content length: received: ' + str(len(httpcontent)) + ' content length : ' + str(self.contentlength))     
+
+
+
+
+
+def _httpretrieve_get_host_port_path(url):
+  # checks if the URL is in the right format and returns a string of host, port and path by parsing the URL  
+  try:
+   # returns a dictionary of {scheme, netloc, path, quer, fragment, username, password, hostname and port} form the url                     
+    urlparse = urlparse_urlsplit(url)  
+  except Exception, e:
+    raise HttpUserInputError('Given URL error: ' + str(e))
+  else:
+    # check if the protocol is http 
+    if urlparse['scheme'] != 'http':
+      raise HttpUserInputError('Given URL error: the given protocol ' + urlparse['scheme'] + ' isnt supported')       
+    if urlparse['hostname'] == None:
+      raise HttpUserInputError('Given URL error: host name is not given') 
+
+    # get only the host path and port from the urlparse dictionary
+    host = urlparse['hostname']
+    path = urlparse['path']
+    # use default port 80 if the port isnt given                    
+    if urlparse['port'] == None:
+      port = 80 
+    else:
+      port = urlparse['port']
+
+    return host, port, path
+
+
+
+def _httpretrieve_sendhttprequest(sock, host, path):
+  # send http request to the http web server using socket connection  
+  try:
+    sock.send('GET ' + path + ' HTTP/1.1\r\n')
+    sock.send('Host: ' + host + '\r\n')
+    sock.send('Server: Seattle Testbed\r\n')
+    sock.send('Accept: text/html\r\n')
+    # closes the servers socket connection after sending all response                    
+    sock.send('Connection: close\r\n\r\n')
+  except Exception, e:
+    sock.close()
+    raise HttpConnectionError('Connection error: on sending http request to server ' + str(e))
+
+
+  
+def _httpretrieve_receive_httpheader(sock):
+  # receives the http header leaving alone rest of the http response and returns in list
+  # of each header as a line
+  httpheader_limit = 8192 # default set to 8 kb                        
+  httpheader_received = 0 
+  httpheader = '' 
+  while True:
+    # receive until a empty line (\n\n or \r\n\r\n ) which separates the
+    # http header from the http content
+    if '\r\n\r\n' in httpheader:
+      # return split to return a list of httpheader lines
+      return httpheader.split('\r\n')
+    if '\n\n' in httpheader:
+      # return split to return a list of httpheader lines
+      return httpheader.split('\n')
+
+    if httpheader_limit == httpheader_received:
+      sock.close()                  
+      raise HttpHeaderFormatError('Http header length Error: The http header is too long, exceeded 8 kb')
+                        
+    try:
+      # receive one character at a time inorder to check for the empty line
+      content = sock.recv(1)
+      # keep track of the received characters to raise an exception if the limit is exceeded                  
+      httpheader_received += 1                  
+
+    except SocketTimeoutError:
+      raise HttpHeaderReceivingError('Timeout Error on receiving header: server taking too long to send http header')
+    except Exception, e:
+      sock.close() 
+      raise HttpHeaderReceivingError('Error on recieving http header: ' + str(e))
+    else:
+      # if there was not receiving error add keep on adding the receieved content
+      httpheader += content
+
+
+
+
+def _httpretrieve_get_httpstatuscode(httpHeaderLines): 
+  # checks if the http status code is valid and return the status number and msg 
+
+  # http response header includes 3 "words": HTTP<version> http_status_number http_status_msg 
+  httpstatusheader = httpHeaderLines[0]
+  headersplit = httpstatusheader.split(' ')
+  
+  if len(headersplit) != 3:
+    raise HttpHeaderFormatError('Invalid Http header status code format: Correct format is HTTP<version> http_status_number http_status_msg: Given '  + httpstatusheader)
+  if not httpstatusheader.startswith('HTTP'):
+    raise HttpHeaderFormatError('Invalid Http header status code format: Http header status code should start of with HTTP<version> but given: '  + httpstatusheader)
+                        
+  # check if http_status_number is valid int
+  try: 
+    int(headersplit[1])
+  except ValueError:
+    raise HttpHeaderFormatError('Invalid Http header status code format: Status number should be a int, Given: ' + str(headersplit[1]) + ' as a http status number')
+  else:
+    http_status_number = headersplit[1]
+
+  http_status_msg = headersplit[2]
+
+  return http_status_number, http_status_msg
+
+
+
+    
+def _httpretrieve_raise_httpstatuscode_error(http_status_number, http_status_msg): 
+  # raises an exception using the http_status_number 1xx for Informational, 2xx for Success 3xx for Redirection,
+  # 4xx for Client Error, and 5xx Server Error
+ 
+  # raise a detailed error message explaining the http_status_number and http_status_msg for popular http errors  
+  if http_status_number == '202':
+    raise HttpError202('Http response error: ' + http_status_number + ' ' + http_status_msg +  ' http proccesing not responding')      
+  elif http_status_number == '204':
+    raise HttpError204('Http response error: ' + http_status_number + ' ' + http_status_msg +  ' thier is no http body content') 
+  elif http_status_number == '300':
+    raise HttpError300('Http response error: ' + http_status_number + ' ' + http_status_msg +  ' multiple redirect isnt suported')                
+  elif http_status_number == '404':
+    raise HttpError404('Http response error: ' + http_status_number + ' ' + http_status_msg +  ' cant find anything matching the given url')                
+  elif http_status_number == '403':
+    raise HttpError403('Http response error: ' + http_status_number + ' ' + http_status_msg +  ' the request was illegal')                
+  elif http_status_number == '400':
+    raise HttpError400('Http response error: ' + http_status_number + ' ' + http_status_msg +  ' the request contians bad syntex')                
+  elif http_status_number == '500':
+    raise HttpError500('Http response error: ' + http_status_number + ' ' + http_status_msg +  ' The server encountered an unexpected condition')                 
+  elif http_status_number == '502':
+    raise HttpError502('Http response error: ' + http_status_number + ' ' + http_status_msg +  ' acting like a gateway received an invalid response')                
+
+  # if the http number wasnt any of the popular http error msgs, raise an exception using
+  # the defualt http status number with http status msg  
+  elif http_status_number >= '100' and http_status_number < '200': 
+    raise HttpError1xx('Http response error: Information ' + http_status_number + ' ' + http_status_msg) 
+  elif http_status_number > '200' and http_status_number < '300': 
+    raise HttpError2xx('Http response error: success error ' + http_status_number + ' ' + http_status_msg)
+  elif http_status_number >= '300' and http_status_number < '400': 
+    raise HttpError3xx('Http response error: Redirection error' + http_status_number + ' ' + http_status_msg)
+  elif http_status_number >= '400' and http_status_number < '500': 
+    raise HttpError4xx('Http response error: client error ' + http_status_number + ' ' + http_status_msg)  
+  elif http_status_number >= '500' and http_status_number < '600': 
+    raise HttpError5xx('Http response error: server error: ' + http_status_number + ' ' + http_status_msg)
+  else:
+    raise HttpStatusCodeError('Http response error: invalid http status response, given ' + http_status_number)  
+
+
+
+
+def _httpretrieve_httpredirect(httpheaderlines):
+  # given http header retruns the redirect location   
+
+  # if there is a redirect location given by the server it will look like
+  # eg.'Location: http://www.google.com'
+  for headerline in httpheaderlines:
+    if headerline.startswith('Location'):
+      # if found redirect need to strip out 'Location: ' to return the url   
+      redirect = headerline[len('Location: '):]
+                        
+      # check if the redirect has given a location then return it
+      if len(redirect) == 0:
+        raise HttpHeaderFormatError('Http header redirection format error: http server gave a redierect location with no URL')
+      return redirect
+                        
+  # there wasn't a redirect location given
+  raise HttpHeaderFormatError('Http header redirection format error: http redirect header didnt include the location')  
+
+
+
+
+def _httpretrieve_get_contentlength(httpheaderlines):
+  # returns the content legth if given or returns None if not given by server
+
+  # if there is a content length given by the server it will look like
+  # eg.'Content-Length: 34'
+  for headerline in httpheaderlines:
+    if headerline.startswith('Content-Length'):
+      # if found content length need to strip out 'Content-Length: ' to return the length   
+      try: 
+        contentlength = int(headerline[len('Content-Length: '):])
+      except ValueError, e:
+        raise HttpHeaderFormatError('Http header Content-Length format error: http server provided content length that isnt a int ' + str(e))                
+
+      else:
+       # check if the content length is valid and retrun it 
+        if len(str(contentlength)) == 0: 
+          raise HttpHeaderFormatError('Http header Content-Length format error: provided content length with nothing')
+        elif contentlength < 0:                
+          return HttpHeaderFormatError('Http header Content-Length format error: provided content length with negative number ' + str(contentlength))
+        else:
+          return contentlength
+                        
+  # there wasn't a content-length line or the content length was given but didnt give a int 
+  return None
