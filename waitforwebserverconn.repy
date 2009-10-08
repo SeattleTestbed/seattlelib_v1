@@ -1,0 +1,525 @@
+"""
+<Program Name>
+  waitforwebserverconn.repy
+
+<Started>
+  Sep 4, 2009
+
+<Author>
+  Yafete Yemuru
+
+<Purpose>
+  This program is Web server that a user can use with out understanding http protocol.
+  Given a url this program acts like a web server that places a call back function when a
+  client(web browser) makes a connection to a given url. The call back fucntion is ment to
+  modify a dynamic page using query and posted data. once the call back return the modified
+  version of the website the waitforwebserverconn will complet the process by sending the
+  web site content to the client(web browser)
+"""
+
+
+
+include urlparse.repy  
+include sockettimeout.repy
+include http_hierarchy_error.repy
+
+
+
+
+def waitforwebserverconn(url, callbackfunc):
+  """
+  <Purpose>
+     This is intended for a client to send dynamic web page content with out understanding http protocol.
+     Given a url this program acts like a web server that places a call back fucntion
+     when a client(web browser) makes a connection to the given url.  
+     
+  <Arguments>
+     url:
+           String of a http web server-URL 
+
+     callbackfucn:
+            The function to be called.  
+
+  <Exceptions>
+    HttpUserInputError -> if server fails on making a connection to client(web browser)
+                        -> if the users input for url is not in correct format
+
+    HttpError408 -> If client(web browser) takes to long to send request  
+    HttpError413 -> If the http posted data length is too long
+                 -> If the http request length is too long
+    HttpError417 -> If there is the http request format problem
+    HttpError501 -> If the given http comand is not suported or valid (suported 'GET' and 'POST')
+    HttpError411 -> If the http command is POST and content length is not given
+    HttpError417 -> If The content length doesnt match the actual posted data length
+    HttpError500 -> If server fails internally on sending the http content OR HTTP header,sending error and
+                    if callback function user doesnt follow the servers requirments.   
+
+  <Side Effects>
+     None 
+
+  <Returns>
+     A handle to the listener. This can be used to stop listening  
+  """  
+  
+  # get the host and port from the given url to use for connection to listen on
+  (host, port) = get_host_port(url)
+
+  # used to pass callbackfunc name to the waitforconn callback function 
+  server = process_websever(callbackfunc)
+
+  try:
+    # waits for a client(web browser) to make a connetion and run the web server 
+    listencommhandle = waitforconn(host, port, server.run_webserver)
+  except Exception, e:
+    stopcomm(listencommhandle)
+    raise HttpConnectionError('Web server failed on waiting for connection ' + str(e))
+
+
+
+
+class process_websever:
+  # file like object used to receive the http content with a length limit   
+  def __init__(self,  callbackfunc):
+    self.callbackfunc = callbackfunc
+    
+  def run_webserver(self, ip, port, sock, thiscommhandle, listencommhandle):
+    try:
+      # receive the client(web browser) request and return the request split line by line
+      client_request_lines = receive_client_request(sock)
+
+      # check if the received request meets http requsest format standards and return a
+      # dictionary of the http request headers. 
+      httprequest_dictionary = make_httprequsest_dictionary(client_request_lines)    
+
+      # recieve posed data if posted (returns none not)      
+      posted_data = receive_httpposted_data(sock, httprequest_dictionary)
+      
+      # place the call back function with dictionary that includes http_command,
+      # http_version, path, query, posted_data, and all the http requests headers
+      webpage_content = self.callbackfunc(httprequest_dictionary)
+
+      # callback function excecuted, send the processed dynamic web page data to client(web browser)
+      send_httpresponse(sock, webpage_content)
+
+    
+    except HttpStatusCodeError, e:
+      # send any error that occur during the prosses via socket
+      send_httpformat_error(sock, e)
+      
+      
+    except Exception, e:
+      # if the program failed to catch an internal error raise an exception and send it to client(web browser)
+      try:
+        raise HttpError500('Server failed internally: ' + str(e))
+      except Exception, e:
+        send_httpformat_error(sock, e)
+  
+
+
+def get_host_port(url):
+  # get host and path from the given url
+  try:
+    # returns a dictionary of {scheme, netloc, path, quer, fragment, username, password, hostname and port} form the url
+    urlparse = urlparse_urlsplit(url)  
+  except Exception, e:
+    raise HttpUserInputError('Server URL format error:' + str(e))
+  else:
+    # check if the given url is valid using the url parse 
+    if urlparse['scheme'] != 'http':
+      raise HttpUserInputError('The given protocol type isnt suported: Given ' + urlparse['scheme'])       
+    if urlparse['hostname'] == None:
+      raise HttpUserInputError('Server URL format error: host name is not given') 
+
+    host = urlparse['hostname']
+    
+    # use default port 80 if the port isnt given
+    if urlparse['port'] == None:
+      port = 80
+    else:
+      # if given use the given port
+      port = urlparse['port']
+
+    return host, port
+
+
+
+      
+def receive_client_request(sock):
+  # receive request from the client using the socket connection  
+  try: 
+    # empty line is used as a signal for when the http request is done, and we set a
+    # default request length limit to be 131072 character(128kb)
+    client_request = receive_untilemptyline(sock, 131072)
+        
+  except Exception, e:
+    # raise depending up on what errors there was while receiving until empty line 
+    if 'Timeout Error' in str(e):
+      raise HttpError408('The server timed out while waiting to receive the request')
+    elif 'Length Exceeded' in str(e):
+      raise HttpError413('The http request length is too long')
+    elif 'Receiveing' in str(e):
+      raise HttpError500('Error while receiving request')
+    else:
+      raise HttpError500('Error on receiving the request '+ str(e))
+ 
+
+  # build a list of the received request split line by line to make a dicitonary
+  client_request_lines = ''
+  try: 
+    # split the entire message line by line 
+    client_request_lines = client_request.splitlines()
+  except Exception, e:
+    # raise an exception if the request doenst follow the http protocol format 
+    raise HttpError417('Error on the http request format ' + str(e))
+  
+  # the http request has to be at least one line including the http header request
+  if len(client_request_lines) == 0:
+    raise HttpError417('The received request doesnt follow http protocol requirments: Given ' + client_request)
+
+  # returns a list of client request line by line
+  return client_request_lines
+
+
+
+
+def make_httprequsest_dictionary(client_request_lines):
+  # builds up a dictionary from the received request or raises an exception if the
+  # request format isnt http protocol.The dictionary also includes the http header request
+  # parsed with custome keys (http_command - for http comand methed, path - parsed form
+  # the request url, query - query string parsed form the request url, http_version -
+  # for the http protocol version)
+  
+  httpheader_request = True
+  httprequest_dictionary = {}
+  
+  for request_line in client_request_lines:  
+    if httpheader_request:
+      # acording to the http protocol format the first line different because it is the http header request
+
+      # check if the http request is valid and parse the http request method, URL and http version
+      (http_command, path, query, http_version) = httprequest_header_parse(request_line)
+
+      # use custom names for the parsed data of the first request line and add to the dictionary 
+      httprequest_dictionary['http_command'] = http_command
+      httprequest_dictionary['http_version'] = http_version
+      httprequest_dictionary['path'] = path
+      httprequest_dictionary['query'] = query  
+
+      # used to flag the for the upcoming lines, because they have stationary keys
+      httpheader_request = False 
+      
+    elif request_line == '':
+      # last line is empty line, return the http dictionary built so far
+      return httprequest_dictionary  
+
+    else:
+      # the rest of the lines should be formated 'httpheader_key: httpheader_value'  eg.'Content-Length: 34'
+      try:
+        modified_request = request_line.split(': ')
+      except Exception, e:
+        raise HttpError417('Error on the http request format; Given: ' + request_line + 'in the request line ' + str(e))
+
+      # raise an exception if the request line doesnt contain 2 contents for 'httpheader_key: httpheader_value' 
+      if len(modified_request) != 2:
+        raise HttpError417('Error on the http request format; Given: ' + request_line + 'in the request line')
+
+      httprequest_key = modified_request[0]
+      httprequest_value = modified_request[1]
+      
+      httprequest_dictionary[httprequest_key] = httprequest_value   
+  
+
+
+  
+def httprequest_header_parse(http_header_request):
+  # check if the client request is valid by varifing the http request header format requirments
+  # and returns http requested method and URL if there was no error with the format
+
+  # http request header should include RequestMethod <url> HTTP<version> or RequestMethod HTTP<version>
+  # and is located at the top of the http request
+  try:
+    http_command_url_version = http_header_request.split()
+  except Exception, e:
+    raise HttpError417('Http header request needs spacing in between: Given: ' + http_header_request + str(e))
+
+  # Check that the first line at least contains 2 or 3  words: RequestMethod <url> HTTP<version>
+  # or RequestMethod HTTP<version>
+  if len(http_command_url_version) == 2:
+    url = ''
+    http_version = http_command_url_version[1]
+  elif len(http_command_url_version) == 3: 
+    url = http_command_url_version[1]
+    http_version = http_command_url_version[2]
+  
+  else:
+    # http request header cant have any more data than RequestMethod <url> HTTP<version> or RequestMethod HTTP<version>
+    raise HttpError417('the request header should contain  RequestMethod <url> HTTP<version> or RequestMethod HTTP<version> Given: ' + httprequest_header)
+
+  # check the http comand is valid or if its even suported(suported comands include GET and POST)
+  if http_command_url_version[0] == 'GET' or http_command_url_version[0] == 'POST':
+     http_command = http_command_url_version[0]
+  else:
+    raise HttpError501('The given http comand is not suported or valid')
+  
+
+  # check the if the http version is valid
+  if not http_version.startswith('HTTP'):
+    raise HttpError417('Http header request version should start of with HTTP then <version>, Given: ' +  httpversion + ' as a http version') 
+
+  # (query used to modify the dynamic page) http header includes the path and query, pasrse the given url to path and query 
+  (path, query) = parse_httpheader_url(url)  
+
+  return http_command, path, query, http_version 
+
+
+
+
+def parse_httpheader_url(url):
+  # parse out the query and path from the url
+  path = ''
+  query = ''
+
+  # if url isnt given return empty strings  
+  if url != '':
+    # if url is given parse the query and path using url parse
+    try:
+     # returns a dictionary of {scheme, netloc, path, query, fragment, username,
+     # password, hostname and port} parsing the url                      
+      urlparse = urlparse_urlsplit(url)  
+    except Exception, e:
+      raise HttpError417('Error on given http request header url: Given ' + url + str(e))
+
+    path = urlparse['path']
+    query = urlparse['query']
+
+    if path == '':
+      raise HttpError417('Error on parsing the http request header url: Given ' + url)
+    
+  return path, query
+
+
+
+
+def receive_httpposted_data(sock, httprequest_dictionary):
+  # receive the posted data which sent right after the http request with a empty line
+  # indicating the end of the posted data(this is if the http comand is only a POST)
+
+  # if the http comand method isnt post theres is no posted data
+  posted_data = None
+  
+  if httprequest_dictionary['http_command'] == 'POST':
+    try:
+      # empty line is used as a signal for when the http post is done, and we set a
+      # default post data length limit to be 2048 character(2mb)
+      posted_data = recieve_untilemptyline(sock, 2048)
+
+    except Exception, e:
+      # raise depending up on what errors there was while receiving until empty line 
+      if 'Timeout Error' in str(e):
+        raise HttpError408('The server timed out while waiting to receive the post data')
+      elif 'Length Exceeded' in str(e):
+        raise HttpError413('The http posted data length is too long')
+      elif 'Receiveing' in str(e):
+        raise HttpError500('Error while receiving request posted data')
+      else:
+        raise HttpError500('Error on receiving the posted data ' + str(e))
+
+    # check if there is a posted data and return it
+    if len(posted_data) == 0:
+      raise HttpError417('The request included a http POST comand with no data posted')
+
+    # get the posted data length or raise an exception if not given  
+    try:
+      posted_data_length = httprequest_dictionary['Content-Length']
+    except Exception, e:   
+      raise HttpError411('content length is required on a http POST comand')
+
+    # raise an exception if the the posted data legnth doesnt equal to what is received
+    if posted_data != posted_data_length:
+      raise HttpError417('The content length didnt match the posted data length: the content length was ' + posted_data_length + 'while the posted data is ' + posted_data)  
+    
+  # return the posted data 
+  return  posted_data 
+
+
+  
+
+def receive_untilemptyline(sock, length_limit):
+  # receives data from socket connection until it a empty line or until the given
+  # length limit is exceeded                      
+  total_recvd_content = ''
+  
+  while True:
+    # receive until a empty line (\n\n or \r\n\r\n because new line is different by computer) 
+    if '\r\n\r\n' in total_recvd_content or '\n\n' in total_recvd_content:
+      # found a empty line return the total received content
+      return total_recvd_content
+
+    # raise an exception if the total received length has exceeded the given length limit
+    if len(total_recvd_content) > length_limit:                  
+      raise Exception('Length Exceeded')
+                        
+    try:
+      # receive one character at a time inorder to check for the empty line
+      content = sock.recv(1)
+
+    # catch any error that happens while receiving content             
+    except SocketTimeoutError, e:
+      raise Exception('Timeout Error' + str(e))
+    except Exception, e: 
+      raise Exception('Receiving ' + str(e))
+
+    else:
+      # if there was not receiving error, keep on adding the receieved content 
+      total_recvd_content += content
+
+  return total_recvd_content
+
+
+
+
+def send_httpresponse(sock, webpage_content):
+  # sends a response to the client(web browser) with a ok http header and the http web page content
+  if len(webpage_content) == 0:
+    raise HttpError500('Server failed internaly: callback class didnt return any content')
+
+  # By default, waitforwebserverconn permits only files that are 4,096 kilobytes
+  if len(webpage_content) >= 4194304:
+    raise HttpError500('Server failed internaly: callback class content length exceeded')
+  
+  # build the http ok response header 
+  httpheader = 'HTTP/1.1 200 OK\n'
+  httpheader += 'Content-Type: text/html\n'
+  httpheader += 'Content-Length: ' + str(len(webpage_content)) + '\n'
+  httpheader += 'Server: Seattle Testbed\n\n'
+
+  # http header followed by http content and close the connection
+  try:
+    sock.send(httpheader) 
+    sock.send(webpage_content)
+    sock.close() 
+  except Exception, e:
+    raise HttpError500('server failed to send the http content')  
+
+
+
+
+def send_httpformat_error(sock ,e):
+  # send  correct format http header with a  http content that displays the error msg and close connection 
+  
+  # using the httpstatuscode dictionary get the statuscode number and statuscode constant
+  (statuscode_numb, client_error_msg, statuscode_constant) = get_http_statuscode(e)
+
+  # build http body error msg to client(web browser)
+  error_msg = client_error_msg
+
+  httpcontent = '<h1>' + str(statuscode_numb) + ' ' + statuscode_constant + ' ' + error_msg + '</h1>'
+  
+  # build the http header to send    
+  httpheader = 'HTTP/1.1 ' + str(statuscode_numb)  + ' ' + statuscode_constant + '\n'
+
+  # for redirect add the location of the redirection   
+  if statuscode_numb == 300 or statuscode_numb == 301:
+    if client_error_msg == '':
+      raise HttpError500('Internal server error on generating error msg: callback func client should put the location on raising redirect')
+    elif not client_error_msg.startswith('http://'):
+      raise HttpError500('Internal server error on generating error msg: calback func client redirect is invalid, Given:' + client_error_msg)
+    else:
+      httpheader += 'Location: ' + str(client_error_msg) + '\n'
+  
+  # finish up the http header
+  httpheader += 'Content-Length: ' + str(len(httpcontent)) + '\n'
+  httpheader += 'Server: Seattle Testbed\n\n'
+  
+  # send the http response header and body to the client(web browser) and close connection
+  try:
+    sock.send(httpheader)
+    sock.send(httpcontent)
+    sock.close()
+  except Exception, e:
+    raise HttpError500('server failed to send error') 
+
+
+
+
+def get_http_statuscode(e):
+  # retrieves the status code number and constant given a exception class 
+  
+  # httpstatus code dictionary with the statuscode constant
+  httpstatuscode_dict = {
+      HttpError100: (100, 'Continue'),
+      HttpError101: (101, 'Switching Protocols'),
+      HttpError102: (102, 'Processing'),
+      HttpError201: (201 ,'Created'),
+      HttpError202: (202, 'Accepted'),  
+      HttpError203: (203, 'Non-Authoritative Information'),
+      HttpError204: (204, 'No Content'),
+      HttpError205: (205, 'Reset Content'),
+      HttpError206: (206, 'Partial Content'),
+      HttpError207: (207, 'Multi-Status'),
+      HttpError226: (226, 'IM Used'),
+      HttpError300: (300, 'Multiple Choices'),
+      HttpError301: (301, 'Moved Permanently'),
+      HttpError302: (302, 'Found'),
+      HttpError303: (303, 'See Other'),
+      HttpError304: (304, 'Not Modified'),
+      HttpError305: (305, 'Use Proxy'),
+      HttpError306: (306, 'Unused'),
+      HttpError307: (307, 'Temporary Redirect'),
+      HttpError400: (400, 'Bad Request'),
+      HttpError401: (401, 'Unauthorized'),
+      HttpError402: (402, 'Payment Required'),
+      HttpError403: (403, 'Forbidden'),
+      HttpError404: (404, 'Not Found'),
+      HttpError405: (405, 'Method Not Allowed'),
+      HttpError406: (406, 'Not Acceptable'),
+      HttpError407: (407, 'Proxy Authentication Required'),
+      HttpError408: (408, 'Request Timeout'),
+      HttpError409: (409, 'Conflict'),
+      HttpError410: (410, 'Gone'),
+      HttpError411: (411, 'Length Required'),
+      HttpError412: (412, 'Precondition Failed'),
+      HttpError413: (413, 'Request Entity Too Large'),
+      HttpError414: (414, 'Request-URI Too Long'),
+      HttpError415: (415, 'Unsupported Media Type'),
+      HttpError416: (416, 'Requested Range Not Satisfiable'),
+      HttpError417: (417, 'Expectation Failed'),
+      HttpError418: (418, 'Im a teapot'),
+      HttpError422: (422, 'Unprocessable Entity'),
+      HttpError423: (423, 'Locked'),
+      HttpError424: (424, 'Failed Dependency'),
+      HttpError425: (425, 'Unordered Collection'),
+      HttpError426: (426, 'Upgrade Required'),
+      HttpError500: (500, 'Internal Server Error'),
+      HttpError501: (501, 'Not Implemented'),
+      HttpError502: (502, 'Bad Gateway'),
+      HttpError503: (503, 'Service Unavailable'),
+      HttpError504: (504, 'Gateway Timeout'),
+      HttpError505: (505, 'HTTP Version Not Supported'),
+      HttpError506: (506, 'Variant Also Negotiates'),
+      HttpError507: (507, 'Insufficient Storage'),
+      HttpError510: (510, 'Not Extended')}
+  
+  # retrieves the status number and constant from the given exception class using the dictionary 
+  try:
+    (statuscode_numb, statuscode_constant) = httpstatuscode_dict[type(e)]
+  except Exception, e:
+    raise HttpError500('Error on generating error msg: the given class is unknown given: ' + str(e))
+
+  # Check if the status code error number is valid  
+  try:
+    int(statuscode_numb)
+  except Exception, e:
+    raise HttpError500('Internal server error on generating error msg ' + str(e))   
+
+  # raise an exception if the http status code dictionary didnt find a error msg
+  if statuscode_constant == '':
+    raise HttpError500('Internal server error: cant find a default error msg for the given error number ' + error_num)
+
+  # get any extra error msg that the callback fucntion raised 
+  client_error_msg = str(e)
+
+  # return what is retrieved
+  return statuscode_numb, client_error_msg, statuscode_constant
+
+  
