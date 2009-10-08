@@ -110,7 +110,6 @@ class xmlrpc_server_SimpleXMLRPCServer:
     self._listen_ip = _xmlrpc_server_lookup_ip(addr[0])
     self._listen_port = addr[1]
 
-    self._callback_instance = None
     self._callback_functions = {}
 
     self._listen_comm = None
@@ -141,32 +140,6 @@ class xmlrpc_server_SimpleXMLRPCServer:
     """
 
     self._callback_functions[name] = function
-
-
-  def register_instance(self, instance):
-    """
-    <Purpose>
-      Register an object with this XMLRPC server.  When the XMLRPC client
-      tries to call a function X, the server will first try to call this
-      method of instance.
-
-    <Arguments>
-      instance:
-             The object whose methods are to be exposed to the XMLRPC client.
-
-    <Exceptions>
-      None.
-
-    <Side Effects>
-      Sets this object as the server's instance. Currently only one instance
-      is remembered (calling this method a second time overrides the saved
-      instance).
-
-    <Returns>
-      None.
-    """
-
-    self._callback_instance = instance
 
 
   def serve_forever(self):
@@ -254,16 +227,6 @@ class xmlrpc_server_SimpleXMLRPCServer:
   def _call_function(self, function_name, args):
     # Call the registered function function_name with the given arguments
     # (args) and return the result.
-
-    if self._callback_instance is not None:
-      if hasattr(self._callback_instance, "_dispatch"):
-        return self._callback_instance._dispatch(function_name, args)
-      try:
-        return getattr(self._callback_instance, function_name)(*args)
-      except AttributeError:
-        # Do nothing, the instance doesn't have the method.  Try the
-        # functions instead.
-        pass
 
     if self._callback_functions.has_key(function_name):
       return self._callback_functions[function_name](*args)
