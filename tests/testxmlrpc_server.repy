@@ -16,9 +16,9 @@ if callfunc == 'initialize':
   # and get correct results from methods.
 
   server = xmlrpc_server_SimpleXMLRPCServer(("localhost", 12345))
-  server.register_function(foo)
-  server.register_function(test)
-  server.register_function(struct_setter)
+  server.register_function(foo, "foo")
+  server.register_function(test, "text")
+  server.register_function(struct_setter, "struct_setter")
   server.serve_nonblocking()
 
   client = xmlrpc_client_Client("localhost", server_port=12345)
