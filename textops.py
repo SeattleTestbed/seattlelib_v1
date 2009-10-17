@@ -183,7 +183,9 @@ def textops_cut(lines, delimiter="\t", characters=None, fields=None,
 
     else:
       split_line = line.split(delimiter)
-      if len(split_line) == 1 and only_delimited:
+      if len(split_line) == 1:
+        if not only_delimited:
+          res_list.append(line)
         continue
 
       if complement:
