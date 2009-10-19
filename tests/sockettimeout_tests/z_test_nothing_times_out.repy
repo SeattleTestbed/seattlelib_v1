@@ -1,6 +1,7 @@
 """
 <Description>
-  This test doesn't pass timeout values to timeout_openconn.
+  This test uses a timeout value to timeout_openconn that is more
+  than sufficient. No exception should result.
   
 <Date>
   Sun Mar  1 10:27:35 PST 2009
@@ -20,7 +21,7 @@ def server():
   sockobj = timeout_waitforconn(getmyip(), 12345, mycallback)
 
 def client():
-  sockobj = timeout_openconn(getmyip(), 12345)
+  sockobj = timeout_openconn(getmyip(), 12345, timeout=10)
   assert sockobj.send(MESSAGE) == len(MESSAGE)
 
 def main():
