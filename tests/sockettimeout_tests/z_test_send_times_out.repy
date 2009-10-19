@@ -10,13 +10,17 @@
 # hello world
 include sockettimeout.repy
 
+
 MESSAGE = 1000000 * "a" # 1 MB of data to fill buffer and block
+
 
 def mycallback(ip, port, sockobj, commhandle, listenhandle):
   pass # don't recv at all
   
+  
 def server():
-  sockobj = timeout_waitforconn(getmyip(), 12345, mycallback)
+  commhandle = timeout_waitforconn(getmyip(), 12345, mycallback)
+
 
 def client():
   sockobj = timeout_openconn(getmyip(), 12345, timeout=1)
@@ -27,11 +31,13 @@ def client():
   else:
     raise Exception("should have raised timeout")
 
+
 def main():
   server()
   client()
   sleep(.1)
   exitall()
+
 
 if callfunc == 'initialize':
   main()
