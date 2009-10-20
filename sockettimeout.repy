@@ -29,6 +29,11 @@ class _timeout_socketlikeobject:
   
   # This is the socket like object we're using underneath
   underlying_socketlikeobject = None
+  
+  # This will be the commhandle when the socket was created through
+  # _timeout_waitforconn_callback. This will remain None for sockets created
+  # through timeout_openconn.
+  commhandle = None
 
   # The amount of time to wait for a timeout...
   timeout = None
@@ -38,9 +43,10 @@ class _timeout_socketlikeobject:
   send_exception = None
   recv_exception = None
 
-  def __init__(self, givensocketlikeobject, giventimeout):
+  def __init__(self, givensocketlikeobject, giventimeout, commhandle=None):
     self.underlying_socketlikeobject = givensocketlikeobject
     self.timeout = giventimeout
+    self.commhandle = commhandle
 
 
   def recv(self, maxamount): # timeout as optional arg ???
@@ -141,12 +147,16 @@ class _timeout_socketlikeobject:
 
 
 
-
   def close(self):
     """
       Identical to socket.close()
     """
-    return self.underlying_socketlikeobject.close()
+    # Socket-like objects created through calls to timeout_openconn don't have
+    # a commhandle like the ones created through waitforconn callback calls.
+    if self.commhandle is None:
+      return self.underlying_socketlikeobject.close()
+    else:
+      return timeout_stopcomm(self.commhandle)
 
 
 
@@ -172,11 +182,12 @@ class _timeout_socketlikeobject:
     # close if I get the lock, else do nothing.
     if thiscalllock.acquire(False):
       self.close()
+      
  
   
 
 
-def timeout_openconn(desthost, destport, localip=None, localport=None, timeout = 5):
+def timeout_openconn(desthost, destport, localip=None, localport=None, timeout=5):
   """
   <Purpose> 
     Wrapper for openconn.   Very, very similar
@@ -200,18 +211,16 @@ def timeout_openconn(desthost, destport, localip=None, localport=None, timeout =
   return thissocketlikeobject
 
 
-# This maps commhandles to their callback function
-# NOTE: I never clean this up.   I probably should, but I'm concerned about
-# the potential for a race condition
-_timeout_mainch_to_function_dict = {}
 
-def timeout_waitforconn(localip, localport, function):
+
+
+def timeout_waitforconn(localip, localport, function, timeout=5):
   """
   <Purpose> 
     Wrapper for waitforconn.   Essentially does the same thing...
 
   <Args>
-    Same as Repy waitforconn
+    Same as Repy waitforconn with the addition of a timeout argument.
 
   <Exceptions> 
     Same as Repy waitforconn
@@ -223,26 +232,20 @@ def timeout_waitforconn(localip, localport, function):
     Handle to listener.
   """
 
-  mainch = waitforconn(localip,localport,_timeout_waitforconn_callback)
-  _timeout_mainch_to_function_dict[mainch] = function
-  return mainch
+  # We use a closure for the callback we pass to waitforconn so that we don't
+  # have to map mainch's to callback functions or deal with potential race
+  # conditions if we did maintain such a mapping. 
+  def _timeout_waitforconn_callback(localip, localport, sockobj, ch, mainch):
+    # 'timeout' is the free variable 'timeout' that was the argument to
+    #  timeout_waitforconn.
+    thissocketlikeobject = _timeout_socketlikeobject(sockobj, timeout, ch)
 
+    # 'function' is the free variable 'function' that was the argument to
+    #  timeout_waitforconn.
+    return function(localip, localport, thissocketlikeobject, ch, mainch)
 
-# this holds the commhandles that are needed by stopcomm.   We essentially
-# just store the info here so we know how handles are associated.
-_timeout_commhandle_to_socket_dict = {}
+  return waitforconn(localip, localport, _timeout_waitforconn_callback)
 
-def _timeout_waitforconn_callback(localip, localport, sockobj, ch, mainch):
-  defaulttimeout = 5
-  thissocketlikeobject = _timeout_socketlikeobject(sockobj, defaulttimeout)
-  _timeout_commhandle_to_socket_dict[ch] = thissocketlikeobject
-
-  # JAC: There is a possibility for a race here, but it's very, very unlikely.
-  # It would need the waitforconn to hang, but the callback to proceed.
-  function = _timeout_mainch_to_function_dict[mainch]
-
-  # I'm not remapping the commhandles...
-  return function(localip, localport, thissocketlikeobject, ch, mainch)
   
   
 
@@ -252,12 +255,6 @@ def timeout_stopcomm(commhandle):
   """
     Wrapper for stopcomm.   Does the same thing...
   """
-
-  if commhandle in _timeout_commhandle_to_socket_dict:
-    # I should close locally and remove the entry...
-    _timeout_commhandle_to_socket_dict[commhandle].close()
-    del _timeout_commhandle_to_socket_dict[commhandle]
-    return True
 
   return stopcomm(commhandle)
   
