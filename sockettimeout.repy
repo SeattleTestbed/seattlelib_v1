@@ -49,7 +49,7 @@ class _timeout_socketlikeobject:
     self.commhandle = commhandle
 
 
-  def recv(self, maxamount): # timeout as optional arg ???
+  def recv(self, maxamount):
     """
     <Purpose>
       If it fails to finish within the timeout, I close the socket and raise a
