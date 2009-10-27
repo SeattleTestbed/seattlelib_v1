@@ -8,7 +8,8 @@ if [ -z "$trunkdir" ] || [ -z "$logfile" ]; then
   exit 1
 fi
 
-tmpdir=`mktemp -d`
+# A mktemp command that works on mac/bsd and linux.
+tmpdir=`mktemp -d -t tmp.XXXXXXXX` || exit 1
 
 # Change directory to the directory that preparetest.py is in.
 cd $trunkdir
