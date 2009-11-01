@@ -515,7 +515,7 @@ def _xmlrpc_common_value2python(xml_node):
     The method results.
 
   """
-  if xml_node.tag_name not in ("value"):
+  if xml_node.tag_name not in ("value",):
     message = "Unexpected XML node: %s" % xml_node.tag_name
     raise xmlrpc_common_XMLParseError(message)
   elif len(xml_node.children) > 1:
