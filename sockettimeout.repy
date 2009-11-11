@@ -1,6 +1,6 @@
 """
 <Author>
-  Justin Cappos
+  Justin Cappos, Armon Dadgar
   This is a rewrite of the previous version by Richard Jordan
 
 <Start Date>
@@ -17,174 +17,171 @@ class SocketTimeoutError(Exception):
   """The socket timed out before receiving a response"""
 
 
-class _timeout_socketlikeobject:
+class _timeout_socket():
   """
   <Purpose>
-    Provide an socket object like the Repy usual one.
-
-  <Side Effects>
-    Uses a getlock() to watch for a timeout
-    Uses waitforconn and openconn to simulate socket
+    Provides a socket like object which supports custom timeouts
+    for send() and recv().
   """
-  
-  # This is the socket like object we're using underneath
-  underlying_socketlikeobject = None
-  
-  # This will be the commhandle when the socket was created through
-  # _timeout_waitforconn_callback. This will remain None for sockets created
-  # through timeout_openconn.
-  commhandle = None
 
-  # The amount of time to wait for a timeout...
-  timeout = None
-
-  # The exception to raise.   This is needed because the thread that is timing
-  # out the connection may want to raise a specific exception
-  send_exception = None
-  recv_exception = None
-
-  def __init__(self, givensocketlikeobject, giventimeout, commhandle=None):
-    self.underlying_socketlikeobject = givensocketlikeobject
-    self.timeout = giventimeout
-    self.commhandle = commhandle
-
-
-  def recv(self, maxamount):
+  # Initialize with the socket object and a default timeout
+  def __init__(self,socket,timeout=10, checkintv=0.1):
     """
     <Purpose>
-      If it fails to finish within the timeout, I close the socket and raise a
-      SocketTimeoutError exception. I.e. if there's no message, we call it an 
-      error and raise it.   
-      
+      Initializes a timeout socket object.
+
     <Arguments>
-      maxamount - maximum number of bytes to recv
+      socket:
+              A socket like object to wrap. Must support send,recv,close, and willblock.
 
-    <Exception>
-      Raises SocketTimeoutError exception if the recv times out
-      without receiving a message.
+      timeout:
+              The default timeout for send() and recv().
 
-    <Side Effects>
-      Closes the connection if times out.   Starts a thread to close after
-      the connection times out.
-
-    <Returns>
-      The message.
+      checkintv:
+              How often socket operations (send,recv) should check if
+              they can run. The smaller the interval the more time is
+              spent busy waiting.
     """
-
-    # get a lock used for this call...
-    thiscalllock = getlock()
-    timerhandle = settimer(self.timeout, self._close_if_lock_is_acquired, (thiscalllock,))
-
-    try:
-      retdata = self.underlying_socketlikeobject.recv(maxamount)
-    except Exception, e:
-      # if it's not the timeout, reraise, otherwise it's a timeout...
-
-      # There is a benign race condition here between a call that fails from
-      # another error at the last moment, but the socket timeout grabs the 
-      # lock before it is reported.
-      if thiscalllock.acquire(False):
-        raise
-      raise SocketTimeoutError("Socket Timeout ('"+str(e)+"')")
-    
-    # I acquired the lock, I should stop the timer because I succeeded...
-    if thiscalllock.acquire(False):
-      # even if this isn't in time, the lock prevents a race condition 
-      # this is merely an optimization to prevent the timer from ever firing...
-      canceltimer(timerhandle)
-      return retdata
-    else:
-      raise SocketTimeoutError("Socket Timeout")
+    # Store the socket, timeout and check interval
+    self.socket = socket
+    self.timeout = timeout
+    self.checkintv = checkintv
 
 
-
-  def send(self, data):
+  # Allow changing the default timeout
+  def settimeout(self,timeout=10):
     """
     <Purpose>
-      If send fails to finish within the timeout, I close the socket and raise 
-      a Socket TimeoutError exception.   I.e. if the receiver hasn't called
-      recv and their buffer is full after a singificant amount of time, we 
-      raise an error.
-      
+      Allows changing the default timeout interval.
+
     <Arguments>
-      data - the string to send
+      timeout:
+              The new default timeout interval. Defaults to 10.
+              Use 0 for no timeout. Given in seconds.
 
-    <Exception>
-      Raises SocketTimeoutError exception if the send times out.
-
-    <Side Effects>
-      Closes the connection if times out.   Starts a thread to close after
-      the connection times out.
-
-    <Returns>
-      The message.
     """
-
-    # get a lock used for this call...
-    thiscalllock = getlock()
-    timerhandle = settimer(self.timeout, self._close_if_lock_is_acquired, (thiscalllock,))
-
-    try:
-      retdata = self.underlying_socketlikeobject.send(data)
-    except Exception, e:
-      # if it's not the timeout, reraise, otherwise it's a timeout...
-
-      # There is a benign race condition here between a call that fails from
-      # another error at the last moment, but the socket timeout grabs the 
-      # lock before it is reported.
-      if thiscalllock.acquire(False):
-        raise
-      raise SocketTimeoutError("Socket Timeout ('"+str(e)+"')")
-    
-    # I acquired the lock, I should stop the timer because I succeeded...
-    if thiscalllock.acquire(False):
-      # even if this isn't in time, the lock prevents a race condition 
-      # this is merely an optimization to prevent the timer from ever firing...
-      canceltimer(timerhandle)
-      return retdata
-    else:
-      raise SocketTimeoutError("Socket Timeout")
+    # Update
+    self.timeout = timeout
+  
+  
+  # Wrap willblock
+  def willblock(self):
+    """
+    See socket.willblock()
+    """
+    return self.socket.willblock()
 
 
-
+  # Wrap close
   def close(self):
     """
-      Identical to socket.close()
+    See socket.close()
     """
-    # Socket-like objects created through calls to timeout_openconn don't have
-    # a commhandle like the ones created through waitforconn callback calls.
-    if self.commhandle is None:
-      return self.underlying_socketlikeobject.close()
-    else:
-      return timeout_stopcomm(self.commhandle)
+    return self.socket.close()
 
 
-
-  # A helper that is used by send and recv
-  def _close_if_lock_is_acquired(self,thiscalllock):
+  # Provide a recv() implementation
+  def recv(self,bytes,timeout=None):
     """
     <Purpose>
-      Call close if a lock can be acquired.   A helper for timeout
-      
+      Allows receiving data from the socket object with a custom timeout.
+
     <Arguments>
-      The lock to use
+      bytes:
+          The maximum amount of bytes to read
+
+      timeout:
+          (Optional) Defaults to the value given at initialization, or by settimeout.
+          If provided, the socket operation will timeout after this amount of time (sec).
+          Use 0 for no timeout.
 
     <Exceptions>
-      None.   This will be called in a separate event and should not raise
-      an exception.
-  
-    <Side Effects>
-      Closes the connection if the lock is acquired.
-    
+      As with socket.recv(), socket.willblock(). Additionally, SocketTimeoutError is
+      raised if the operation times out.
+
     <Returns>
-      None.
+      The data received from the socket.
     """
-    # close if I get the lock, else do nothing.
-    if thiscalllock.acquire(False):
-      self.close()
-      
- 
-  
+    # Set the timeout if None
+    if timeout is None:
+      timeout = self.timeout
+
+    # Get the start time
+    starttime = getruntime()
+
+    # Block until we can read
+    rblock, wblock = self.socket.willblock()
+    while rblock:
+      # Check if we should break
+      if timeout > 0:
+        # Get the elapsed time
+        diff = getruntime() - starttime
+
+        # Raise an exception
+        if diff > timeout:
+          raise SocketTimeoutError,"recv() timed out!"
+
+      # Sleep
+      sleep(self.checkintv)
+
+      # Update rblock
+      rblock, wblock = self.socket.willblock()
+
+    # Do the recv
+    return self.socket.recv(bytes)
+
+
+  # Provide a send() implementation
+  def send(self,data,timeout=None):
+    """
+    <Purpose>
+      Allows sending data with the socket object with a custom timeout.
+
+    <Arguments>
+      data:
+          The data to send
+
+      timeout:
+          (Optional) Defaults to the value given at initialization, or by settimeout.
+          If provided, the socket operation will timeout after this amount of time (sec).
+          Use 0 for no timeout.
+
+    <Exceptions>
+      As with socket.send(), socket.willblock(). Additionally, SocketTimeoutError is
+      raised if the operation times out.
+
+    <Returns>
+      The number of bytes sent.
+    """
+    # Set the timeout if None
+    if timeout is None:
+      timeout = self.timeout
+
+    # Get the start time
+    starttime = getruntime()
+
+    # Block until we can write
+    rblock, wblock = self.socket.willblock()
+    while wblock:
+      # Check if we should break
+      if timeout > 0:
+        # Get the elapsed time
+        diff = getruntime() - starttime
+
+        # Raise an exception
+        if diff > timeout:
+          raise SocketTimeoutError,"send() timed out!"
+
+      # Sleep
+      sleep(self.checkintv)
+
+      # Update rblock
+      rblock, wblock = self.socket.willblock()
+
+    # Do the recv
+    return self.socket.send(data) 
+
+
 
 
 def timeout_openconn(desthost, destport, localip=None, localport=None, timeout=5):
@@ -207,7 +204,7 @@ def timeout_openconn(desthost, destport, localip=None, localport=None, timeout=5
 
   realsocketlikeobject = openconn(desthost, destport, localip, localport, timeout)
 
-  thissocketlikeobject = _timeout_socketlikeobject(realsocketlikeobject, timeout)
+  thissocketlikeobject = _timeout_socket(realsocketlikeobject, timeout)
   return thissocketlikeobject
 
 
@@ -238,7 +235,7 @@ def timeout_waitforconn(localip, localport, function, timeout=5):
   def _timeout_waitforconn_callback(localip, localport, sockobj, ch, mainch):
     # 'timeout' is the free variable 'timeout' that was the argument to
     #  timeout_waitforconn.
-    thissocketlikeobject = _timeout_socketlikeobject(sockobj, timeout, ch)
+    thissocketlikeobject = _timeout_socket(sockobj, timeout)
 
     # 'function' is the free variable 'function' that was the argument to
     #  timeout_waitforconn.
