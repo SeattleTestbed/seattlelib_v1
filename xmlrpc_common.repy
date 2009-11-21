@@ -100,7 +100,7 @@ class xmlrpc_common_Fault(ValueError):
       None.
 
     """
-    self.message = message
+    self.strerror = message
     self.code = code
     ValueError.__init__(self, message)
 
@@ -518,11 +518,14 @@ def _xmlrpc_common_value2python(xml_node):
   if xml_node.tag_name not in ("value",):
     message = "Unexpected XML node: %s" % xml_node.tag_name
     raise xmlrpc_common_XMLParseError(message)
-  elif len(xml_node.children) > 1:
+  elif xml_node.children is not None and len(xml_node.children) > 1:
     raise xmlrpc_common_XMLParseError("Too many children for 'value'")
 
-  value_node = xml_node.children[0]
-  tag = value_node.tag_name
+  value_node = xml_node
+  tag = "string"
+  if xml_node.children is not None:
+    value_node = xml_node.children[0]
+    tag = value_node.tag_name
   value = value_node.content
 
   if tag == "nil":
