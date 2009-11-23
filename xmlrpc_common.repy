@@ -515,17 +515,31 @@ def _xmlrpc_common_value2python(xml_node):
     The method results.
 
   """
+
   if xml_node.tag_name not in ("value",):
     message = "Unexpected XML node: %s" % xml_node.tag_name
     raise xmlrpc_common_XMLParseError(message)
+
+  # The values that XMLRPC can encode have an optional type-specifier.
+  # If the type-specifier is not included, the data is simply a string
+  # and doesn't need any other special interpretation. Additionally, there
+  # is an optional <string> type specifier, but e.g. openDHT doesn't use
+  # it. If xml_node.children is None here, the data lacks a type-specifying
+  # tag, so it is to be interpreted as a string.
   elif xml_node.children is not None and len(xml_node.children) > 1:
     raise xmlrpc_common_XMLParseError("Too many children for 'value'")
 
   value_node = xml_node
+
+  # Assume string by default, as explained earlier.
   tag = "string"
   if xml_node.children is not None:
+    # If the xml specifies a type, override the default.
     value_node = xml_node.children[0]
     tag = value_node.tag_name
+
+  # The string contents of the <value> tag (or of the type-specifying tag
+  # inside <value>, if one exists).
   value = value_node.content
 
   if tag == "nil":
@@ -546,6 +560,10 @@ def _xmlrpc_common_value2python(xml_node):
   elif tag == "array":
     if len(value_node.children) > 1:
       raise xmlrpc_common_XMLParseError("Too many children for 'array'")
+    # Arrays are encoded as:  <array><data>
+    #                           <value>...</value>
+    #                           ...
+    #                         </data></array>
     data_node = value_node.children[0]
     result = []
     if data_node.children:
@@ -556,6 +574,12 @@ def _xmlrpc_common_value2python(xml_node):
   elif tag == "struct":
     result = {}
 
+    # Structs are encoded as: <struct>
+    #                           <member><name>...</name><value>...</value></member>
+    #                           ...
+    #                         </struct>
+    # Keys (<name>) do not contain type information, so they are strings
+    # as far as XMLRPC is concerned.
     for member_node in value_node.children:
       if len(member_node.children) != 2:
         message = "Incorrect number of children for 'member'"
@@ -572,5 +596,5 @@ def _xmlrpc_common_value2python(xml_node):
     return xmlrpc_common_Binary(base64_standard_b64decode(value_node.content))
 
   else:
-    message = "Demashaller: Unsupported value type: %s" % value_node.tag_name
+    message = "Demarshaller: Unsupported value type: %s" % value_node.tag_name
     raise xmlrpc_common_XMLParseError(message)
