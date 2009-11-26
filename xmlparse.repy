@@ -246,8 +246,10 @@ def _xmlparse_node_from_string(string):
       raise xmlparse_XMLParseError("Error parsing XML -- parser " + \
           "ran out of input trying to read a tag")
 
-    # The tag name is ended with a space or a closing angle-brace.
-    if string[read_pos].isspace() or string[read_pos] == ">":
+    # The tag name is ended with a space or a closing angle-brace or
+    # a "/".
+    curchar = string[read_pos]
+    if curchar.isspace() or curchar == ">" or curchar == "/":
       break
 
     read_pos += 1
