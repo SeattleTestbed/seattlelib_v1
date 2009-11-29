@@ -3,10 +3,10 @@ repyhelper.translate_and_import('domainnameinfo.repy')
 
 if __name__ == '__main__':
 
-  assert(domainnameinfo_gethostlocation('amazon.uk'), 'United Kingdom')
-  assert(domainnameinfo_gethostlocation('microsoft.us'), 'United States')
+  assert(domainnameinfo_gethostlocation('amazon.uk') == 'United Kingdom')
+  assert(domainnameinfo_gethostlocation('microsoft.us') == 'United States')
   # we don't care about what the url contains (except the end)
-  assert(domainnameinfo_gethostlocation('asd.fasdf.as.df.asdf.asd.fas.microsoft.us'), 'United States')
+  assert(domainnameinfo_gethostlocation('asd.fasdf.as.df.asdf.asd.fas.microsoft.us') == 'United States')
 
   try:
     # invalid, we should get a TypeError
