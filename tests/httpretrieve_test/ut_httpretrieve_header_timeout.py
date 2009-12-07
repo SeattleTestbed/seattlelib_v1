@@ -5,7 +5,7 @@
 
 
 include httpretrieve.repy
-include waitforwebserver.repy
+include registerhttpcallback.repy
 
 
 
@@ -22,7 +22,7 @@ if callfunc == 'initialize':
     
   # build temp server that fails to send http header 
   try:    
-    waitforwebserverconn('http://127.0.0.1:12345', server_test_header_timeout)
+    handle = registerhttpcallback('http://127.0.0.1:12345', server_test_header_timeout)
   except Exception, e:
     raise Exception('Server failed internally ' + str(e))  
 
@@ -30,7 +30,7 @@ if callfunc == 'initialize':
   # a timeout exception, print failed_error_msg
   failed_error_msg = 'Failed: HttpContentReceivingError should have raised a timeout exception'
   try:  
-    recv_msg = httpretrieve_get_string('http://127.0.0.1:12345')  
+    recv_msg = httpretrieve_get_string('http://127.0.0.1:12345', ' ', 5, 5)  
 
   # catch the right Exception(HttpHeaderReceivingError) if there is a different exception print failed_error_msg
   except HttpHeaderReceivingError, e:
@@ -41,5 +41,8 @@ if callfunc == 'initialize':
     print failed_error_msg + ' :Raised: ' + str(e)  
   else:
     print failed_error_msg
-  
+
+  finally:
+    # stop the server from waiting for more connections
+    stop_registerhttpcallback(handle)
     

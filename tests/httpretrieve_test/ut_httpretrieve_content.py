@@ -1,11 +1,12 @@
 # checks if httpretrieve receives the right content as sent from the http server
 
+
 # prints failed error msg if httpretrieve failes the test and just excutes if the
 # if it pass's the test
 
 
 include httpretrieve.repy
-include waitforwebserver.repy
+include registerhttpcallback.repy
 
 
 
@@ -28,7 +29,7 @@ if callfunc == 'initialize':
     
   # build temp server that acts normally and sends content
   try:    
-    waitforwebserverconn('http://127.0.0.1:12345', server_test_content)
+    handle = registerhttpcallback('http://127.0.0.1:12345', server_test_content)
   except Exception, e:
     raise Exception('Server failed internally ' + str(e))  
 
@@ -44,4 +45,8 @@ if callfunc == 'initialize':
       print 'Failed: http response sent and received doesnt match'
       print 'Server SENT MESSAGE: ' + mycontext['httpcontent']  
       print 'Httpretrieve RECIEVED MESSAGE: ' + recv_msg
+
+  finally:
+    # stop the server from waiting for other requests
+    stop_registerhttpcallback(handle)
 

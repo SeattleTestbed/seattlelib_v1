@@ -7,7 +7,7 @@
 
 
 include httpretrieve.repy
-include waitforwebserver.repy
+include registerhttpcallback.repy
 
 
 
@@ -22,7 +22,7 @@ if callfunc == 'initialize':
     
   # build temp server that acts normal and raise an exception if the server fails
   try:    
-    waitforwebserverconn('http://127.0.0.1:12345', server_test_filelikeobj)
+    handle = registerhttpcallback('http://127.0.0.1:12345', server_test_filelikeobj)
   except Exception, e:
     raise Exception('Server failed internally ' + str(e))  
 
@@ -44,4 +44,6 @@ if callfunc == 'initialize':
   else:
     print failed_error_msg
   
-    
+  finally:
+    # stop the server from waiting for more connecitons
+    stop_registerhttpcallback(handle)

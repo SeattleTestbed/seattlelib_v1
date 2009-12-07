@@ -7,7 +7,7 @@
 
 
 include httpretrieve.repy
-include waitforwebserver.repy
+include registerhttpcallback.repy
 
 
 
@@ -21,7 +21,7 @@ if callfunc == 'initialize':
     
   # build temp server that acts normal and raise an excecption if the server fails 
   try:    
-    waitforwebserverconn('http://127.0.0.1:12345', server_test_read)
+    handle = registerhttpcallback('http://127.0.0.1:12345', server_test_read)
   except Exception, e:
     raise Exception('Server failed internally ' + str(e))  
 
@@ -37,6 +37,11 @@ if callfunc == 'initialize':
 
   else:
     # the read didnt raise an exception, thus the test passed
-    if read_after_done == 'normal server':
+    if read_after_done != 'normal server':
       print 'Failed: the file like obj read didnt receive the right content'
-  
+      print 'Receieved: ' + read_after_done
+      print 'Server sent: normal server'  
+
+  finally:
+    # stop the server from waiting for more connections
+    stop_registerhttpcallback(handle)

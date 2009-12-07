@@ -1,110 +1,122 @@
 """
 <Program Name>
-  waitforwebserverconn.repy
+  registerhttpcallback.repy
 
 <Started>
-  Sep 4, 2009
+  July 29, 2009
 
 <Author>
   Yafete Yemuru
 
 <Purpose>
-  This program is Web server that a user can use with out understanding http protocol.
-  Given a url this program acts like a web server that places a call back function when a
-  client(web browser) makes a connection to a given url. The call back fucntion is ment to
-  modify a dynamic page using query and posted data. once the call back return the modified
-  version of the website the waitforwebserverconn will complet the process by sending the
-  web site content to the client(web browser)
+  This program is Web server that a user can use without understanding http protocol.
+  Given a URL this program acts like a web server that places a call back callbackfunc when a
+  client(web browser) makes a connection to a given URL. The call back function is meant to
+  modify a dynamic page using query and posted data. Once the call back return the modified
+  version of the website the registerhttpcallback will complete the process by sending the
+  web site content to the client(web browser).
+
 """
 
 
-
+# used for closing handle
+include uniqueid.py
 include urlparse.repy  
 include sockettimeout.repy
+# used for hierarchy exception 
 include http_hierarchy_error.repy
 
 
 
 
-def waitforwebserverconn(url, callbackfunc):
+
+def registerhttpcallback(url, callbackfunc, httprequest_limit = 131072, httppost_limit = 2048):
   """
   <Purpose>
-     This is intended for a client to send dynamic web page content with out understanding http protocol.
-     Given a url this program acts like a web server that places a call back fucntion
-     when a client(web browser) makes a connection to the given url.  
+     Waits for a connection to the given url(host). Calls callbackfunc with a argument of http request
+     dictionary up on success. 
+  
      
   <Arguments>
      url:
            String of a http web server-URL 
 
-     callbackfucn:
-            The function to be called.  
+     callbackfunc:
+            The callbackfunc to be called. it should take one argument for http request dictionary.
+            The dictionary keys are as follows:
+              http_command - for the http request method GET or POST
+              http_version - which http version the client  used HTTP\1.1 or HTTP\1.0  
+              path - the exact request path parsed 
+              query - the exact request query parsed 
+              posted_data - if there is any posted data returns None if there isnt one
+
+              And all the http requests headers the client provided. eg. Content-Length: 22  
+              will incude Content-Length as a key and 22 as a value
+
+            RESTRICTIONS:
+              -> Follow the http_hierarchy_error(HttpStatusCodeError)to raise an exception. eg. raise
+                  HttpError404 for file not found
+              -> To redirect raise HttpError301(url) or HttpError302(url). The url has to be valid.  
+              -> server only excepts string type to process
+
+     httprequest_limit:
+            -> used to to limit the http request a client can make(default value set to 128kb or 131072 charactors)
+
+     httppost_limit:
+            -> used to to limit the http post a client can make(default value set to 2mb or 2048 charactors)     
+
 
   <Exceptions>
-    HttpUserInputError -> if server fails on making a connection to client(web browser)
-                        -> if the users input for url is not in correct format
+          HttpConnectionError-> if the server fails on waiting for a connection
+          HttpUserInputError -> if server fails on making a connection to client(web browser)
+          HttpServerError -> If server fails internally
 
-    HttpError408 -> If client(web browser) takes to long to send request  
-    HttpError413 -> If the http posted data length is too long
-                 -> If the http request length is too long
-    HttpError417 -> If there is the http request format problem
-    HttpError501 -> If the given http comand is not suported or valid (suported 'GET' and 'POST')
-    HttpError411 -> If the http command is POST and content length is not given
-    HttpError417 -> If The content length doesnt match the actual posted data length
-    HttpError500 -> If server fails internally on sending the http content OR HTTP header,sending error and
-                    if callback function user doesnt follow the servers requirments.   
+          HttpError408 -> If client(web browser) takes to long to send request  
+          HttpError413 -> If the http posted data length is too long
+                       -> If the http request length is too long
+          HttpError417 -> If there is the http request format problem
+                       -> If the content length doesnt match the actual posted data length
+          HttpError501 -> If the given http command is not supported or valid (supported 'GET' and 'POST')
+          HttpError411 -> If the http command is POST and content length is not given
+          HttpError500 -> If server fails internally on sending the http content OR HTTP header,sending error and
+                       -> If the callback fucntion doesnt follow restrictions  
+                       -> if the users input for url is not in correct format or unsuported
+                          protocol(this program only supports Http)
+
 
   <Side Effects>
      None 
 
   <Returns>
-     A handle to the listener. This can be used to stop listening  
+     A handle to the listener. This can be used to stop the server from waiting for a connection.  
   """  
-  
-  # get the host and port from the given url to use for connection to listen on
-  (host, port) = get_host_port(url)
-
-  # used to pass callbackfunc name to the waitforconn callback function 
-  server = process_websever(callbackfunc)
-
-  try:
-    # waits for a client(web browser) to make a connetion and run the web server 
-    listencommhandle = waitforconn(host, port, server.run_webserver)
-  except Exception, e:
-    stopcomm(listencommhandle)
-    raise HttpConnectionError('Web server failed on waiting for connection ' + str(e))
-
-
-
-
-class process_websever:
-  # file like object used to receive the http content with a length limit   
-  def __init__(self,  callbackfunc):
-    self.callbackfunc = callbackfunc
-    
-  def run_webserver(self, ip, port, sock, thiscommhandle, listencommhandle):
+  def run_webserver(ip, port, sock, thiscommhandle, listencommhandle):
+  # this function is defined inside the registerhttpcallback fuction so callback function name that is
+  # given by a user is placed a call on when there is a connection. 
     try:
-      # receive the client(web browser) request and return the request split line by line
-      client_request_lines = receive_client_request(sock)
+      # receive the client(web browser) request and return a list of the request
+      client_request_lines = _registerhttpcallback_receive_client_request(sock, httprequest_limit)
 
       # check if the received request meets http requsest format standards and return a
       # dictionary of the http request headers. 
-      httprequest_dictionary = make_httprequsest_dictionary(client_request_lines)    
+      httprequest_dictionary = _registerhttpcallback_make_httprequsest_dictionary(client_request_lines)    
 
-      # recieve posed data if posted (returns none not)      
-      posted_data = receive_httpposted_data(sock, httprequest_dictionary)
+      # check if there is posted data and add to the httprequest_dictionary with a key posted_data.
+      # returns None if there isnt a posted data
+      _registerhttpcallback_receive_httpposted_data(sock, httprequest_dictionary, httppost_limit)
       
-      # place the call back function with dictionary that includes http_command,
+      
+      # place the call back callbackfunc with dictionary that includes http_command,
       # http_version, path, query, posted_data, and all the http requests headers
-      webpage_content = self.callbackfunc(httprequest_dictionary)
+      webpage_content = callbackfunc(httprequest_dictionary)
+        
+      # callback callbackfunc excecuted, send the processed dynamic web page data to client(web browser)
+      _registerhttpcallback_send_httpresponse(sock, webpage_content)
 
-      # callback function excecuted, send the processed dynamic web page data to client(web browser)
-      send_httpresponse(sock, webpage_content)
-
-    
+      
     except HttpStatusCodeError, e:
-      # send any error that occur during the prosses via socket
-      send_httpformat_error(sock, e)
+      # send any error that occur during processing server to the client(web browser)
+      _registerhttpcallback_send_httpformat_error(sock, e)
       
       
     except Exception, e:
@@ -112,11 +124,61 @@ class process_websever:
       try:
         raise HttpError500('Server failed internally: ' + str(e))
       except Exception, e:
-        send_httpformat_error(sock, e)
+        _registerhttpcallback_send_httpformat_error(sock, e)
+
+
+
+  
+  # get the host and port from the given url to use for connection to listen on
+  (host, port) = _registerhttpcallback_get_host_port(url)
+
+  try:
+    # waits for a client(web browser) to make a connetion and run the web server 
+    listencommhandle = waitforconn(host, port, run_webserver)
+
+  except Exception, e:
+    # the waiting for a connection failed, stop waiting and raise an exception 
+    stopcomm(listencommhandle)
+    raise HttpConnectionError('Web server failed on waiting for connection ' + str(e))
+
+  else:
+    # store the listencommhandle, to stop server if needed
+    return listencommhandle
+
+
+
+
+
+
+
+
+def stop_registerhttpcallback(handle):   
+  """
+    <Purpose>
+          Deregister a callback for a commhandle. 
+
+    <Arguments>
+          commhandle:
+              A commhandle as returned by registerhttpcallback.
+
+    <Exceptions>
+          None.
+
+    <Side Effects>
+          This has an undefined effect on a socket-like object if it is currently in use.
+
+    <Returns>
+          Returns True if commhandle was successfully closed, False if the handle cannot be closed 
+  """
+  #close the connection
+  return stopcomm(handle)
+
+   
+
+
   
 
-
-def get_host_port(url):
+def _registerhttpcallback_get_host_port(url):
   # get host and path from the given url
   try:
     # returns a dictionary of {scheme, netloc, path, quer, fragment, username, password, hostname and port} form the url
@@ -144,12 +206,18 @@ def get_host_port(url):
 
 
       
-def receive_client_request(sock):
-  # receive request from the client using the socket connection  
+def _registerhttpcallback_receive_client_request(sock, httprequest_limit):
+  # receive request from the client using the socket connection
+  try:
+    # check if the given httprequest limit is valid
+    int(httprequest_limit)
+  except Exception, e:
+    raise HttpServerError('The given http request limit isnt int ' + str(e))
+  
   try: 
     # empty line is used as a signal for when the http request is done, and we set a
     # default request length limit to be 131072 character(128kb)
-    client_request = receive_untilemptyline(sock, 131072)
+    client_request = _registerhttpcallback_receive_untilemptyline(sock, httprequest_limit)
         
   except Exception, e:
     # raise depending up on what errors there was while receiving until empty line 
@@ -158,12 +226,12 @@ def receive_client_request(sock):
     elif 'Length Exceeded' in str(e):
       raise HttpError413('The http request length is too long')
     elif 'Receiveing' in str(e):
-      raise HttpError500('Error while receiving request')
+      raise HttpError500('Error while receiving http request')
     else:
-      raise HttpError500('Error on receiving the request '+ str(e))
+      raise HttpError500('Error on receiving the request ' + str(e))
  
-
-  # build a list of the received request split line by line to make a dicitonary
+  # http request format requires the request to be line by line
+  # build a list of the received request split line by line to check the formating of the request
   client_request_lines = ''
   try: 
     # split the entire message line by line 
@@ -176,15 +244,15 @@ def receive_client_request(sock):
   if len(client_request_lines) == 0:
     raise HttpError417('The received request doesnt follow http protocol requirments: Given ' + client_request)
 
-  # returns a list of client request line by line
+  # returns a list of client request
   return client_request_lines
 
 
 
 
-def make_httprequsest_dictionary(client_request_lines):
+def _registerhttpcallback_make_httprequsest_dictionary(client_request_lines):
   # builds up a dictionary from the received request or raises an exception if the
-  # request format isnt http protocol.The dictionary also includes the http header request
+  # request format isnt http protocol. The dictionary also includes the http header request
   # parsed with custome keys (http_command - for http comand methed, path - parsed form
   # the request url, query - query string parsed form the request url, http_version -
   # for the http protocol version)
@@ -194,10 +262,10 @@ def make_httprequsest_dictionary(client_request_lines):
   
   for request_line in client_request_lines:  
     if httpheader_request:
-      # acording to the http protocol format the first line different because it is the http header request
+      # acording to the http protocol format the first line is different because it is includes comand url and version
 
       # check if the http request is valid and parse the http request method, URL and http version
-      (http_command, path, query, http_version) = httprequest_header_parse(request_line)
+      (http_command, path, query, http_version) = _registerhttpcallback_httprequest_header_parse(request_line)
 
       # use custom names for the parsed data of the first request line and add to the dictionary 
       httprequest_dictionary['http_command'] = http_command
@@ -226,14 +294,16 @@ def make_httprequsest_dictionary(client_request_lines):
       httprequest_key = modified_request[0]
       httprequest_value = modified_request[1]
       
-      httprequest_dictionary[httprequest_key] = httprequest_value   
+      httprequest_dictionary[httprequest_key] = httprequest_value
+
+  return httprequest_dictionary
   
 
 
   
-def httprequest_header_parse(http_header_request):
-  # check if the client request is valid by varifing the http request header format requirments
-  # and returns http requested method and URL if there was no error with the format
+def _registerhttpcallback_httprequest_header_parse(http_header_request):
+  # varifiy's if the http request header format is valid and returns the http command, path, query,
+  # and http version parsed from the http header
 
   # http request header should include RequestMethod <url> HTTP<version> or RequestMethod HTTP<version>
   # and is located at the top of the http request
@@ -242,24 +312,20 @@ def httprequest_header_parse(http_header_request):
   except Exception, e:
     raise HttpError417('Http header request needs spacing in between: Given: ' + http_header_request + str(e))
 
-  # Check that the first line at least contains 2 or 3  words: RequestMethod <url> HTTP<version>
-  # or RequestMethod HTTP<version>
-  if len(http_command_url_version) == 2:
-    url = ''
-    http_version = http_command_url_version[1]
-  elif len(http_command_url_version) == 3: 
+  # Check that the first line at least contains 3  words: RequestMethod <url> HTTP<version>
+  if len(http_command_url_version) >= 3: 
     url = http_command_url_version[1]
     http_version = http_command_url_version[2]
   
   else:
     # http request header cant have any more data than RequestMethod <url> HTTP<version> or RequestMethod HTTP<version>
-    raise HttpError417('the request header should contain  RequestMethod <url> HTTP<version> or RequestMethod HTTP<version> Given: ' + httprequest_header)
+    raise HttpError417('The request header should contain  RequestMethod <url> HTTP<version>, Given: ' + http_header_request)
 
   # check the http comand is valid or if its even suported(suported comands include GET and POST)
   if http_command_url_version[0] == 'GET' or http_command_url_version[0] == 'POST':
      http_command = http_command_url_version[0]
   else:
-    raise HttpError501('The given http comand is not suported or valid')
+    raise HttpError501('The given http comand is not suported or valid. Given: ' + str(http_command_url_version[0]))
   
 
   # check the if the http version is valid
@@ -267,14 +333,14 @@ def httprequest_header_parse(http_header_request):
     raise HttpError417('Http header request version should start of with HTTP then <version>, Given: ' +  httpversion + ' as a http version') 
 
   # (query used to modify the dynamic page) http header includes the path and query, pasrse the given url to path and query 
-  (path, query) = parse_httpheader_url(url)  
+  (path, query) = _registerhttpcallback_parse_httpheader_url(url)  
 
   return http_command, path, query, http_version 
 
 
 
 
-def parse_httpheader_url(url):
+def _registerhttpcallback_parse_httpheader_url(url):
   # parse out the query and path from the url
   path = ''
   query = ''
@@ -287,11 +353,16 @@ def parse_httpheader_url(url):
      # password, hostname and port} parsing the url                      
       urlparse = urlparse_urlsplit(url)  
     except Exception, e:
-      raise HttpError417('Error on given http request header url: Given ' + url + str(e))
+      raise HttpError417('Http request given url doesnt meet the http protocol standards ' + str(e) + 'Given url: ' + url)
 
-    path = urlparse['path']
-    query = urlparse['query']
-
+    # retrieve only the path and query 
+    try:
+      path = urlparse['path']
+      query = urlparse['query']
+    except Exception, e:
+      raise HttpError417('Http request given url doesnt meet the http protocol standards ' + str(e) + 'Given url: ' + url)
+        
+    # if there is a url there has to be a path so raise an exception because the given url format is wrong 
     if path == '':
       raise HttpError417('Error on parsing the http request header url: Given ' + url)
     
@@ -300,10 +371,16 @@ def parse_httpheader_url(url):
 
 
 
-def receive_httpposted_data(sock, httprequest_dictionary):
+def _registerhttpcallback_receive_httpposted_data(sock, httprequest_dictionary, httppoost_limit):
   # receive the posted data which sent right after the http request with a empty line
   # indicating the end of the posted data(this is if the http comand is only a POST)
 
+  try:
+    # check if the given http post limit is valid
+    int(httppoost_limit)
+  except Exception, e:
+    raise HttpServerError('The given http post limit isnt int ' + str(e))
+  
   # if the http comand method isnt post theres is no posted data
   posted_data = None
   
@@ -311,7 +388,7 @@ def receive_httpposted_data(sock, httprequest_dictionary):
     try:
       # empty line is used as a signal for when the http post is done, and we set a
       # default post data length limit to be 2048 character(2mb)
-      posted_data = recieve_untilemptyline(sock, 2048)
+      posted_data = _registerhttpcallback_receive_untilemptyline(sock, httppoost_limit)
 
     except Exception, e:
       # raise depending up on what errors there was while receiving until empty line 
@@ -335,16 +412,16 @@ def receive_httpposted_data(sock, httprequest_dictionary):
       raise HttpError411('content length is required on a http POST comand')
 
     # raise an exception if the the posted data legnth doesnt equal to what is received
-    if posted_data != posted_data_length:
-      raise HttpError417('The content length didnt match the posted data length: the content length was ' + posted_data_length + 'while the posted data is ' + posted_data)  
+    if len(posted_data) != int(posted_data_length):
+      raise HttpError417('The content length didnt match the posted data length: the content length was ' + posted_data_length + ' while the posted data is ' + str(len(posted_data)))  
     
-  # return the posted data 
-  return  posted_data 
+  # adds the posted data or None to the httprequest dictionary 
+  httprequest_dictionary['posted_data'] = posted_data
 
 
   
 
-def receive_untilemptyline(sock, length_limit):
+def _registerhttpcallback_receive_untilemptyline(sock, length_limit):
   # receives data from socket connection until it a empty line or until the given
   # length limit is exceeded                      
   total_recvd_content = ''
@@ -353,7 +430,7 @@ def receive_untilemptyline(sock, length_limit):
     # receive until a empty line (\n\n or \r\n\r\n because new line is different by computer) 
     if '\r\n\r\n' in total_recvd_content or '\n\n' in total_recvd_content:
       # found a empty line return the total received content
-      return total_recvd_content
+      return total_recvd_content.strip()
 
     # raise an exception if the total received length has exceeded the given length limit
     if len(total_recvd_content) > length_limit:                  
@@ -378,17 +455,19 @@ def receive_untilemptyline(sock, length_limit):
 
 
 
-def send_httpresponse(sock, webpage_content):
+def _registerhttpcallback_send_httpresponse(sock, webpage_content):
   # sends a response to the client(web browser) with a ok http header and the http web page content
+  if not type(webpage_content) == str:
+    raise HttpUserInputError('Server failed internally: callback func didnt return str, returned ' + str(type(webpage_content)))
   if len(webpage_content) == 0:
-    raise HttpError500('Server failed internaly: callback class didnt return any content')
+    raise HttpUserInputError('Server failed internally: callback func didnt return any content')
 
-  # By default, waitforwebserverconn permits only files that are 4,096 kilobytes
+  # By default, registerhttpcallback permits only files that are 4,096 kilobytes
   if len(webpage_content) >= 4194304:
-    raise HttpError500('Server failed internaly: callback class content length exceeded')
+    raise HttpUserInputError('Server failed internally: callback class content length exceeded')
   
   # build the http ok response header 
-  httpheader = 'HTTP/1.1 200 OK\n'
+  httpheader = 'HTTP/1.0 200 OK\n'
   httpheader += 'Content-Type: text/html\n'
   httpheader += 'Content-Length: ' + str(len(webpage_content)) + '\n'
   httpheader += 'Server: Seattle Testbed\n\n'
@@ -399,31 +478,38 @@ def send_httpresponse(sock, webpage_content):
     sock.send(webpage_content)
     sock.close() 
   except Exception, e:
-    raise HttpError500('server failed to send the http content')  
+    raise HttpConnectionError('server failed to send the http content ' + str(e))  
 
 
 
 
-def send_httpformat_error(sock ,e):
-  # send  correct format http header with a  http content that displays the error msg and close connection 
+def _registerhttpcallback_send_httpformat_error(sock, e):
+  # send  correct format http header with a  http content that displays detailed error msg and close connection 
+
+  # using the httpstatuscode dictionary get the statuscode number and statuscode constant from the given httperror
+  (statuscode_numb, client_error_msg, statuscode_constant) = _registerhttpcallback_get_http_statuscode(e)
   
-  # using the httpstatuscode dictionary get the statuscode number and statuscode constant
-  (statuscode_numb, client_error_msg, statuscode_constant) = get_http_statuscode(e)
-
   # build http body error msg to client(web browser)
   error_msg = client_error_msg
 
-  httpcontent = '<h1>' + str(statuscode_numb) + ' ' + statuscode_constant + ' ' + error_msg + '</h1>'
+  # error content body
+  httpcontent = '<html>'
+  httpcontent += '<head><title>' + str(statuscode_numb) + ' ' + statuscode_constant + '</title></head>'
+  httpcontent += '<body><h1>' + str(statuscode_numb) + ' ' + statuscode_constant + '</h1>'
+  httpcontent += '<p>' + error_msg + '</p></body>'
+  httpcontent += '</html>'
+  # to end the error content
+  httpcontent += '\n\n'
   
   # build the http header to send    
-  httpheader = 'HTTP/1.1 ' + str(statuscode_numb)  + ' ' + statuscode_constant + '\n'
+  httpheader = 'HTTP/1.0 ' + str(statuscode_numb)  + ' ' + statuscode_constant + '\n'
 
-  # for redirect add the location of the redirection   
-  if statuscode_numb == 300 or statuscode_numb == 301:
+  # for redirect add the location of the redirection to the http header    
+  if statuscode_numb == 301 or statuscode_numb == 302:
     if client_error_msg == '':
-      raise HttpError500('Internal server error on generating error msg: callback func client should put the location on raising redirect')
+      raise HttpUserInputError('Internal server error on generating error msg: callback func client should put the location on raising redirect')
     elif not client_error_msg.startswith('http://'):
-      raise HttpError500('Internal server error on generating error msg: calback func client redirect is invalid, Given:' + client_error_msg)
+      raise HttpUserInputError('Internal server error on generating error msg: calback func client redirect is invalid, Given:' + client_error_msg)
     else:
       httpheader += 'Location: ' + str(client_error_msg) + '\n'
   
@@ -437,12 +523,12 @@ def send_httpformat_error(sock ,e):
     sock.send(httpcontent)
     sock.close()
   except Exception, e:
-    raise HttpError500('server failed to send error') 
+    raise HttpConnectionError('server failed internally on send http error ' + str(statuscode_numb) + ' ' + statuscode_constant + ' ' + error_msg + ' Raised' + str(e)) 
 
 
 
 
-def get_http_statuscode(e):
+def _registerhttpcallback_get_http_statuscode(e):
   # retrieves the status code number and constant given a exception class 
   
   # httpstatus code dictionary with the statuscode constant
@@ -504,17 +590,7 @@ def get_http_statuscode(e):
   try:
     (statuscode_numb, statuscode_constant) = httpstatuscode_dict[type(e)]
   except Exception, e:
-    raise HttpError500('Error on generating error msg: the given class is unknown given: ' + str(e))
-
-  # Check if the status code error number is valid  
-  try:
-    int(statuscode_numb)
-  except Exception, e:
-    raise HttpError500('Internal server error on generating error msg ' + str(e))   
-
-  # raise an exception if the http status code dictionary didnt find a error msg
-  if statuscode_constant == '':
-    raise HttpError500('Internal server error: cant find a default error msg for the given error number ' + error_num)
+    raise HttpServerError('Internal error on generating error msg: ' + str(e))
 
   # get any extra error msg that the callback fucntion raised 
   client_error_msg = str(e)
@@ -522,4 +598,6 @@ def get_http_statuscode(e):
   # return what is retrieved
   return statuscode_numb, client_error_msg, statuscode_constant
 
-  
+
+
+

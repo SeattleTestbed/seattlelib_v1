@@ -9,7 +9,7 @@
 
 
 include httpretrieve.repy
-include waitforwebserver.repy
+include registerhttpcallback.repy
 
 
 
@@ -33,7 +33,7 @@ if callfunc == 'initialize':
 
   try: 
     # build temp server that sends random error msg for client requests   
-    waitforwebserverconn('http://127.0.0.1:12345', server_test_errormsg)
+    handle = registerhttpcallback('http://127.0.0.1:12345', server_test_errormsg)
   except Exception, e:
     raise Exception('server raised a different error msg ' + str(e))  
 
@@ -80,7 +80,7 @@ if callfunc == 'initialize':
     else:
       print 'Failed: should have raised an exception because the server sent a http error'
 
-  # done test failed (should stop the server over here)  
-   
+  # stop the server   
+  stop_registerhttpcallback(handle)   
 
       
