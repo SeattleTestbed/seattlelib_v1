@@ -1,7 +1,7 @@
 """
 Author: Armon Dadgar
 Description:
-    This test checks the behavior of dyn_dispatch_module and makes sure it is sane.
+    This test checks the behavior of dy_dispatch_module and makes sure it is sane.
 
 Expected Output:
     You should see 'Steps (i/4)' where i is 1..4
@@ -44,7 +44,7 @@ else:
 
 
 # Always do a dispatch
-did_run = dyn_dispatch_module()
+did_run = dy_dispatch_module()
 
 # If the callfunc doesn't have "check" in it, then did_run should be true.
 # This is because the module directly after dylink should always evaluate

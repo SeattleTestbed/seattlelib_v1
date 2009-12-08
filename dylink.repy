@@ -4,20 +4,20 @@ Description:
   This module is designed to help dynamically link against other modules,
   and to provide a import like functionality in repy.
 
-  Its main mechanisms are dyn_import_module, dyn_import_module_symbols and dyn_dispatch_module.
-  dyn_import_module_symbols allows importing directly into the current context (ala from X import *)
-  and dyn_import_module allows importing as an encapsulated module (ala import X as Y).
+  Its main mechanisms are dy_import_module, dy_import_module_symbols and dy_dispatch_module.
+  dy_import_module_symbols allows importing directly into the current context (ala from X import *)
+  and dy_import_module allows importing as an encapsulated module (ala import X as Y).
 
-  dyn_dispatch_module is a convenience for programs that want to behavior as "modules".
+  dy_dispatch_module is a convenience for programs that want to behavior as "modules".
   These are behavior altering programs, that don't execute any code, but provide
   new code or alter behavior of builtin calls. These types of modules expect to be
-  chained and to recursively call into the next module in the chain. dyn_dispatch_module
+  chained and to recursively call into the next module in the chain. dy_dispatch_module
   will take the globally defined CHILD_CONTEXT and evaluate the next module in that
-  context. Modules are free to alter CHILD_CONTEXT prior to calling dyn_dispatch_module.
+  context. Modules are free to alter CHILD_CONTEXT prior to calling dy_dispatch_module.
 
   Modules being imported are called with callfunc set to "import" to
   allow modules to have special behavior. If the module performs some
-  action on import, it is possible that dyn_* never returns, as with
+  action on import, it is possible that dy_* never returns, as with
   import in Python.
 """
 
@@ -41,7 +41,7 @@ if callfunc == "initialize":
   STOCK_API = set(["gethostname_ex","getmyip","recvmess","sendmess","openconn","waitforconn",
              "stopcomm","open","listdir","removefile","exitall","getlock","getruntime",
              "randomfloat","settimer","canceltimer","sleep","VirtualNamespace","get_thread_name",
-                  "dyn_import_module","dyn_import_module_symbols","dyn_dispatch_module"])
+                  "dy_import_module","dy_import_module_symbols","dy_dispatch_module"])
 
   # Controls if we run the code preprocessor
   # If True, we will replace the old "include" directive, but this will cause a speed penalty
@@ -58,7 +58,7 @@ def _preprocess_code(code):
   return code
 
 # Replace's the old "include module.py" clause with
-# dyn_import_module_symbols which should have the same effect
+# dy_import_module_symbols which should have the same effect
 def _replace_include(code):
   # Find the initial include
   index = code.find("\ninclude ")
@@ -71,8 +71,8 @@ def _replace_include(code):
     # Read the module name
     module_name = code[index+9:new_line_index]
 
-    # Replace this occurrence with dyn_import_module_symbols
-    code = code[:index+1] + "dyn_import_module_symbols('"+module_name+"', callfunc)" + code[new_line_index:]
+    # Replace this occurrence with dy_import_module_symbols
+    code = code[:index+1] + "dy_import_module_symbols('"+module_name+"', callfunc)" + code[new_line_index:]
 
     # Add 30 to the index, since we just added more characters
     index += 30
@@ -376,18 +376,18 @@ def init_dylink(import_context, child_context):
             The context to initialize in.
     
     child_context:
-            A copy of the import_context that is used for dyn_dispatch_module
+            A copy of the import_context that is used for dy_dispatch_module
             to pass to the child namespace.
 
   <Side Effects>
-    dyn_* will be defined in the context.
+    dy_* will be defined in the context.
   """
 
-  # Define closures around dyn_* functions
-  def _dyn_import_module(module,new_callfunc="import"):
+  # Define closures around dy_* functions
+  def _dy_import_module(module,new_callfunc="import"):
     return dylink_import_module(module,import_context,new_callfunc)
 
-  def _dyn_import_global(module,new_callfunc="import"):
+  def _dy_import_global(module,new_callfunc="import"):
     return dylink_import_global(module,import_context,new_callfunc)
 
   def _dylink_dispatch(eval_context=None):
@@ -400,9 +400,9 @@ def init_dylink(import_context, child_context):
 
 
   # Make these available
-  import_context["dyn_import_module"] = _dyn_import_module
-  import_context["dyn_import_module_symbols"] = _dyn_import_global
-  import_context["dyn_dispatch_module"] = _dylink_dispatch
+  import_context["dy_import_module"] = _dy_import_module
+  import_context["dy_import_module_symbols"] = _dy_import_global
+  import_context["dy_dispatch_module"] = _dylink_dispatch
 
 
 # Wrap around VirtualNamespace
@@ -427,7 +427,7 @@ class DylinkNamespace(object):
     
     # Explicitly remove dylink_* calls if disabled
     if not enable_dylink:
-      calls = ["dyn_import_module","dyn_import_module_symbols","dyn_dispatch_module"]
+      calls = ["dy_import_module","dy_import_module_symbols","dy_dispatch_module"]
       for call in calls:
         if call in context:
           del context[call]
