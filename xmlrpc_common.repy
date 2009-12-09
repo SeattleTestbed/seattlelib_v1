@@ -108,6 +108,23 @@ class xmlrpc_common_Fault(ValueError):
 
 
 
+class xmlrpc_common_Timeout(Exception):
+  """
+  <Purpose>
+    Exception representing a normal timeout occuring.
+
+  <Side Effects>
+    None.
+
+  <Example Use>
+    raise xmlrpc_common_Timeout()
+
+  """
+
+
+
+
+
 class xmlrpc_common_XMLParseError(ValueError):
   """
   <Purpose>

@@ -22,7 +22,7 @@ openDHTadvertise_context["currentproxy"] = None
 openDHTadvertise_context["serverlist"] = []
 openDHTadvertise_context["serverlistlock"] = getlock()
 
-def openDHTadvertise_announce(key, value, ttlval, concurrentevents=5, proxiestocheck=5):
+def openDHTadvertise_announce(key, value, ttlval, concurrentevents=5, proxiestocheck=5, timeout=None):
   """
   <Purpose>
     Announce a (key, value) pair to openDHT.
@@ -62,6 +62,10 @@ def openDHTadvertise_announce(key, value, ttlval, concurrentevents=5, proxiestoc
   # convert ttl to an int
   ttl = int(ttlval)
 
+  # If no timeout was specified, choose 10 seconds (completely arbitrary).
+  if timeout is None:
+    timeout = 10.0
+
 #  print "Announce key:",key,"value:",value, "ttl:",ttl
   while True:
     # if we have an empty proxy list and no proxy, get more
@@ -85,10 +89,10 @@ def openDHTadvertise_announce(key, value, ttlval, concurrentevents=5, proxiestoc
     valtosend = xmlrpc_common_Binary(value)
 
     try:
-      pxy.send_request("put", (keytosend, valtosend, ttl, "put.py"))
+      pxy.send_request("put", (keytosend, valtosend, ttl, "put.py"), timeout=timeout)
       # if there isn't an exception, we succeeded
       break
-    except xmlrpc_common_ConnectionError:
+    except (xmlrpc_common_ConnectionError, xmlrpc_common_Timeout):
       # Let's avoid this proxy.   It seems broken
       openDHTadvertise_context["currentproxy"] = None
 
@@ -97,7 +101,7 @@ def openDHTadvertise_announce(key, value, ttlval, concurrentevents=5, proxiestoc
 
 
 
-def openDHTadvertise_lookup(key, maxvals=100, concurrentevents=5, proxiestocheck=5):
+def openDHTadvertise_lookup(key, maxvals=100, concurrentevents=5, proxiestocheck=5, timeout=None):
   """
   <Purpose>
     Retrieve a stored value from openDHT.
@@ -126,6 +130,10 @@ def openDHTadvertise_lookup(key, maxvals=100, concurrentevents=5, proxiestocheck
   <Returns>
     The value stored in openDHT at key.
   """
+
+  # if no timeout is specified, pick 10 seconds (arbitrary value).
+  if timeout is None:
+    timeout = 10.0
 
   while True:
     # if we have an empty proxy list and no proxy, get more
@@ -156,10 +164,7 @@ def openDHTadvertise_lookup(key, maxvals=100, concurrentevents=5, proxiestocheck
     # If the proxy fails, then we will go to the next one...
     while openDHTadvertise_context["currentproxy"]:
       try:
-        try:
-          vals, pm = pxy.send_request("get", (keyhash, maxvalhash, pm, "get.py"))
-        except xmlrpc_common_XMLParseError, e:
-          raise Exception, e
+        vals, pm = pxy.send_request("get", (keyhash, maxvalhash, pm, "get.py"), timeout=timeout)
         # if there isn't an exception, we succeeded
 
         # append the .data part of the items, the other bits are:
@@ -171,7 +176,7 @@ def openDHTadvertise_lookup(key, maxvals=100, concurrentevents=5, proxiestocheck
         if pm.data == "":
           return listofitems
 
-      except xmlrpc_common_ConnectionError:
+      except (xmlrpc_common_ConnectionError, xmlrpc_common_Timeout):
         # Let's avoid this proxy.   It seems broken
         openDHTadvertise_context["currentproxy"] = None
 

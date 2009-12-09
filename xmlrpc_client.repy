@@ -32,7 +32,9 @@ class xmlrpc_client_Client(object):
 
   """
 
+
   USER_AGENT = "seattlelib/1.0.0"
+
 
   def __init__(self, url):
     """
@@ -64,7 +66,8 @@ class xmlrpc_client_Client(object):
     if not self.server_host:
       raise ValueError("Invalid argument: url must have a valid host")
 
-  def send_request(self, method_name, params):
+
+  def send_request(self, method_name, params, timeout=None):
     """
     <Purpose>
       Send a XML-RPC request to a XML-RPC server to do a RPC call.
@@ -82,6 +85,7 @@ class xmlrpc_client_Client(object):
       xmlrpc_common_XMLParseError on a XML-RPC structural parse error.
       xmlparse_XMLParseError on a general XML parse error.
       xmlrpc_common_ConnectionError on unexpected disconnects.
+      xmlrpc_common_Timeout if the time limit is exceeded.
 
     <Side Effects>
       None.
@@ -90,6 +94,8 @@ class xmlrpc_client_Client(object):
       The XML-RPC method return values.
 
     """
+
+    starttime = getruntime()
 
     # Prepare the XML request.
     request_xml = xmlrpc_common_call2xml(method_name, params)
@@ -100,18 +106,25 @@ class xmlrpc_client_Client(object):
       socket = None
 
       # Open the connection to the server
-      socket = openconn(self.server_host, self.server_port)
+      socket = openconn(self.server_host, self.server_port, timeout=timeout)
 
-      # Send HTTP headers.
-      socket.send("POST %s HTTP/1.1\r\n" % self.server_path)
-      socket.send("User-Agent: %s\r\n" % self.USER_AGENT)
-      socket.send("Host: %s\r\n" % self.server_host)
-      socket.send("Content-Type: text/xml\r\n")
-      socket.send("Content-Length: %d\r\n" % len(request_xml))
-      socket.send("\r\n")
+      # Timeout if the openconn took too long.
+      if getruntime() - starttime > timeout:
+        raise xmlrpc_common_Timeout()
 
-      # Send the XML request.
-      socket.send(request_xml)
+      # Send the xmlrpc request.
+      socket.send("POST %s HTTP/1.1\r\n" + \
+          "User-Agent: %s\r\n" + \
+          "Host: %s\r\n" + \
+          "Content-Type: text/xml\r\n" + \
+          "Content-Length: %d\r\n" + \
+          "Connection: close\r\n\r\n%s" %
+          (self.server_path, self.USER_AGENT, self.server_host,
+            len(request_xml), request_xml))
+
+      # Timeout if the request sending took too long.
+      if getruntime() - starttime > timeout:
+        raise xmlrpc_common_Timeout()
 
       # Receive the raw response.  If the server does not respond before
       # the timeout, a socket.error exception will be raised.
@@ -125,7 +138,12 @@ class xmlrpc_client_Client(object):
         if len(recvdata) == 0:
           raise xmlrpc_common_ConnectionError( \
               "Server closed connection before completing response.")
+
         response += recvdata
+
+        # Timeout if recieving the response headers takes too long.
+        if getruntime() - starttime > timeout:
+          raise xmlrpc_common_Timeout()
 
       # Separate the header from the response body.
       raw_header, raw_content = response.split("\r\n\r\n", 1)
@@ -148,6 +166,10 @@ class xmlrpc_client_Client(object):
       # Get the rest of the response body.
       while len(raw_content) < content_size:
         raw_content += socket.recv(4096)
+
+        # Timeout if recieving the body took too long.
+        if getruntime() - starttime > timeout:
+          raise xmlrpc_common_Timeout()
 
     finally:
       # Close the socket.  Connection: keep-alive is not yet supported.
