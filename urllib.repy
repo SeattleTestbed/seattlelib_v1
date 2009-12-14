@@ -143,3 +143,32 @@ def urllib_unquote_plus(string):
   """
 
   return urllib_unquote(string.replace("+", " "))
+
+
+
+
+def urllib_quote_parameters(dictionary):
+  """
+  <Purpose>
+    Encode a dictionary of (key, value) pairs into an HTTP query string or
+    POST body (same form).
+
+  <Arguments>
+    dictionary:
+           The dictionary to quote.
+
+  <Exceptions>
+    None.
+
+  <Side Effects>
+    None.
+
+  <Returns>
+    The quoted dictionary.
+  """
+
+  quoted_keyvals = []
+  for key, val in dictionary.items():
+    quoted_keyvals.append("%s=%s" % (urllib_quote(key), urllib_quote(val)))
+
+  return "&".join(quoted_keyvals)
