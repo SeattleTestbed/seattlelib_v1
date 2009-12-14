@@ -15,7 +15,7 @@
 
 
 '''
-http hierarchy error exception classes formation
+http hierarchy error exception classes
 
 -> HttpError
    -> HttpRetrieveClientError

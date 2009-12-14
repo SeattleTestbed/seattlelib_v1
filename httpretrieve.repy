@@ -21,12 +21,13 @@
 include urlparse.repy  
 include sockettimeout.repy
 include http_hierarchy_error.repy
+include urllib.repy
 
 
 
 
 
-def httpretrieve_open(url, http_post=None, header_timeout=30, content_timeout=30, httpheader_limit=8192):
+def httpretrieve_open(url, http_query=None, http_post=None, http_header=None, header_timeout=30, content_timeout=30, httpheader_limit=8192, httpcontent_limit=4194304):
   """
   <Purpose>
      Returns file like object that that can read the http content form a http server. The file like
@@ -36,14 +37,19 @@ def httpretrieve_open(url, http_post=None, header_timeout=30, content_timeout=30
     url:
            String of a http web server-URL
     http_post:
-           string of data to post to server
+           dictionary of data to post to server(unencoded string, the library encodes the post it self)
+    http_query:
+           dictionary of query to send to server(unencoded string, the library encodes the query it self)
+    http_header:
+           dictionary of http header to add the the http header request
     header_timeout:
            socket timeout for receiving header from server(default value set to 30 seconds)
     content_timeout:
            socket timeout for receiving content from server(default value set to 30 seconds)
     httpheader_limit:
            length limit for when a server sends http header(default value set to 8kb(8192 charactors)) 
-    
+    httpcontent_limit:
+            limits the the amount of content a server can send to the retrieval 
  
   <Exceptions>
         HttpUserInputError
@@ -92,9 +98,9 @@ def httpretrieve_open(url, http_post=None, header_timeout=30, content_timeout=30
   <Returns>
     Returns file like obj which can read the http content from http web server. 
   """
-
+  
   # check if url is valid and get host, path, port and query from the given url
-  (host, port, path, query) = _httpretrieve_parse_given_url(url)
+  (host, port, path, url_query) = _httpretrieve_parse_given_url(url)
 
   # get connection to the http web server
   try:
@@ -102,13 +108,13 @@ def httpretrieve_open(url, http_post=None, header_timeout=30, content_timeout=30
     
   except Exception, e:
     raise HttpConnectionError('Error: opening a connection failed with given http server, Given: ' + str(url) + ' ' + str(e))
-
+    
   # build a http format request using the given port, host, path and query
-  httpheader = _httpretrieve_buildhttprequest(port, host, path, query, http_post)
-
+  httpheader = _httpretrieve_buildhttprequest(http_header, port, host, path, url_query, http_query, http_post)
+  
   # send http format request to http web server  
-  _httpretrieve_sendhttprequest(sock, httpheader, http_post) 
-
+  _httpretrieve_sendhttprequest(sock, httpheader) 
+  
   # receive the http header lines in a form of list from the http web server
   httpheaderlines = _httpretrieve_receive_httpheader(sock, header_timeout, httpheader_limit)
   
@@ -119,7 +125,7 @@ def httpretrieve_open(url, http_post=None, header_timeout=30, content_timeout=30
     # gets the content length if given.
     contentlength = _httpretrieve_get_contentlength(httpheaderlines)
     # return a filelikeobj to read the http content from the http server 
-    return _httpretrieve_filelikeobject(sock, contentlength, content_timeout) 
+    return _httpretrieve_filelikeobject(sock, contentlength, httpcontent_limit, content_timeout) 
   
   elif http_status_number == '301' or http_status_number == '302': # redirect
     # redirect to the new location via recursion  
@@ -142,8 +148,7 @@ def httpretrieve_open(url, http_post=None, header_timeout=30, content_timeout=30
   
 
 
-
-def httpretrieve_save_file(url, filename, http_post=None, header_timeout=30, content_timeout=30, httpheader_limit=8192):
+def httpretrieve_save_file(url, filename, http_query=None, http_post=None, http_header=None, header_timeout=30, content_timeout=30, httpheader_limit=8192, httpcontent_limit=4194304):
   """
   <Purpose>
      Saves http content of the given URL to current directory  
@@ -151,9 +156,22 @@ def httpretrieve_save_file(url, filename, http_post=None, header_timeout=30, con
   <Arguments>
     url:
            String of a http web server URL
-
     filename:
            The file name for the http content to be saved in
+    http_post:
+           dictionary of data to post to server(unencoded string, the library encodes the post it self)
+    http_query:
+           dictionary of query to send to server(unencoded string, the library encodes the query it self)
+    http_header:
+           dictionary of http header to add the the http header request
+    header_timeout:
+           socket timeout for receiving header from server(default value set to 30 seconds)
+    content_timeout:
+           socket timeout for receiving content from server(default value set to 30 seconds)
+    httpheader_limit:
+           length limit for when a server sends http header(default value set to 8kb(8192 charactors)) 
+    httpcontent_limit:
+            limits the the amount of content a server can send to the retrieval 
            
   <Exceptions>
   
@@ -174,7 +192,7 @@ def httpretrieve_save_file(url, filename, http_post=None, header_timeout=30, con
   except Exception, e:
     raise HttpRetrieveClientError('Error on creating a file to saving http content' + str(e))
 
-  http_obj = httpretrieve_open(url, http_post, header_timeout, content_timeout, httpheader_limit)
+  http_obj = httpretrieve_open(url, http_query, http_post, http_header, header_timeout, content_timeout, httpheader_limit, httpcontent_limit)
 
   # keep on reading 1024 and writing it into a file, until it receives an empty string
   # which means the http server content is completely read 
@@ -189,14 +207,28 @@ def httpretrieve_save_file(url, filename, http_post=None, header_timeout=30, con
 
 
   
-def httpretrieve_get_string(url, http_post=None, header_timeout=30, content_timeout=30, httpheader_limit=8192):
+def httpretrieve_get_string(url, http_query=None, http_post=None, http_header=None, header_timeout=30, content_timeout=30, httpheader_limit=8192, httpcontent_limit=4194304):
   """
   <Purpose>
      retruns string of the http content from a given URL
 
   <Arguments>
-     url:
-           string of a http web server URL
+    url:
+           String of a http web server-URL
+    http_post:
+           dictionary of data to post to server(unencoded string, the library encodes the post it self)
+    http_query:
+           dictionary of query to send to server(unencoded string, the library encodes the query it self)
+    http_header:
+           dictionary of http header to add the the http header request
+    header_timeout:
+           socket timeout for receiving header from server(default value set to 30 seconds)
+    content_timeout:
+           socket timeout for receiving content from server(default value set to 30 seconds)
+    httpheader_limit:
+           length limit for when a server sends http header(default value set to 8kb(8192 charactors)) 
+    httpcontent_limit:
+            limits the the amount of content a server can send to the retrieval 
  
   <Exceptions>
      same as httpretrieve_open
@@ -208,7 +240,7 @@ def httpretrieve_get_string(url, http_post=None, header_timeout=30, content_time
      returns a string of the http content. 
   """       
   
-  http_obj = httpretrieve_open(url, http_post, header_timeout, content_timeout, httpheader_limit)
+  http_obj = httpretrieve_open(url, http_query, http_post, http_header, header_timeout, content_timeout, httpheader_limit, httpcontent_limit)
   # retrieve the http content from server using httpretrieve file like object
   httpcontent = http_obj.read()
   http_obj.close()
@@ -219,13 +251,14 @@ def httpretrieve_get_string(url, http_post=None, header_timeout=30, content_time
 
 class _httpretrieve_filelikeobject:
   # file like object used to receive the http content with a length limit   
-  def __init__(self, sock, contentlength, content_timeout):
+  def __init__(self, sock, contentlength, httpcontent_limit, content_timeout):
     self.sock = sock
     if contentlength == None:
       self.contentlengthisknown = False
     else:
       self.contentlengthisknown = True
       self.contentlength = contentlength
+    self.httpcontent_limit = httpcontent_limit  
     self.content_timeout = content_timeout  
     self.fileobjclosed = False
     self.totalcontentisreceived = False 
@@ -284,14 +317,11 @@ class _httpretrieve_filelikeobject:
       left_to_read = 1024
     else: 
     # check if limit is a valid number
-      try: # none int check
-        int(limit)
-      except ValueError, e:
+      if not type(limit) == int:
         raise HttpUserInputError('User input Error: given a none int to receive' + str(e))  
-      else:
+      elif limit < 0:
         # raise an exception if limit is a negative number
-        if limit < 0: 
-          raise HttpUserInputError('User input Error: given a negative number to receive, given: ' + str(limit))
+        raise HttpUserInputError('User input Error: given a negative number to receive, given: ' + str(limit))
       readhaslimit = True
       left_to_read = limit  
 
@@ -321,8 +351,8 @@ class _httpretrieve_filelikeobject:
 
       else:
         # By default, httpretrieve permits content length to be less than 4,096 kilobytes(4194304 charactors)
-        if len(content) >= 4194304:
-          raise HttpContentLengthError('content length exceeded 4096 kb')
+        if len(content) >= self.httpcontent_limit:
+          raise HttpContentLengthError('content length exceeded ' + self.httpcontent_limit)
 
         # add what is received
         httpcontent += content
@@ -414,32 +444,82 @@ def _httpretrieve_parse_given_url(url):
 
 
 
-def _httpretrieve_buildhttprequest(port, host, path, query, http_post):
+def _httpretrieve_buildhttprequest(http_header, port, host, path, url_query, dict_query, http_post):
   # send http request to the http web server using socket connection  
   
   if http_post != None:
-    # check if the given post is valid
-    if not type(http_post) == str:
-      raise HttpUserInputError('The given http_post is not a string, given: ' + str(type(http_post)))
-    # there is a posted data use http POST method
-    http_command = 'POST'
+    # there is a posted data, thus use http POST command
+   
+    # check if the given post data is valid
+    if not type(http_post) == dict:
+      raise HttpUserInputError('The given http_post is not a dictionary, given: ' + str(type(http_post)))
+
+    # change the given http post dictionary into a encoded post data with a key and val  
+    try: 
+      http_post = urllib_quote_parameters(http_post)
+    except Exception, e:
+      raise HttpUserInputError('Error encoding the given http post dictionary ' +  str(http_post) + str(e))
+
+
+    # build the main http request header which includes the GET/POST and the Host name field
+    httpheader = _httpretrieve_httprequestmain_header('POST', url_query, dict_query, path, host, port)
+
+    # if given add a client http header to the request
+    httpheader += _httpretrieve_parse_clienthttpheader(http_header)
+
+    # indicate the http post content length
+    httpheader += 'Content-Length: ' + str(len(http_post)) + '\r\n'  
+    # add a new line to indicate that the http header is done and the http post is followed.
+    httpheader += '\r\n'
+    # include the posted data after the http header empty line
+    httpheader += http_post
+        
 
   else:
-    # there was no posted data use http GET method   
-    http_command = 'GET'
+    # there is no posted data, use http GET method   
+    httpheader = _httpretrieve_httprequestmain_header('GET', url_query, dict_query, path, host, port)
+    # if http header is given, add client headers to the request 
+    httpheader += _httpretrieve_parse_clienthttpheader(http_header)
+    # add a new line to indicate that the header request is complete
+    httpheader += '\r\n'
 
-  # if there is no query, dont need to include it in the request
-  addquery = ''
-  if query != '':
+  # return header with a new line which is signal for http header is done 
+  return httpheader 
+
+
+
+
+def _httpretrieve_httprequestmain_header(http_command, url_query, dict_query, path, host, port):
+  # builds the first two main http request headers which include the GET/POST and the HOST name
+  
+  # before building the httprequest make sure there isnt two fields of query given by the client
+  if url_query != '' and dict_query != None:
+    # cant have two different fields with query
+    raise HttpUserInputError('Cant input a http query with the url and an extra parameter dictionary with a http query')
+
+  elif dict_query != None:
+    # user has given a http query 
+    try: 
+      encoded_query = '?' + urllib_quote_parameters(dict_query)
+    except Exception, e:
+      raise HttpUserInputError('Error encoding the given http query dictionary ' +  str(dict_query) + str(e))
+
+  elif url_query != '':
     # if there is a query include the query on the main header('?' is used as a seperater between path)
-    addquery = '?' + query
+    encoded_query = '?' + url_query
+  else:
+    # there is no query
+    encoded_query = ''
+    
 
-  # if there is no path add a / on the request and if there is a path use the given path
+  # if there is no path add a '/' on the request and if there is a path use the given path
   addpath = '/'
   if path != '':
     addpath = path
-    
-  httpheader = http_command + ' ' + addpath + addquery + ' HTTP/1.0\r\n'
+
+  # FIRST header which includes the POST/GET request  
+  main_httpheader = http_command + ' ' + addpath + encoded_query + ' HTTP/1.0\r\n'
+
 
   # if port is 80, dont need to include the port upon request
   addport = ''
@@ -447,35 +527,56 @@ def _httpretrieve_buildhttprequest(port, host, path, query, http_post):
     # if the port is not 80 the host needs to include the port number on Host header
     # (':' is used as a separater between host and port)
     addport = ':' + str(port)
-    
-  httpheader += 'Host: ' + host + addport + '\r\n'
 
-  # server name 
-  httpheader += 'Server: Seattle Testbed\r\n'
-  # closes the servers socket connection after sending all response                    
-  httpheader += 'Connection: close\r\n'
+  # SECOND line of the header request which include the host name with port if the port is not 80   
+  main_httpheader += 'Host: ' + host + addport + '\r\n'
 
-  # if there is a posted data include the content length in httpheader
-  if http_command == 'POST':
-    httpheader += 'Content-Length: ' + str(len(http_post)) + '\r\n'  
-
-  # return header with a new line which is signal for http header is done 
-  return httpheader + '\r\n'  
-
-  
+  # return the firs two lines of the http request 
+  return main_httpheader
 
 
-def _httpretrieve_sendhttprequest(sock, httpheader, http_post):
+
+
+def _httpretrieve_parse_clienthttpheader(http_header):
+  # builds a http header from the given http header dictionary
+  if http_header == None:
+    # if the http header isnt given return a empty string
+    return ''
+  elif not type(http_header) == dict:
+    # raise an exception if the http header isnt dictionary
+    raise HttpUserInputError('The given http_post is not a dictionary, given: ' + str(type(http_header)))
+  else: 
+    # take the given key and val from the http_header dictionary and add them to the http header with
+    # correct http format
+    clienthttpheader = ''
+    for key, val in http_header.items():
+      # make simple checks on the key and val 
+      if not type(key) == str:
+        raise HttpUserInputError('The given http header key isnt str given ' + str(type(key)))
+      if not type(val) == str:
+        raise HttpUserInputError('The given http header value isnt str given ' + str( type(val)))
+      if key == '' or val == '':
+        # raise an exception if the key or value is a empty field
+        raise HttpUserInputError('The given empty http header feild of key or value')
+      if key.capitalize() != key:
+        raise HttpUserInputError('The given http header key is not capitalized, given: ' + key)
+
+      # add the key and value to the http header field
+      clienthttpheader += key + ' : ' + val + '\r\n'  
+
+    # return the string of the http header  
+    return clienthttpheader
+
+
+
+
+def _httpretrieve_sendhttprequest(sock, httpheader):
   # send the request, and if there is any error raise an excetion
   try:
     sock.send(httpheader)
-    # if there is a posted data send the posted data right after the http header
-    if httpheader.startswith('POST'):
-      sock.send(http_post)
-      # used to end the post
-      sock.send('\r\n\r\n')
   except Exception, e:
-    sock.close()
+    if 'Socket closed' not in str(e): 
+      sock.close()
     raise HttpConnectionError('Connection error: on sending http request to server ' + str(e))
 
 
@@ -632,7 +733,7 @@ def _httpretrieve_httpredirect(httpheaderlines):
   # if there is a redirect location given by the server it will look like
   # eg.'Location: http://www.google.com'
   for headerline in httpheaderlines:
-    if headerline.startswith('Location'):
+    if headerline.startswith('Location:'):
       # if found redirect need to strip out 'Location: ' to return the url   
       redirect = headerline[len('Location: '):]
                         
@@ -653,21 +754,22 @@ def _httpretrieve_get_contentlength(httpheaderlines):
   # if there is a content length given by the server it will look like
   # eg.'Content-Length: 34'
   for headerline in httpheaderlines:
-    if headerline.startswith('Content-Length'):
+    if headerline.startswith('Content-Length:'):
       # if found content length need to strip out 'Content-Length: ' to return the length   
+      
       try: 
         contentlength = int(headerline[len('Content-Length: '):])
       except ValueError, e:
         raise HttpHeaderFormatError('Http header Content-Length format error: http server provided content length that isnt a int ' + str(e))                
 
+      
+      # check if the content length is valid and retrun it 
+      if contentlength <= 0:                
+        raise HttpHeaderFormatError('Http header Content-Length format error: provided content length with invalid number ' + str(contentlength))
       else:
-       # check if the content length is valid and retrun it 
-        if len(str(contentlength)) == 0: 
-          raise HttpHeaderFormatError('Http header Content-Length format error: provided content length with nothing')
-        elif contentlength < 0:                
-          return HttpHeaderFormatError('Http header Content-Length format error: provided content length with negative number ' + str(contentlength))
-        else:
-          return contentlength
+        return contentlength
                         
   # there wasn't a content-length line or the content length was given but didnt give a int 
   return None
+
+

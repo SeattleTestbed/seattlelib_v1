@@ -105,7 +105,6 @@ def registerhttpcallback(url, callbackfunc, httprequest_limit = 131072, httppost
       # returns None if there isnt a posted data
       _registerhttpcallback_receive_httpposted_data(sock, httprequest_dictionary, httppost_limit)
       
-      
       # place the call back callbackfunc with dictionary that includes http_command,
       # http_version, path, query, posted_data, and all the http requests headers
       webpage_content = callbackfunc(httprequest_dictionary)
@@ -208,28 +207,16 @@ def _registerhttpcallback_get_host_port(url):
       
 def _registerhttpcallback_receive_client_request(sock, httprequest_limit):
   # receive request from the client using the socket connection
-  try:
+  if not type(httprequest_limit) == int:
     # check if the given httprequest limit is valid
-    int(httprequest_limit)
-  except Exception, e:
     raise HttpServerError('The given http request limit isnt int ' + str(e))
   
-  try: 
-    # empty line is used as a signal for when the http request is done, and we set a
-    # default request length limit to be 131072 character(128kb)
-    client_request = _registerhttpcallback_receive_untilemptyline(sock, httprequest_limit)
+  
+  # empty line is used as a signal for when the http request is done, and we set a
+  # default request length limit to be 131072 character(128kb)
+  client_request = _registerhttpcallback_receive_untilemptyline(sock, httprequest_limit)
         
-  except Exception, e:
-    # raise depending up on what errors there was while receiving until empty line 
-    if 'Timeout Error' in str(e):
-      raise HttpError408('The server timed out while waiting to receive the request')
-    elif 'Length Exceeded' in str(e):
-      raise HttpError413('The http request length is too long')
-    elif 'Receiveing' in str(e):
-      raise HttpError500('Error while receiving http request')
-    else:
-      raise HttpError500('Error on receiving the request ' + str(e))
- 
+  
   # http request format requires the request to be line by line
   # build a list of the received request split line by line to check the formating of the request
   client_request_lines = ''
@@ -246,6 +233,7 @@ def _registerhttpcallback_receive_client_request(sock, httprequest_limit):
 
   # returns a list of client request
   return client_request_lines
+
 
 
 
@@ -322,7 +310,7 @@ def _registerhttpcallback_httprequest_header_parse(http_header_request):
     raise HttpError417('The request header should contain  RequestMethod <url> HTTP<version>, Given: ' + http_header_request)
 
   # check the http comand is valid or if its even suported(suported comands include GET and POST)
-  if http_command_url_version[0] == 'GET' or http_command_url_version[0] == 'POST':
+  if http_command_url_version[0] == 'GET' or http_command_url_version[0].lower() == 'post':
      http_command = http_command_url_version[0]
   else:
     raise HttpError501('The given http comand is not suported or valid. Given: ' + str(http_command_url_version[0]))
@@ -375,48 +363,68 @@ def _registerhttpcallback_receive_httpposted_data(sock, httprequest_dictionary, 
   # receive the posted data which sent right after the http request with a empty line
   # indicating the end of the posted data(this is if the http comand is only a POST)
 
-  try:
+  if not type(httppoost_limit) == int:
     # check if the given http post limit is valid
-    int(httppoost_limit)
-  except Exception, e:
-    raise HttpServerError('The given http post limit isnt int ' + str(e))
-  
+    raise HttpServerError('The given http post limit is not a int, given: ' + str(type(httppoost_limit)))
+
   # if the http comand method isnt post theres is no posted data
   posted_data = None
-  
-  if httprequest_dictionary['http_command'] == 'POST':
-    try:
-      # empty line is used as a signal for when the http post is done, and we set a
-      # default post data length limit to be 2048 character(2mb)
-      posted_data = _registerhttpcallback_receive_untilemptyline(sock, httppoost_limit)
 
-    except Exception, e:
-      # raise depending up on what errors there was while receiving until empty line 
-      if 'Timeout Error' in str(e):
-        raise HttpError408('The server timed out while waiting to receive the post data')
-      elif 'Length Exceeded' in str(e):
-        raise HttpError413('The http posted data length is too long')
-      elif 'Receiveing' in str(e):
-        raise HttpError500('Error while receiving request posted data')
-      else:
-        raise HttpError500('Error on receiving the posted data ' + str(e))
+  # Bug pointed out by Albert Rafetseder: not all browsers send post with caps 
+  if httprequest_dictionary['http_command'].lower() == 'post':
+    # get the posted data length or raise an exception if not given 
+    try:
+      posted_data_length = int(httprequest_dictionary['Content-Length'])
+    except Exception, e:   
+      raise HttpError411('content length is required on a http POST comand')
+    else:
+      # Bug pointed out by Albert Rafetseder: post doesnt send a empty line after the posted data
+      # recieve the posted data using the posted data length
+      posted_data = _registerhttpcallback_receive_httppost(sock, posted_data_length, httppoost_limit)
 
     # check if there is a posted data and return it
     if len(posted_data) == 0:
       raise HttpError417('The request included a http POST comand with no data posted')
-
-    # get the posted data length or raise an exception if not given  
-    try:
-      posted_data_length = httprequest_dictionary['Content-Length']
-    except Exception, e:   
-      raise HttpError411('content length is required on a http POST comand')
-
-    # raise an exception if the the posted data legnth doesnt equal to what is received
-    if len(posted_data) != int(posted_data_length):
-      raise HttpError417('The content length didnt match the posted data length: the content length was ' + posted_data_length + ' while the posted data is ' + str(len(posted_data)))  
     
   # adds the posted data or None to the httprequest dictionary 
   httprequest_dictionary['posted_data'] = posted_data
+
+
+
+
+
+def _registerhttpcallback_receive_httppost(sock, http_post_length, length_limit):
+  # receives posted data from the given connection untill the given content length field matchs the received amount 
+  total_recvd_post = ''
+  
+  while True:
+    if len(total_recvd_post) == http_post_length:
+      # if the content length matchs the received posted data return it 
+      return total_recvd_post
+
+    # raise an exception if the received posted data length is greater than the given http header content length   
+    if len(total_recvd_post) > http_post_length:
+      raise HttpError417('The http posted data didnt match the http content length header, given content length: ' + str(http_post_length) + ' while posted data length is ' + str(len(total_recvd_post)))
+
+    # raise an exception if the total received length has exceeded the given length limit
+    if len(total_recvd_post) > length_limit:                  
+      raise HttpError413('The http posted data length exceeded length limit of ' + str(length_limit))
+
+                       
+    try:
+      # receive one character at a time inorder to check for the empty line
+      content = sock.recv(512)
+
+    # catch any error that happens while receiving content             
+    except SocketTimeoutError, e:
+      raise HttpError408('The server timed out while waiting to receive the post data ' + str(e))
+    except Exception, e: 
+      raise HttpError500('Error while receiving request posted data ' + str(e))
+
+    else:
+      # if there was not receiving error, keep on adding the receieved content 
+      total_recvd_post += content
+
 
 
   
@@ -434,7 +442,7 @@ def _registerhttpcallback_receive_untilemptyline(sock, length_limit):
 
     # raise an exception if the total received length has exceeded the given length limit
     if len(total_recvd_content) > length_limit:                  
-      raise Exception('Length Exceeded')
+      raise HttpError413('The http request length exceeded the given length limit ' + str(length_limit))
                         
     try:
       # receive one character at a time inorder to check for the empty line
@@ -442,15 +450,14 @@ def _registerhttpcallback_receive_untilemptyline(sock, length_limit):
 
     # catch any error that happens while receiving content             
     except SocketTimeoutError, e:
-      raise Exception('Timeout Error' + str(e))
+      raise HttpError408('The server timed out while waiting to receive the request ' + str(e))
     except Exception, e: 
-      raise Exception('Receiving ' + str(e))
+      raise HttpError500('Error while receiving http request ' + str(e))
 
     else:
       # if there was not receiving error, keep on adding the receieved content 
       total_recvd_content += content
 
-  return total_recvd_content
 
 
 
@@ -507,9 +514,9 @@ def _registerhttpcallback_send_httpformat_error(sock, e):
   # for redirect add the location of the redirection to the http header    
   if statuscode_numb == 301 or statuscode_numb == 302:
     if client_error_msg == '':
-      raise HttpUserInputError('Internal server error on generating error msg: callback func client should put the location on raising redirect')
+      raise HttpUserInputError('Internal server error: callback func client should put the location on raising redirect')
     elif not client_error_msg.startswith('http://'):
-      raise HttpUserInputError('Internal server error on generating error msg: calback func client redirect is invalid, Given:' + client_error_msg)
+      raise HttpUserInputError('Internal server error: calback func client redirect is invalid, Given: ' + client_error_msg)
     else:
       httpheader += 'Location: ' + str(client_error_msg) + '\n'
   

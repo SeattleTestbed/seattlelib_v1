@@ -7,6 +7,7 @@
 
 include httpretrieve.repy
 include registerhttpcallback.repy
+include urllib.repy
 
 
 
@@ -21,9 +22,7 @@ def server_test_content(httprequest_dictionary):
 if callfunc == 'initialize':
 
   # data to post to server using the httpretrieve 
-  http_post = ''
-  for i in range(100):
-    http_post += str(i)  
+  http_post={"first": "1st", "second": "2nd"}
     
   # build temp server that acts normally and sends what ever the client posted data is
   try:    
@@ -34,14 +33,15 @@ if callfunc == 'initialize':
 
   try:
     # use httpretrieve to retrieve the content form the server.(which is the posted data)  
-    recv_msg = httpretrieve_get_string('http://127.0.0.1:12345', http_post)   
+    recv_msg = httpretrieve_get_string('http://127.0.0.1:12345', None, http_post)   
 
   except Exception, e:
     print 'Http retrieve failed on receiving content, Raised: ' + str(e)
   else:
-    if recv_msg != http_post:
+    # check if the recieved post is similar to the http post sent                               
+    if recv_msg != urllib_quote_parameters(http_post):
       print 'failed: the received posted data didnt match the actual posted data'
-      print 'httpretrieve posted ' + http_post
+      print 'httpretrieve posted ' + urllib_quote_parameters(http_post)
       print 'server receieved ' + recv_msg 
   
   finally:
