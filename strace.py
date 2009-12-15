@@ -289,6 +289,6 @@ if callfunc == "initialize":
 
 # Dylink specific
 if "HAS_DYLINK" in _context and HAS_DYLINK:
-  dyn_dispatch_module()
+  dy_dispatch_module()
 
 
