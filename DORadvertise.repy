@@ -13,7 +13,6 @@ Advertisements to the Digital Object Registry run by CNRI.
 
 include sockettimeout.repy
 include httpretrieve.repy
-include urllib.repy
 include xmlparse.repy
 
 
@@ -180,8 +179,7 @@ def _DORadvertise_command(parameters, timeout=None):
         if content is None:
           content = ""
 
-        # We need to urldecode the values, as they were inserted urlencoded.
-        values.append(urllib_unquote(content))
+        values.append(content)
 
   if error is not 0:
     raise DORadvertise_BadRequest(error, error_msg)
