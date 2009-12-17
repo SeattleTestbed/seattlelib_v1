@@ -27,7 +27,7 @@ include urllib.repy
 
 
 
-def httpretrieve_open(url, http_query=None, http_post=None, http_header=None, header_timeout=30, content_timeout=30, httpheader_limit=8192, httpcontent_limit=4194304):
+def httpretrieve_open(url, http_query=None, http_post=None, http_header=None, header_timeout=None, content_timeout=None, httpheader_limit=8192, httpcontent_limit=4194304):
   """
   <Purpose>
      Returns file like object that that can read the http content form a http server. The file like
@@ -98,6 +98,12 @@ def httpretrieve_open(url, http_query=None, http_post=None, http_header=None, he
   <Returns>
     Returns file like obj which can read the http content from http web server. 
   """
+
+  # Pick default values for header_timeout and content_timeout if None given.
+  if header_timeout is None:
+    header_timeout = 30
+  if content_timeout is None:
+    content_timeout = 30
   
   # check if url is valid and get host, path, port and query from the given url
   (host, port, path, url_query) = _httpretrieve_parse_given_url(url)
@@ -114,7 +120,7 @@ def httpretrieve_open(url, http_query=None, http_post=None, http_header=None, he
   
   # send http format request to http web server  
   _httpretrieve_sendhttprequest(sock, httpheader) 
-  
+
   # receive the http header lines in a form of list from the http web server
   httpheaderlines = _httpretrieve_receive_httpheader(sock, header_timeout, httpheader_limit)
   
