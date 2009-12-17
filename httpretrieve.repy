@@ -558,11 +558,9 @@ def _httpretrieve_parse_clienthttpheader(http_header):
       if key == '' or val == '':
         # raise an exception if the key or value is a empty field
         raise HttpUserInputError('The given empty http header feild of key or value')
-      if key.capitalize() != key:
-        raise HttpUserInputError('The given http header key is not capitalized, given: ' + key)
 
       # add the key and value to the http header field
-      clienthttpheader += key + ' : ' + val + '\r\n'  
+      clienthttpheader += key + ': ' + val + '\r\n'  
 
     # return the string of the http header  
     return clienthttpheader
