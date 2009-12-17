@@ -457,14 +457,16 @@ def _httpretrieve_buildhttprequest(http_header, port, host, path, url_query, dic
     # there is a posted data, thus use http POST command
    
     # check if the given post data is valid
-    if not type(http_post) == dict:
-      raise HttpUserInputError('The given http_post is not a dictionary, given: ' + str(type(http_post)))
+    if type(http_post) == dict:
+      # change the given http post dictionary into a encoded post data with a key and val  
+      try: 
+        http_post = urllib_quote_parameters(http_post)
+      except Exception, e:
+        raise HttpUserInputError('Error encoding the given http post dictionary ' +  str(http_post) + str(e))
 
-    # change the given http post dictionary into a encoded post data with a key and val  
-    try: 
-      http_post = urllib_quote_parameters(http_post)
-    except Exception, e:
-      raise HttpUserInputError('Error encoding the given http post dictionary ' +  str(http_post) + str(e))
+    if type(http_post) != str:
+      raise HttpUserInputError('The given http_post is not a dictionary or string, given: ' + str(type(http_post)))
+
 
 
     # build the main http request header which includes the GET/POST and the Host name field
