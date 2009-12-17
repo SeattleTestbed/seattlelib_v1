@@ -172,3 +172,37 @@ def urllib_quote_parameters(dictionary):
     quoted_keyvals.append("%s=%s" % (urllib_quote(key), urllib_quote(val)))
 
   return "&".join(quoted_keyvals)
+
+
+
+
+def urllib_unquote_parameters(string):
+  """
+  <Purpose>
+    Decode a urlencoded query string or POST body.
+
+  <Arguments>
+    string:
+           The string to decode.
+
+  <Exceptions>
+    ValueError if the string is poorly formed.
+
+  <Side Effects>
+    None.
+
+  <Returns>
+    A dictionary mapping keys to values.
+  """
+
+  keyvalpairs = string.split("&")
+  res = {}
+
+  for quotedkeyval in keyvalpairs:
+    # Throw ValueError if there is more or less than one '='.
+    quotedkey, quotedval = quotedkeyval.split("=")
+    key = urllib_unquote(quotedkey)
+    val = urllib_unquote(quotedval)
+    res[key] = val
+
+  return res
