@@ -15,14 +15,18 @@ Raises an AdvertiseError exception if there is a problem advertising with either
 include listops.repy
 include openDHTadvertise.repy
 include centralizedadvertise.repy
-
+include DORadvertise.repy
 include parallelize.repy
 
+
+# All the names of services we can support.
+_advertise_all_services = ("central", "DHT", "DOR")
+
+
 nodemanager_announce_context = {}
-nodemanager_announce_context["skipDHT"] = 0
-nodemanager_announce_context["previousDHTskip"] = 1
-nodemanager_announce_context["skipcentral"] = 0
-nodemanager_announce_context["previouscentralskip"] = 1
+for service in _advertise_all_services:
+  nodemanager_announce_context["skip" + service] = 0
+  nodemanager_announce_context["previous" + service + "skip"] = 1
 nodemanager_announce_context_lock = getlock()
 
 
@@ -38,12 +42,14 @@ def _try_advertise_announce(args):
   # run in parallel for DHT and central announces.
   which_service, key, value, ttlval, exceptions, finishedref = args
 
-  if which_service not in ("central", "DHT"):
+  if which_service not in _advertise_all_services:
     raise AdvertiseError("Incorrect service type used in internal function _try_advertise_announce.")
 
   try:
     if which_service == "central":
       centralizedadvertise_announce(key, value, ttlval)
+    elif which_service == "DOR":
+      DORadvertise_announce(key, value, ttlval)
     else:
       openDHTadvertise_announce(key, value, ttlval)
 
@@ -116,7 +122,7 @@ def advertise_announce(key, value, ttlval, concurrentevents=2, \
 
   onefinished = [False]
 
-  for service_type in ("central", "DHT"):
+  for service_type in _advertise_all_services:
     if nodemanager_announce_context["skip" + service_type] == 0:
       parallize_worksets.append((service_type, key, value, ttlval, \
           exceptions, onefinished))
@@ -156,12 +162,14 @@ def _try_advertise_lookup(args):
   # run in parallel for DHT and central lookups.
   which_service, key, maxvals, finishedref = args
 
-  if which_service not in ("central", "DHT"):
+  if which_service not in _advertise_all_services:
     raise AdvertiseError("Incorrect service type used in internal function _try_advertise_lookup.")
 
   try:
     if which_service == "central":
       results = centralizedadvertise_lookup(key, maxvals)
+    elif which_service == "DOR":
+      results = DORadvertise_lookup(key, maxvals=maxvals)
     else:
       results = openDHTadvertise_lookup(key, maxvals)
 
@@ -174,7 +182,7 @@ def _try_advertise_lookup(args):
 
 
 
-def advertise_lookup(key, maxvals=100, lookuptype=['central','opendht'], \
+def advertise_lookup(key, maxvals=100, lookuptype=['central','opendht','DOR'], \
     concurrentevents=2, graceperiod=10, timeout=60):
   """
   <Purpose>
@@ -188,7 +196,7 @@ def advertise_lookup(key, maxvals=100, lookuptype=['central','opendht'], \
     maxvals (optional, defaults to 100):
             Maximum number of values to return.
 
-    lookuptype (optional, defaults to ['central', 'opendht']):
+    lookuptype (optional, defaults to ['central', 'opendht', 'DOR']):
             Which services to employ looking up values.
     
     concurrentevents (optional, defaults to 2):
@@ -220,6 +228,8 @@ def advertise_lookup(key, maxvals=100, lookuptype=['central','opendht'], \
   for type in lookuptype:
     if type == "central":
       parallel_worksets.append(("central", key, maxvals, onefinished))
+    elif type == "DOR":
+      parallel_worksets.append(("DOR", key, maxvals, onefinished))
     elif type == "opendht":
       parallel_worksets.append(("DHT", key, maxvals, onefinished))
     else:
