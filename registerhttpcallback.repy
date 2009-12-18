@@ -19,8 +19,7 @@
 """
 
 
-# used for closing handle
-include uniqueid.py
+
 include urlparse.repy  
 include sockettimeout.repy
 # used for hierarchy exception 
