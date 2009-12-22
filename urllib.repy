@@ -201,8 +201,8 @@ def urllib_unquote_parameters(string):
   for quotedkeyval in keyvalpairs:
     # Throw ValueError if there is more or less than one '='.
     quotedkey, quotedval = quotedkeyval.split("=")
-    key = urllib_unquote(quotedkey)
-    val = urllib_unquote(quotedval)
+    key = urllib_unquote_plus(quotedkey)
+    val = urllib_unquote_plus(quotedval)
     res[key] = val
 
   return res
