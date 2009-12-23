@@ -27,7 +27,7 @@ include urllib.repy
 
 
 
-def httpretrieve_open(url, http_query=None, http_post=None, http_header=None, header_timeout=None, content_timeout=None, httpheader_limit=8192, httpcontent_limit=4194304):
+def httpretrieve_open(url, http_query=None, http_post=None, http_header=None, header_timeout=30, content_timeout=30, httpheader_limit=8192, httpcontent_limit=4194304):
   """
   <Purpose>
      Returns file like object that that can read the http content form a http server. The file like
@@ -98,12 +98,6 @@ def httpretrieve_open(url, http_query=None, http_post=None, http_header=None, he
   <Returns>
     Returns file like obj which can read the http content from http web server. 
   """
-
-  # Pick default values for header_timeout and content_timeout if None given.
-  if header_timeout is None:
-    header_timeout = 30
-  if content_timeout is None:
-    content_timeout = 30
   
   # check if url is valid and get host, path, port and query from the given url
   (host, port, path, url_query) = _httpretrieve_parse_given_url(url)
@@ -120,7 +114,7 @@ def httpretrieve_open(url, http_query=None, http_post=None, http_header=None, he
   
   # send http format request to http web server  
   _httpretrieve_sendhttprequest(sock, httpheader) 
-
+  
   # receive the http header lines in a form of list from the http web server
   httpheaderlines = _httpretrieve_receive_httpheader(sock, header_timeout, httpheader_limit)
   
@@ -457,16 +451,14 @@ def _httpretrieve_buildhttprequest(http_header, port, host, path, url_query, dic
     # there is a posted data, thus use http POST command
    
     # check if the given post data is valid
-    if type(http_post) == dict:
-      # change the given http post dictionary into a encoded post data with a key and val  
-      try: 
-        http_post = urllib_quote_parameters(http_post)
-      except Exception, e:
-        raise HttpUserInputError('Error encoding the given http post dictionary ' +  str(http_post) + str(e))
+    if not type(http_post) == dict:
+      raise HttpUserInputError('The given http_post is not a dictionary, given: ' + str(type(http_post)))
 
-    if type(http_post) != str:
-      raise HttpUserInputError('The given http_post is not a dictionary or string, given: ' + str(type(http_post)))
-
+    # change the given http post dictionary into a encoded post data with a key and val  
+    try: 
+      http_post = urllib_quote_parameters(http_post)
+    except Exception, e:
+      raise HttpUserInputError('Error encoding the given http post dictionary ' +  str(http_post) + str(e))
 
 
     # build the main http request header which includes the GET/POST and the Host name field
@@ -566,9 +558,11 @@ def _httpretrieve_parse_clienthttpheader(http_header):
       if key == '' or val == '':
         # raise an exception if the key or value is a empty field
         raise HttpUserInputError('The given empty http header feild of key or value')
+      if key.capitalize() != key:
+        raise HttpUserInputError('The given http header key is not capitalized, given: ' + key)
 
       # add the key and value to the http header field
-      clienthttpheader += key + ': ' + val + '\r\n'  
+      clienthttpheader += key + ' : ' + val + '\r\n'  
 
     # return the string of the http header  
     return clienthttpheader
@@ -770,7 +764,7 @@ def _httpretrieve_get_contentlength(httpheaderlines):
 
       
       # check if the content length is valid and retrun it 
-      if contentlength <= 0:                
+      if contentlength < 0:                
         raise HttpHeaderFormatError('Http header Content-Length format error: provided content length with invalid number ' + str(contentlength))
       else:
         return contentlength

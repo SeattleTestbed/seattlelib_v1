@@ -19,7 +19,7 @@
 """
 
 
-
+include urllib.repy
 include urlparse.repy  
 include sockettimeout.repy
 # used for hierarchy exception 
@@ -41,8 +41,8 @@ def registerhttpcallback(url, callbackfunc, httprequest_limit = 131072, httppost
            String of a http web server-URL 
 
      callbackfunc:
-            The callbackfunc to be called. it should take one argument for http request dictionary.
-            The dictionary keys are as follows:
+            The callbackfunc to be called. It can take up to three argument .
+            First argument- The http request dictionary keys are as follows:
               http_command - for the http request method GET or POST
               http_version - which http version the client  used HTTP\1.1 or HTTP\1.0  
               path - the exact request path parsed 
@@ -52,11 +52,16 @@ def registerhttpcallback(url, callbackfunc, httprequest_limit = 131072, httppost
               And all the http requests headers the client provided. eg. Content-Length: 22  
               will incude Content-Length as a key and 22 as a value
 
+            Second argument - httprequest query; this returns a unencoded dictionary of the query
+            Third argument - httprequest posted data; this returns a unencoded dictionary of the posted data
+
             RESTRICTIONS:
               -> Follow the http_hierarchy_error(HttpStatusCodeError)to raise an exception. eg. raise
                   HttpError404 for file not found
               -> To redirect raise HttpError301(url) or HttpError302(url). The url has to be valid.  
-              -> server only excepts string type to process
+              -> server only excepts tuple type of [httpcontent, httpheader] where the httpcontent is a
+                  string of the content intended to display. httpheader is a dictionary used only if you have a
+                  extra header you want to add on the http response. 
 
      httprequest_limit:
             -> used to to limit the http request a client can make(default value set to 128kb or 131072 charactors)
@@ -104,9 +109,15 @@ def registerhttpcallback(url, callbackfunc, httprequest_limit = 131072, httppost
       # returns None if there isnt a posted data
       _registerhttpcallback_receive_httpposted_data(sock, httprequest_dictionary, httppost_limit)
       
+      # get dictionary decode from the given query 
+      httprequest_query = _registerhttpcallback_get_decode_dict(httprequest_dictionary, 'query')
+
+      # get dictionary decode from the given post 
+      httprequest_posted_data = _registerhttpcallback_get_decode_dict(httprequest_dictionary, 'posted_data')
+
       # place the call back callbackfunc with dictionary that includes http_command,
       # http_version, path, query, posted_data, and all the http requests headers
-      webpage_content = callbackfunc(httprequest_dictionary)
+      webpage_content = callbackfunc(httprequest_dictionary, httprequest_query, httprequest_posted_data)
         
       # callback callbackfunc excecuted, send the processed dynamic web page data to client(web browser)
       _registerhttpcallback_send_httpresponse(sock, webpage_content)
@@ -287,6 +298,36 @@ def _registerhttpcallback_make_httprequsest_dictionary(client_request_lines):
   
 
 
+
+
+def _registerhttpcallback_get_decode_dict(httprequest_dictionary , decode_type):
+  # returns a decode dictionary of post or query depending up on the encoded style   
+
+  # get the data from the request dictionary 
+  data_to_decode = httprequest_dictionary[decode_type]
+      
+  if decode_type == 'posted_data':
+    # inorder to check if the post is empty use None   
+    empty_check = None    
+  else:
+    # inorder to check if the query is empty use empty string   
+     empty_check = ''
+        
+  if data_to_decode != empty_check:
+    try:
+      # decode the given data depending up on the style it was encoded  
+      return urllib_unquote_parameters(data_to_decode)
+
+    except Exception, e:
+      # raise an exception if the fails decoding the given data  
+      raise HttpUserInputError('Invalid ' + decode_type + ' Raised ' + str(e) + ' on decoding')
+
+  # if the data is empty return None 
+  return None    
+
+
+
+
   
 def _registerhttpcallback_httprequest_header_parse(http_header_request):
   # varifiy's if the http request header format is valid and returns the http command, path, query,
@@ -461,21 +502,30 @@ def _registerhttpcallback_receive_untilemptyline(sock, length_limit):
 
 
 
-def _registerhttpcallback_send_httpresponse(sock, webpage_content):
+def _registerhttpcallback_send_httpresponse(sock, callbackfunc_val):
   # sends a response to the client(web browser) with a ok http header and the http web page content
-  if not type(webpage_content) == str:
-    raise HttpUserInputError('Server failed internally: callback func didnt return str, returned ' + str(type(webpage_content)))
-  if len(webpage_content) == 0:
-    raise HttpUserInputError('Server failed internally: callback func didnt return any content')
+  if not type(callbackfunc_val) == list:
+    raise HttpUserInputError('Callback func didnt return list, returned ' + str(type(callbackfunc_val)))
 
-  # By default, registerhttpcallback permits only files that are 4,096 kilobytes
-  if len(webpage_content) >= 4194304:
-    raise HttpUserInputError('Server failed internally: callback class content length exceeded')
+  try:
+    webpage_content = callbackfunc_val[0]
+    callbckfunc_httpheader = callbackfunc_val[1]
+  except Exception, e:
+    raise HttpUserInputError('Callback func returned data failed ' + str(e))
+
+  # check the given web page content 
+  if not type(webpage_content) == str:
+    raise HttpUserInputError('Callback func didnt return str for the content, returned ' + str(type(webpage_content)))
+  if len(webpage_content) == 0:
+    raise HttpUserInputError('Callback func didnt return any content')
+  
   
   # build the http ok response header 
   httpheader = 'HTTP/1.0 200 OK\n'
-  httpheader += 'Content-Type: text/html\n'
   httpheader += 'Content-Length: ' + str(len(webpage_content)) + '\n'
+  #check if there is a given http header and add it to the response
+  httpheader += _registerhttpcallback_parse_callbckfunc_httpheader(callbckfunc_httpheader)
+    
   httpheader += 'Server: Seattle Testbed\n\n'
 
   # http header followed by http content and close the connection
@@ -486,6 +536,41 @@ def _registerhttpcallback_send_httpresponse(sock, webpage_content):
   except Exception, e:
     raise HttpConnectionError('server failed to send the http content ' + str(e))  
 
+
+
+
+
+def _registerhttpcallback_parse_callbckfunc_httpheader(callbckfunc_httpheader):
+  # builds a http header from the given http callback func list
+  if callbckfunc_httpheader == None:
+    # if the http header isnt given return a empty string
+    return ''
+  elif not type(callbckfunc_httpheader) == dict:
+    # raise an exception if the http header isnt dictionary
+    raise HttpUserInputError('The given http header is not a dictionary, given: ' + str(type(callbckfunc_httpheader)))
+  else: 
+    # take the given key and val from the callbckfunc_httpheader dictionary and add them to the http header with
+    # correct http format
+    httpheaders = ''
+    for key, val in callbckfunc_httpheader.items():
+      # make simple checks on the key and val 
+      if not type(key) == str:
+        raise HttpUserInputError('The callback func given http header key isnt str given ' + str(type(key)))
+      if not type(val) == str:
+        raise HttpUserInputError('The callback func given http header value isnt str given ' + str( type(val)))
+      if key == '' or val == '':
+        # raise an exception if the key or value is a empty field
+        raise HttpUserInputError('The callback func given empty http header feild of key or value')
+      if key.capitalize() != key:
+        raise HttpUserInputError('The callback func given http header key is not capitalized, given: ' + key)
+
+      # add the key and value to the http header field
+      httpheaders += key + ' : ' + val + '\n'  
+
+    # return the string of the http header  
+    return httpheaders
+
+  
 
 
 
