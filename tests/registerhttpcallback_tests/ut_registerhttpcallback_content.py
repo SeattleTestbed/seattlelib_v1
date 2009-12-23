@@ -8,9 +8,9 @@ include registerhttpcallback.repy
 include httpretrieve.repy
 
 
-def test_normal_server(httprequest_dictionary):
+def test_normal_server(httprequest_dictionary, http_query, http_post):
   # normal server just sends a message  
-  return mycontext['msg_sent']
+  return [mycontext['msg_sent'], None]
    
 
     

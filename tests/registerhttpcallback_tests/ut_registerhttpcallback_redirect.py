@@ -9,13 +9,13 @@ include registerhttpcallback.repy
 include httpretrieve.repy
 
 
-def test_redirect(httprequest_dictionary):
+def test_redirect(httprequest_dictionary, http_query, http_post):
   # server that redirects to a different server(http://127.0.0.2:12345)   
   raise HttpError302('http://127.0.0.2:12345')
 
-def test_redirected(httprequest_dictionary):
+def test_redirected(httprequest_dictionary, http_query, http_post):
  # normal server that sends a content  
- return mycontext['redirect_content']   
+ return [mycontext['redirect_content'], None]  
 
     
 if callfunc == 'initialize':
