@@ -9,7 +9,7 @@ include registerhttpcallback.repy
 
 
 
-def server_test_header_timeout(httprequest_dictionary):
+def server_test_header_timeout(httprequest_dictionary, http_query, http_post):
   # build a server that takes too long to response to the httpretrieve
 
   # use a forever loop so the server acts as if the it failed(this will not send any http header)

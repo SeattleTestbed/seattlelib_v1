@@ -11,9 +11,9 @@ include registerhttpcallback.repy
 
 
 
-def server_test_read(httprequest_dictionary):
+def server_test_read(httprequest_dictionary, http_query, http_post):
   # for this test the server should just act normal and send a http content
-  return 'normal server'
+  return ['normal server', None]
 
 
 

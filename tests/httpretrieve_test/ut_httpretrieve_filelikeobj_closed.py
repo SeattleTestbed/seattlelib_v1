@@ -11,10 +11,10 @@ include registerhttpcallback.repy
 
 
 
-def server_test_filelikeobj(httprequest_dictionary):
+def server_test_filelikeobj(httprequest_dictionary, http_query, http_post):
   # for this test the server should just act normal because we are testing if the http retrieve raises an exception
   # when called after closed. 
-  return 'normal server'     
+  return ['normal server', None]     
 
 
 
