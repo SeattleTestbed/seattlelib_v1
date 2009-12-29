@@ -147,7 +147,6 @@ def registerhttpcallback(url, callbackfunc, httprequest_limit = 131072, httppost
 
   except Exception, e:
     # the waiting for a connection failed, stop waiting and raise an exception 
-    stopcomm(listencommhandle)
     raise HttpConnectionError('Web server failed on waiting for connection ' + str(e))
 
   else:
