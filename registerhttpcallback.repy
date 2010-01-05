@@ -529,11 +529,42 @@ def _registerhttpcallback_send_httpresponse(sock, callbackfunc_val):
 
   # http header followed by http content and close the connection
   try:
-    sock.send(httpheader) 
-    sock.send(webpage_content)
+    sock.send(httpheader)
+    # sends data by chunk of 1024 charactors at a time
+    _registerhttpcallback_sendbychunk(webpage_content, 1024, sock)
     sock.close() 
   except Exception, e:
     raise HttpConnectionError('server failed to send the http content ' + str(e))  
+
+
+
+
+
+def _registerhttpcallback_sendbychunk(full_data, chunck_size, sock):
+  # sends a given data to a socket connection by the chunk amount one at a time. 
+  length_of_data = len(full_data)
+  start = 0 
+  end = chunck_size
+  # used to signal when there is no more data left to parse by chunk size
+  done = False
+  
+  while not done :
+    if length_of_data <= end:
+      # last end of data
+      end = length_of_data
+      done = True
+
+    # parse the given data by the given chunk size and keep on sending by chunk bytes
+    chuncked_data = full_data[start:end]
+
+    try:
+      sock.send(chuncked_data)  
+    except Exception, e:
+      raise Exception('faild on sending data: ' + str(e))
+    else:
+      # change start and end to send the next part of the data
+      start = end
+      end += chunck_size
 
 
 

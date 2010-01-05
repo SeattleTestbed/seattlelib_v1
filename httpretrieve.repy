@@ -111,10 +111,10 @@ def httpretrieve_open(url, http_query=None, http_post=None, http_header=None, he
     
   # build a http format request using the given port, host, path and query
   httpheader = _httpretrieve_buildhttprequest(http_header, port, host, path, url_query, http_query, http_post)
-  
+
   # send http format request to http web server  
   _httpretrieve_sendhttprequest(sock, httpheader) 
-  
+
   # receive the http header lines in a form of list from the http web server
   httpheaderlines = _httpretrieve_receive_httpheader(sock, header_timeout, httpheader_limit)
   
@@ -317,7 +317,7 @@ class _httpretrieve_filelikeobject:
       left_to_read = 1024
     else: 
     # check if limit is a valid number
-      if not type(limit) == int:
+      if not type(webpage_content) == int:
         raise HttpUserInputError('User input Error: given a none int to receive' + str(e))  
       elif limit < 0:
         # raise an exception if limit is a negative number
@@ -478,10 +478,11 @@ def _httpretrieve_buildhttprequest(http_header, port, host, path, url_query, dic
   else:
     # there is no posted data, use http GET method   
     httpheader = _httpretrieve_httprequestmain_header('GET', url_query, dict_query, path, host, port)
-    # if http header is given, add client headers to the request 
+    # add client header if given 
     httpheader += _httpretrieve_parse_clienthttpheader(http_header)
     # add a new line to indicate that the header request is complete
     httpheader += '\r\n'
+
 
   # return header with a new line which is signal for http header is done 
   return httpheader 
@@ -550,18 +551,7 @@ def _httpretrieve_parse_clienthttpheader(http_header):
     # correct http format
     clienthttpheader = ''
     for key, val in http_header.items():
-      # make simple checks on the key and val 
-      if not type(key) == str:
-        raise HttpUserInputError('The given http header key isnt str given ' + str(type(key)))
-      if not type(val) == str:
-        raise HttpUserInputError('The given http header value isnt str given ' + str( type(val)))
-      if key == '' or val == '':
-        # raise an exception if the key or value is a empty field
-        raise HttpUserInputError('The given empty http header feild of key or value')
-      if key.capitalize() != key:
-        raise HttpUserInputError('The given http header key is not capitalized, given: ' + key)
-
-      # add the key and value to the http header field
+      # if the key is not capital letter raise an exception
       clienthttpheader += key + ' : ' + val + '\r\n'  
 
     # return the string of the http header  
@@ -575,8 +565,7 @@ def _httpretrieve_sendhttprequest(sock, httpheader):
   try:
     sock.send(httpheader)
   except Exception, e:
-    if 'Socket closed' not in str(e): 
-      sock.close()
+    sock.close()
     raise HttpConnectionError('Connection error: on sending http request to server ' + str(e))
 
 
@@ -764,12 +753,10 @@ def _httpretrieve_get_contentlength(httpheaderlines):
 
       
       # check if the content length is valid and retrun it 
-      if contentlength < 0:                
+      if contentlength <= 0:                
         raise HttpHeaderFormatError('Http header Content-Length format error: provided content length with invalid number ' + str(contentlength))
       else:
         return contentlength
                         
   # there wasn't a content-length line or the content length was given but didnt give a int 
   return None
-
-
