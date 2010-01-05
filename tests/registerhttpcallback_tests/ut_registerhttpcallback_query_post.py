@@ -39,15 +39,17 @@ if callfunc == 'initialize':
     httpretrieve_get_string('http://127.0.0.1:12345', http_query, http_post)
   except Exception, e:
     raise Exception('http retrieve failed on retrieving data from server')  
+  else:
+    if mycontext['received_http_query'] != http_query:
+      print 'query failed'
+      print 'sent query dict was ' + str(http_query)
+      print 'received query dict was ' + str(mycontext['received_http_query'])
 
-  if mycontext['received_http_query'] != http_query:
-    print 'query failed'
-    print 'sent query dict was ' + str(http_query)
-    print 'received query dict was ' + str(mycontext['received_http_query'])
-
-  if mycontext['received_http_post'] != http_post:
-    print 'post failed'
-    print 'sent query dict was ' + str(http_query)
-    print 'received query dict was ' + str(mycontext['received_http_post'])    
-    
-
+    if mycontext['received_http_post'] != http_post:
+      print 'post failed'
+      print 'sent query dict was ' + str(http_query)
+      print 'received query dict was ' + str(mycontext['received_http_post'])    
+      
+  finally:
+    #stop sever
+    stop_registerhttpcallback(handle)
