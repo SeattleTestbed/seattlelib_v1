@@ -24,7 +24,7 @@ Note: client is stored in wrapper list to avoid using mycontext dict
 """
 geoip_clientlist = [None]
 
-def geoip_init_client(url="http://128.208.3.203:12679"):
+def geoip_init_client(url="http://geoip.cs.washington.edu:12679"):
   """
   <Purpose>
     Create a new GeoIP XML-RPC client object.
