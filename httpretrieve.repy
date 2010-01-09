@@ -19,104 +19,110 @@
 
 include urlparse.repy
 include sockettimeout.repy
-include http_hierarchy_error.repy
 include urllib.repy
 
 
 
 
+class HttpConnectionError:
+  """
+  Error indicating that the web server has unexpectedly dropped the
+  connection.
+  """
 
-def httpretrieve_open(url, http_query=None, http_post=None, \
-    http_header=None, header_timeout=30, content_timeout=30, \
-    httpheader_limit=8192, httpcontent_limit=4194304):
+
+
+
+class HttpBrokenServerError:
+  """
+  Error indicating that the web server has sent us complete garbage instead
+  of something resembling HTTP.
+  """
+
+
+
+
+def httpretrieve_open(url, postdata=None, querydata=None, \
+    httpheaders=None, timeout=None):
   """
   <Purpose>
      Returns a file-like object that can be used to read the content from
-     an HTTP server.
+     an HTTP server. Follows 3xx redirects.
 
   <Arguments>
     url:
            The URL to perform a GET or POST request on.
-    http_post (optional):
-           A dictionary of form data to POST to the server. Passing
-           a non-None value results in a POST request being sent to the
-           server.
-    http_query (optional):
-           A dictionary of form data to send as a GET request's query
+    postdata (optional):
+           A dictionary of form data or a string to POST to the server.
+           Passing a non-None value results in a POST request being sent
+           to the server.
+    querydata (optional):
+           A dictionary of form data or a string to send as the query
            string to the server.
 
-           If http_post is omitted, the URL is retrieved with GET. If
-           both http_post and http_query are omitted, there is no query
+           If postdata is omitted, the URL is retrieved with GET. If
+           both postdata and querydata are omitted, there is no query
            string sent in the request.
-    http_header (optional):
+
+           For both querydata and postdata, strings are sent *unmodified*.
+           This means you probably should encode them first, with
+           urllib_quote().
+    httpheaders (optional):
            A dictionary of supplemental HTTP request headers to add to the
            request.
-    header_timeout (optional):
-           A timeout for receiving the HTTP response headers from the
-           server. Defaults to 30 seconds.
-    content_timeout (optional):
-           A timeout for receiving the body of the HTTP response from the
-           server. Defaults to 30 seconds.
-    httpheader_limit (optional):
-           An optional limit on the quantity of HTTP response headers to
-           accept from the server. Defaults to 8 kiB.
-    httpcontent_limit (optional):
-           An optional limit on the quantity of the HTTP response's body.
-           Defaults to 4 MiB.
+    timeout (optional):
+           A timeout for establishing a connection to the web server,
+           sending headers, and reading the response headers.
+
+           If excluded or None, never times out.
 
   <Exceptions>
-    HttpUserInputError if given an invalid URL, or malformed limit /
-      timeout values. This is also raised if the user attempts to call
-      a method on the file-like object after closing it.
+    ValueError if given an invalid URL, or malformed limit or timeout
+      values. This is also raised if the user attempts to call a method
+      on the file-like object after closing it.
 
-    HttpConnectionError if opening the connection or sending the HTTP
-      request fails.
+    HttpConnectionError if opening the connection fails, or if the
+      connection is closed by the server before we expect.
 
-    HttpHeaderReceivingError if the timeout for recieving headers is
-      exceeded or the limit on header data size is exceeded.
+    SocketTimeoutError if the timeout is exceeded.
 
-    HttpHeaderFormatError if the header data size is exceeded, the
-      response is malformed, the Content-length response header is
-      negative, or the Location response header is malformed.
-
-    HttpContentReceivingError if the server fails to send the content,
-      if the timeout for receiving is exceeded, or if the server
-      connection fails for any reason while receiving content.
-
-    HttpContentLengthError if the Content-length header returned by the
-      server exceeds httpcontent_limit, or if the Content-length header
-      doesn't match the amount of data sent by the server.
-
-    HttpStatuscodeError if the status code isn't 2xx or 3xx.
+    HttpBrokenServerError if the response or the Location response header
+      is malformed.
 
   <Side Effects>
     None
 
   <Returns>
     Returns a file-like object which can be used to read the body of
-    the response from the web server.
+    the response from the web server. The protocol version spoken by the
+    server, status code, and response headers are available as members of
+    the object.
   """
 
+  starttime = getruntime()
+
   # Check if the URL is valid and get host, path, port and query
-  (host, port, path, url_query) = _httpretrieve_parse_given_url(url)
+  (host, port, path) = _httpretrieve_parse_given_url(url)
 
   # Open connection to the web server
   try:
     sock = timeout_openconn(host, port)
 
   except Exception, e:
-    raise HttpConnectionError('Error: opening a connection failed with given http server, Given: ' + str(url) + ' ' + str(e))
+    if repr(e).startswith("timeout("):
+      raise HttpConnectionError("Socket timed out connecting to host/port.")
+    raise
 
   # build an HTTP request using the given port, host, path and query
-  httpheader = _httpretrieve_buildhttprequest(http_header, port, host, \
-      path, url_query, http_query, http_post)
+  httpheader = _httpretrieve_buildhttprequest(httpheaders, port, host, \
+      path, querydata, postdata)
 
   # send HTTP request to the web server
-  _httpretrieve_sendhttprequest(sock, httpheader)
+  sock.send(httpheader)
 
   # receive the header lines from the web server
   httpheaderlines = _httpretrieve_receive_httpheader(sock, \
-      header_timeout, httpheader_limit)
+      timeout, getruntime() - starttime)
 
   # get the status code and status message from the HTTP response
   (http_status_number, http_status_msg) = \
@@ -124,8 +130,7 @@ def httpretrieve_open(url, http_query=None, http_post=None, \
 
   if http_status_number == '200':
     contentlength = _httpretrieve_get_contentlength(httpheaderlines)
-    return _httpretrieve_filelikeobject(sock, contentlength, \
-        httpcontent_limit, content_timeout)
+    return _httpretrieve_filelikeobject(sock, contentlength)
 
   elif http_status_number == '301' or http_status_number == '302':
     # redirect to the new location via recursion
@@ -138,20 +143,16 @@ def httpretrieve_open(url, http_query=None, http_post=None, \
     # page to the user.
     contentlength = _httpretrieve_get_contentlength(httpheaderlines)
     http_errorcontent = \
-        _httpretrieve_receive_httperror_content(sock, contentlength)
-    _httpretrieve_raise_httpstatuscode_error(http_status_number, \
-        http_status_msg, http_errorcontent)
+        _httpretrieve_receive_httperror_content(sock)
 
 
 
 
-
-def httpretrieve_save_file(url, filename, http_query=None, http_post=None, \
-    http_header=None, header_timeout=30, content_timeout=30, \
-    httpheader_limit=8192, httpcontent_limit=4194304):
+def httpretrieve_save_file(url, filename, querydata=None, postdata=None, \
+    httpheaders=None, timeout=None):
   """
   <Purpose>
-    Performs an HTTP request, and saves the content of the response to a
+    Perform an HTTP request, and save the content of the response to a
     file.
 
   <Arguments>
@@ -161,10 +162,11 @@ def httpretrieve_save_file(url, filename, http_query=None, http_post=None, \
            See documentation for httpretrieve_open().
 
   <Exceptions>
-    HttpRetrieveClientError if we cannot create the file.
+    This function will raise any exception raised by Repy file objects
+    in opening, writing to, and closing the file.
 
-    This function will all raise any exception raised by httpretrieve_open(),
-    for the same reasons.
+    This function will all also raise any exception raised by
+    httpretrieve_open(), for the same reasons.
 
   <Side Effects>
     Writes the body of the response to 'filename'.
@@ -174,14 +176,10 @@ def httpretrieve_save_file(url, filename, http_query=None, http_post=None, \
   """
 
   httpcontent = ''
-  try:
-    newfile = open(filename, 'w')
-  except Exception, e:
-    raise HttpRetrieveClientError( \
-        'Error on creating a file to saving http content' + str(e))
+  newfile = open(filename, 'w')
 
-  http_obj = httpretrieve_open(url, http_query, http_post, http_header, \
-      header_timeout, content_timeout, httpheader_limit, httpcontent_limit)
+  http_obj = httpretrieve_open(url, querydata, postdata, httpheaders, \
+      timeout)
 
   # Read from the file-like HTTP object into our file.
   while True:
@@ -195,9 +193,9 @@ def httpretrieve_save_file(url, filename, http_query=None, http_post=None, \
 
 
 
-def httpretrieve_get_string(url, http_query=None, http_post=None, \
-    http_header=None, header_timeout=30, content_timeout=30, \
-    httpheader_limit=8192, httpcontent_limit=4194304):
+
+def httpretrieve_get_string(url, querydata=None, postdata=None, \
+    httpheaders=None, timeout=30):
   """
   <Purpose>
     Performs an HTTP request on the given URL, using POST or GET,
@@ -217,11 +215,12 @@ def httpretrieve_get_string(url, http_query=None, http_post=None, \
     Returns the body of the HTTP response (no headers).
   """
 
-  http_obj = httpretrieve_open(url, http_query, http_post, http_header, \
-      header_timeout, content_timeout, httpheader_limit, httpcontent_limit)
+  http_obj = httpretrieve_open(url, querydata, postdata, httpheaders, \
+      timeout)
   httpcontent = http_obj.read()
   http_obj.close()
   return httpcontent
+
 
 
 
@@ -229,22 +228,21 @@ class _httpretrieve_filelikeobject:
   # This class implements a file-like object used for performing HTTP
   # requests and retrieving responses.
 
-  def __init__(self, sock, contentlength, httpcontent_limit, content_timeout):
+  def __init__(self, sock, contentlength):
     self.sock = sock
     if contentlength == None:
       self.contentlengthisknown = False
     else:
       self.contentlengthisknown = True
       self.contentlength = contentlength
-    self.httpcontent_limit = httpcontent_limit
-    self.content_timeout = content_timeout
+    self.timeout = timeout
     self.fileobjclosed = False
     self.totalcontentisreceived = False
     self.totalread = 0
 
 
 
-  def read(self, limit = None):
+  def read(self, limit=None, timeout=None):
     """
     <Purpose>
       Behaves like Python's file.read(), with the potential to raise
@@ -267,7 +265,7 @@ class _httpretrieve_filelikeobject:
     """
 
     if self.fileobjclosed == True:
-      raise HttpUserInputError('Http Error: filelikeobj is closed')
+      raise ValueError("I/O operation on closed file")
 
     if self.totalcontentisreceived:
       return ''
@@ -276,52 +274,32 @@ class _httpretrieve_filelikeobject:
       readhaslimit = False
       left_to_read = 1024
     else:
-      if not type(webpage_content) == int:
-        raise HttpUserInputError( \
-            'User input Error: given a none int to receive' + str(e))
+      # Sanity check type/value of limit
+      if type(limit) is not int:
+        raise TypeError("Expected an integer for limit")
       elif limit < 0:
-        raise HttpUserInputError( \
-            'User input Error: given a negative number to receive, given: ' + \
-            str(limit))
+        raise ValueError("Expected a non-negative integer for limit")
+
       readhaslimit = True
       left_to_read = limit
 
-    self.sock.settimeout(self.content_timeout)
+    if timeout is None:
+      self.sock.settimeout(0)
+    else:
+      self.sock.settimeout(timeout)
 
     # Try to read up to limit, or until there is nothing left.
     httpcontent = ''
     while True:
-      try:
-        content = self.sock.recv(left_to_read)
+      content = self.sock.recv(left_to_read)
 
-      except SocketTimeoutError:
-        self.sock.close()
-        raise HttpContentReceivingError( \
-            'Timeout Error on receiving content: server taking too long to send content')
-
-      except Exception, e:
-        if 'Socket closed' not in str(e):
-          self.sock.close()
-          raise HttpContentReceivingError('Error on receiving content:' + str(e))
-
-        self.totalcontentisreceived = True
-        break
-
-      else:
-        if len(content) >= self.httpcontent_limit:
-          raise HttpContentLengthError('content length exceeded ' + \
-              self.httpcontent_limit)
-
-        httpcontent += content
-        if readhaslimit:
-          self.totalread += len(content)
-          if len(content) == left_to_read:
-            break
-          else:
-            left_to_read -= len(content)
-
-    # Check if there was an error receiving the HTTP response.
-    self._check_recieving_error(readhaslimit, httpcontent)
+      httpcontent += content
+      if readhaslimit:
+        self.totalread += len(content)
+        if len(content) == left_to_read:
+          break
+        else:
+          left_to_read -= len(content)
 
     return httpcontent
 
@@ -349,117 +327,71 @@ class _httpretrieve_filelikeobject:
 
 
 
-  def _check_recieving_error(self, readhaslimit, httpcontent):
-    if len(httpcontent) == 0:
-      self.sock.close()
-      raise HttpContentLengthError('Error on recieving content: ' + \
-          'received a http header but didnt receive any http content')
-
-    if self.contentlengthisknown:
-      if readhaslimit and self.totalcontentisreceived:
-        if self.totalread != self.contentlength:
-          self.sock.close()
-          raise HttpContentLengthError('Total length read with limit ' + \
-              'did not match the content length: total read: ' + \
-              str(self.totalread) + ' content length: ' + \
-              str(self.contentlength))
-
-      if readhaslimit == False:
-        if len(httpcontent) != self.contentlength:
-          self.sock.close()
-          raise HttpContentLengthError('Total received length did not ' + \
-              'match the content length: received: ' + \
-              str(len(httpcontent)) + ' content length : ' + \
-              str(self.contentlength))
-
-
-
 
 def _httpretrieve_parse_given_url(url):
   # Checks that the URL is in the right format and returns a tuple of host,
   # port, path and query.
-  try:
-    urlparse = urlparse_urlsplit(url)
-  except Exception, e:
-    raise HttpUserInputError('Given URL error: ' + str(e))
-  else:
-    if urlparse['scheme'] != 'http':
-      raise HttpUserInputError('Given URL error: the given protocol ' + \
-          urlparse['scheme'] + ' isnt supported')
-    if urlparse['hostname'] == None:
-      raise HttpUserInputError('Given URL error: host name is not given')
+  urlparse = urlparse_urlsplit(url)
+  if urlparse['scheme'] != 'http':
+    raise ValueError("URL doesn't seem to be for the HTTP protocol.")
+  if urlparse['hostname'] == None:
+    raise ValueError("Missing hostname.")
+  if urlparse['query'] is not None and urlparse['query'] != "":
+    raise ValueError("URL cannot include a query string.")
 
-    host = urlparse['hostname']
-    path = urlparse['path']
-    query = urlparse['query']
-    port = urlparse.get('port', 80)
+  host = urlparse['hostname']
+  path = urlparse['path']
+  port = urlparse.get('port', 80)
 
-    return (host, port, path, query)
+  return (host, port, path)
 
 
 
 
-def _httpretrieve_buildhttprequest(http_header, port, host, path, url_query,
-    dict_query, http_post):
-  # Sends the HTTP request.
+def _httpretrieve_buildhttprequest(httpheaders, port, host, path, \
+    querydata, postdata):
+  # Builds the HTTP request.
 
-  if http_post != None:
+  if postdata != None:
     # There is a posted data, use HTTP POST.
 
-    if not type(http_post) == dict:
-      raise HttpUserInputError('The given http_post is not a ' + \
-          'dictionary, given: ' + str(type(http_post)))
+    if type(postdata) is dict:
+      postdata = urllib_quote_parameters(postdata)
 
-    # Convert the dictionary of form values into a POST message body.
-    try:
-      http_post = urllib_quote_parameters(http_post)
-    except Exception, e:
-      raise HttpUserInputError('Error encoding the given http post ' + \
-          'dictionary ' + str(http_post) + str(e))
+    if type(postdata) is not str:
+      raise TypeError("postdata should be a dict of form data or string")
 
     # Build the minimal HTTP request header -- includes only the request
     # and the Host field.
-    httpheader = _httpretrieve_httprequestmain_header('POST', url_query, \
-        dict_query, path, host, port)
+    httpheader = _httpretrieve_httprequestmain_header('POST', querydata, \
+        path, host, port)
 
     # Build the rest of the request.
-    httpheader += _httpretrieve_parse_clienthttpheader(http_header)
-    httpheader += 'Content-Length: ' + str(len(http_post)) + '\r\n'
+    httpheader += _httpretrieve_parse_clienthttpheader(httpheaders)
+    httpheader += 'Content-Length: ' + str(len(postdata)) + '\r\n'
     httpheader += '\r\n'
-    httpheader += http_post
+    httpheader += postdata
 
   else:
     # There is no posted data, use HTTP GET.
-    httpheader = _httpretrieve_httprequestmain_header('GET', url_query, \
-        dict_query, path, host, port)
-    httpheader += _httpretrieve_parse_clienthttpheader(http_header)
+    httpheader = _httpretrieve_httprequestmain_header('GET', querydata, \
+        path, host, port)
+    httpheader += _httpretrieve_parse_clienthttpheader(httpheaders)
     httpheader += '\r\n'
 
-  # return header with a new line which is signal for http header is done
   return httpheader
 
 
 
 
-def _httpretrieve_httprequestmain_header(http_command, url_query, \
-    dict_query, path, host, port):
+def _httpretrieve_httprequestmain_header(http_command, querydata, path, \
+    host, port):
   # Builds a minimal HTTP request, returning it as a string.
 
-  # Sanity check -- the user should have only given us one set of data.
-  if url_query != '' and dict_query != None:
-    raise HttpUserInputError('Cant input a http query with the url and ' + \
-        'an extra parameter dictionary with a http query')
+  if type(querydata) is dict:
+    querydata = urllib_quote_parameters(querydata)
 
-  elif dict_query != None:
-    # Send form data via GET.
-    try:
-      encoded_query = '?' + urllib_quote_parameters(dict_query)
-    except Exception, e:
-      raise HttpUserInputError('Error encoding the given http ' + \
-          'query dictionary ' + str(dict_query) + str(e))
-
-  elif url_query != '':
-    # Send an arbitrary string via GET.
+  if type(querydata) is str and querydata != '':
     encoded_query = '?' + url_query
   else:
     encoded_query = ''
@@ -483,74 +415,44 @@ def _httpretrieve_httprequestmain_header(http_command, url_query, \
 
 
 
-def _httpretrieve_parse_clienthttpheader(http_header):
+def _httpretrieve_parse_clienthttpheader(httpheaders):
   # Converts a dictionary of HTTP request headers into a string.
 
-  if http_header == None:
+  if httpheaders is None:
     return ''
 
-  elif not type(http_header) == dict:
-    raise HttpUserInputError('The given http_post is not a dictionary, ' + \
-        'given: ' + str(type(http_header)))
+  elif type(httpheaders) is not dict:
+    raise TypeError("Expected HTTP headers as a dictionary.")
 
   else:
     clienthttpheader = ''
-    for key, val in http_header.items():
-      clienthttpheader += key + ' : ' + val + '\r\n'
+    for key, val in httpheaders.items():
+      clienthttpheader += key + ': ' + val + '\r\n'
     return clienthttpheader
 
 
 
 
-def _httpretrieve_sendhttprequest(sock, httpheader):
-  # Send the HTTP request; raise an exception on error.
-  try:
-    sock.send(httpheader)
-  except Exception, e:
-    sock.close()
-    raise HttpConnectionError('Connection error: on sending http ' + \
-        'request to server ' + str(e))
-
-
-
-
-def _httpretrieve_receive_httpheader(sock, header_timeout, httpheader_limit):
+def _httpretrieve_receive_httpheader(sock, timeout, currentruntime):
   # Receives the HTTP headers only. Returns them as a list of strings.
 
-  sock.settimeout(header_timeout)
+  if timeout is None:
+    sock.settimeout(0)
+  elif timeout - currentruntime <= 0:
+    raise SocketTimeoutError("Timed out")
+  else:
+    sock.settimeout(timeout - currentruntime)
 
   httpheader_received = 0
   httpheader = ''
   while True:
     # CRLFCRLF separates the HTTP headers from the body of the response.
-    if '\r\n\r\n' in httpheader:
+    if httpheader.endswith('\r\n\r\n'):
       return httpheader.split('\r\n')
 
-    # Against the HTTP spec, we also accept LFLF as a mark of reaching the
-    # end of the headers.
-    if '\n\n' in httpheader:
-      return httpheader.split('\n')
-
-    if httpheader_limit == httpheader_received:
-      sock.close()
-      raise HttpHeaderFormatError('Http header length Error: The http ' + \
-          'header is too long, exceeded 8 kb')
-
-    try:
-      content = sock.recv(1)
-      httpheader_received += 1
-
-    except SocketTimeoutError:
-      raise HttpHeaderReceivingError('Timeout Error on receiving ' + \
-          'header: server taking too long to send http header')
-
-    except Exception, e:
-      sock.close()
-      raise HttpHeaderReceivingError('Error on recieving http ' + \
-          'header: ' + str(e))
-
-    else:
-      httpheader += content
+    content = sock.recv(1)
+    httpheader_received += 1
+    httpheader += content
 
 
 
@@ -564,98 +466,30 @@ def _httpretrieve_get_httpstatuscode(httpHeaderLines):
   headersplit = httpstatusheader.split(' ', 2)
 
   if len(headersplit) != 3:
-    raise HttpHeaderFormatError('Invalid Http header status code ' + \
-        'format: Correct format is HTTP<version> http_status_number ' + \
-        'http_status_msg: Given '  + httpstatusheader)
+    raise HttpBrokenServerError("Server returned garbage for HTTP response.")
   if not httpstatusheader.startswith('HTTP'):
-    raise HttpHeaderFormatError('Invalid Http header status code ' + \
-        'format: Http header status code should start of with ' + \
-        'HTTP<version> but given: '  + httpstatusheader)
-
-  http_version = headersplit[0]
-
-  try:
-    int(headersplit[1])
-  except ValueError, e:
-    raise HttpHeaderFormatError('Invalid Http header status code ' + \
-        'format: Status number should be a int, Given: ' + \
-        str(headersplit[1]) + str(e))
-  else:
-    http_status_number = headersplit[1]
+    raise HttpBrokenServerError("Server returned garbage for HTTP response.")
 
   http_status_msg = headersplit[2]
-  return http_status_number, http_status_msg
+
+  try:
+    return (int(headersplit[1]), http_status_msg)
+  except ValueError, e:
+    raise HttpBrokenServerError("Server returned garbage for HTTP response.")
 
 
 
 
-def _httpretrieve_receive_httperror_content(sock, contentlength):
+def _httpretrieve_receive_httperror_content(sock):
   # Receive the error message (this is called when the server returns an
   # 'error' response).
 
   httperror_content = ''
   while True:
-    try:
-      content = sock.recv(1024)
+    content = sock.recv(1024)
+    httperror_content += content
 
-    except SocketTimeoutError:
-      raise HttpContentReceivingError('Timeout Error on receiving http ' + \
-          'error content: server taking too long to send http error content')
-    except Exception, e:
-      if 'Socket closed' not in str(e):
-        sock.close()
-        raise HttpContentReceivingError('Error on receiving http error ' + \
-            'content: ' + str(e))
-      break
-
-    else:
-      httperror_content += content
-
-  if contentlength != None:
-    if contentlength != len(httperror_content):
-      raise HttpContentLengthError('Error on receiving http error ' + \
-          'content: received conent length: ' + \
-          str(len(httperror_content)) + ' actual content length: ' + \
-          str(contentlength))
   return httperror_content
-
-
-
-
-def _httpretrieve_raise_httpstatuscode_error(http_status_number, http_status_msg, http_errorcontent):
-  # Raises an exception for the status code.
-
-  # Arbitrarily chosen individual status codes:
-  if http_status_number == '202':
-    raise HttpError202('Http response error: ' + http_status_number + ' ' + http_status_msg +  ' http proccesing not responding. Http error content: ' + http_errorcontent)
-  elif http_status_number == '204':
-    raise HttpError204('Http response error: ' + http_status_number + ' ' + http_status_msg +  ' thier is no http body content. Http error content: ' + http_errorcontent)
-  elif http_status_number == '300':
-    raise HttpError300('Http response error: ' + http_status_number + ' ' + http_status_msg +  ' multiple redirect isnt suported. Http error content: ' + http_errorcontent)
-  elif http_status_number == '404':
-    raise HttpError404('Http response error: ' + http_status_number + ' ' + http_status_msg +  ' cant find anything matching the given url. Http error content: ' + http_errorcontent)
-  elif http_status_number == '403':
-    raise HttpError403('Http response error: ' + http_status_number + ' ' + http_status_msg +  ' the request was illegal. Http error content: ' + http_errorcontent)
-  elif http_status_number == '400':
-    raise HttpError400('Http response error: ' + http_status_number + ' ' + http_status_msg +  ' the request contians bad syntex. Http error content: ' + http_errorcontent)
-  elif http_status_number == '500':
-    raise HttpError500('Http response error: ' + http_status_number + ' ' + http_status_msg +  ' The server encountered an unexpected condition. Http error content: ' + http_errorcontent)
-  elif http_status_number == '502':
-    raise HttpError502('Http response error: ' + http_status_number + ' ' + http_status_msg +  ' acting like a gateway received an invalid response. Http error content: ' + http_errorcontent)
-
-  # Ranges:
-  elif http_status_number >= '100' and http_status_number < '200':
-    raise HttpError1xx('Http response error: Information ' + http_status_number + ' ' + http_status_msg + '.Http error content: ' + http_errorcontent)
-  elif http_status_number > '200' and http_status_number < '300':
-    raise HttpError2xx('Http response error: success error ' + http_status_number + ' ' + http_status_msg + '.Http error content: ' + http_errorcontent)
-  elif http_status_number >= '300' and http_status_number < '400':
-    raise HttpError3xx('Http response error: Redirection error' + http_status_number + ' ' + http_status_msg + '.Http error content: ' + http_errorcontent)
-  elif http_status_number >= '400' and http_status_number < '500':
-    raise HttpError4xx('Http response error: client error ' + http_status_number + ' ' + http_status_msg + '.Http error content: ' + http_errorcontent)
-  elif http_status_number >= '500' and http_status_number < '600':
-    raise HttpError5xx('Http response error: server error: ' + http_status_number + ' ' + http_status_msg + '.Http error content: ' + http_errorcontent)
-  else:
-    raise HttpStatusCodeError('Http response error: invalid http status response, given ' + http_status_number + '.Http error content: ' + http_errorcontent)
 
 
 
@@ -665,15 +499,10 @@ def _httpretrieve_httpredirect(httpheaderlines):
 
   for headerline in httpheaderlines:
     if headerline.startswith('Location: '):
-      redirect = headerline[len('Location: '):]
+      return headerline[len('Location: '):]
 
-      if len(redirect) == 0:
-        raise HttpHeaderFormatError('Http header redirection format ' + \
-            'error: http server gave a redierect location with no URL')
-      return redirect
-
-  raise HttpHeaderFormatError('Http header redirection format error: ' + \
-      'http redirect header didnt include the location')
+  raise HttpBrokenServerError("HTTP server indicated a redirect and did " + \
+      "not send a Location header.")
 
 
 
@@ -683,18 +512,6 @@ def _httpretrieve_get_contentlength(httpheaderlines):
 
   for headerline in httpheaderlines:
     if headerline.startswith('Content-Length: '):
-      try:
-        contentlength = int(headerline[len('Content-Length: '):])
-      except ValueError, e:
-        raise HttpHeaderFormatError('Http header Content-Length format ' + \
-            'error: http server provided content length that isnt a int ' + \
-            str(e))
-
-      if contentlength <= 0:
-        raise HttpHeaderFormatError('Http header Content-Length format ' + \
-            'error: provided content length with invalid number ' + \
-            str(contentlength))
-      else:
-        return contentlength
+      return int(headerline[len('Content-Length: '):])
 
   return None
