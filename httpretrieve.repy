@@ -173,9 +173,15 @@ def httpretrieve_open(url, postdata=None, querydata=None, \
 
   headers_str = ""
   while True:
-    headers_str += sock.recv(1)
-    if headers_str.endswith("\r\n\r\n"):
-      break
+    try:
+      headers_str += sock.recv(1)
+      if headers_str.endswith("\r\n\r\n"):
+        break
+    except Exception, e:
+      if str(e) == "Socket closed":
+        break
+      else:
+        raise
 
   httpheaderlines = headers_str.split("\r\n")
   while httpheaderlines[-1] == "":
