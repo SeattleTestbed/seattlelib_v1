@@ -22,7 +22,7 @@ include urllib.repy
 
 
 
-class HttpConnectionError:
+class HttpConnectionError(Exception):
   """
   Error indicating that the web server has unexpectedly dropped the
   connection.
@@ -31,7 +31,7 @@ class HttpConnectionError:
 
 
 
-class HttpBrokenServerError:
+class HttpBrokenServerError(Exception):
   """
   Error indicating that the web server has sent us complete garbage instead
   of something resembling HTTP.
@@ -112,7 +112,7 @@ def httpretrieve_open(url, postdata=None, querydata=None, \
     raise ValueError("URL doesn't seem to be for the HTTP protocol.")
   if host is None:
     raise ValueError("Missing hostname.")
-  if parsedurl['query'] is not None and urlparse['query'] != "":
+  if parsedurl['query'] is not None and parsedurl['query'] != "":
     raise ValueError("URL cannot include a query string.")
 
   # Open connection to the web server
@@ -136,7 +136,7 @@ def httpretrieve_open(url, postdata=None, querydata=None, \
     postdata = ""
 
   if path == "":
-    path = "/"
+    raise ValueError("Invalid path -- empty string.")
   if type(querydata) is dict:
     querydata = urllib_quote_parameters(querydata)
   if type(querydata) is str and querydata != "":
@@ -145,12 +145,12 @@ def httpretrieve_open(url, postdata=None, querydata=None, \
     encquerydata = ""
 
   httpheader = method + ' ' + path + encquerydata + ' HTTP/1.0\r\n'
-  if "Host" not in httpheaders:
-    httpheader += "Host: " + host + ':' + port + "\r\n"
   if httpheaders is not None:
     if type(httpheaders) is not dict:
       raise TypeError("Expected HTTP headers as a dictionary.")
     else:
+      if "Host" not in httpheaders:
+        httpheader += "Host: " + host + ':' + port + "\r\n"
       for key, val in httpheaders.items():
         httpheader += key + ": " + val + '\r\n'
 
@@ -178,13 +178,15 @@ def httpretrieve_open(url, postdata=None, querydata=None, \
       break
 
   httpheaderlines = headers_str.split("\r\n")
+  while httpheaderlines[-1] == "":
+    httpheaderlines = httpheaderlines[:-1]
 
   # get the status code and status message from the HTTP response
   statusline, httpheaderlines = httpheaderlines[0], httpheaderlines[1:]
   headersplit = statusline.split(' ', 2)
   if len(headersplit) < 3:
     raise HttpBrokenServerError("Server returned garbage for HTTP response.")
-  if headersplit[0] != 'HTTP':
+  if not headersplit[0].startswith('HTTP'):
     raise HttpBrokenServerError("Server returned garbage for HTTP response.")
   statusmsg = headersplit[2]
   try:
@@ -349,7 +351,15 @@ class _httpretrieve_filelikeobject:
     # Try to read up to limit, or until there is nothing left.
     httpcontent = ''
     while True:
-      content = self._sock.recv(lefttoread or 4096)
+      try:
+        content = self._sock.recv(lefttoread or 4096)
+      except Exception, e:
+        if str(e) == "Socket closed":
+          self._totalcontentisreceived = True
+          break
+        else:
+          raise
+      
       httpcontent += content
       self._totalread += len(content)
       if limit is not None:
@@ -383,7 +393,10 @@ class _httpretrieve_filelikeobject:
       Nothing
     """
     self._fileobjclosed = True
-    self._sock.close()
+    try:
+      self._sock.close()
+    except Exception, e:
+      pass # don't care
 
 
 
@@ -414,9 +427,13 @@ def _httpretrieve_parse_responseheaders(headerlines):
           if lastheader not in res:
             res[lastheader] = []
           res[lastheader].append(lastheader_str.strip())
-        lastheader, lastheader_str = headerlines[i].split(":")
+        lastheader, lastheader_str = headerlines[i].split(":", 1)
       i += 1
       if i >= len(headerlines):
+        if lastheader is not None:
+          if lastheader not in res:
+            res[lastheader] = []
+          res[lastheader].append(lastheader_str.strip())
         break
     return res
   except IndexError, idx:
