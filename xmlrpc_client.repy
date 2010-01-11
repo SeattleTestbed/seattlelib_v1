@@ -102,12 +102,12 @@ class xmlrpc_client_Client(object):
     request_xml = xmlrpc_common_call2xml(method_name, params)
 
     response = httpretrieve_get_string("http://%s:%s%s" % (self.server_host, \
-        self.server_port, self.server_path), http_post=request_xml, \
-        header_timeout=timeout, content_timeout=timeout, http_header={\
+        self.server_port, self.server_path), postdata=request_xml, \
+        timeout=timeout, httpheaders={\
         "User-Agent": self.USER_AGENT, "Content-Type": "text/xml"})
 
     # Timeout if the POST took too long.
-    if getruntime() - starttime > timeout:
+    if timeout is not None and getruntime() - starttime > timeout:
       raise xmlrpc_common_Timeout()
 
     # Parse the XML response body into Python values.
