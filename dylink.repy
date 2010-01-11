@@ -41,7 +41,7 @@ if callfunc == "initialize":
   STOCK_API = set(["gethostname_ex","getmyip","recvmess","sendmess","openconn","waitforconn",
              "stopcomm","open","listdir","removefile","exitall","getlock","getruntime",
              "randomfloat","settimer","canceltimer","sleep","VirtualNamespace","get_thread_name",
-                  "dy_import_module","dy_import_module_symbols","dy_dispatch_module"])
+                   "getresources","dy_import_module","dy_import_module_symbols","dy_dispatch_module"])
 
   # Controls if we run the code preprocessor
   # If True, we will replace the old "include" directive, but this will cause a speed penalty
@@ -88,10 +88,14 @@ def _replace_include(code):
 #### Helper functions ####
 
 # Constructs a "default" context from the given context
-def _default_context(import_context):
+# Additional_globals can be an array of "extra" globals, which are
+# copied in addition to the STOCK_API
+def _default_context(import_context, additional_globals=[]):
   # Construct a new context based on the importer's context
   new_context = SafeDict()
-  for func in STOCK_API:
+  all_globals = set(additional_globals)
+  all_globals.update(STOCK_API)
+  for func in all_globals:
     if func in import_context:
       new_context[func] = import_context[func]
 
@@ -176,7 +180,7 @@ def _dy_module_code(module):
     try:
       virt = DylinkNamespace(code,module)
     except Exception, e:
-      raise Exception, "Failed to initialize the module! Got the following exception: '" + str(e) + "'"
+      raise Exception, "Failed to initialize the module ("+module+")! Got the following exception: '" + str(e) + "'"
     
     # Cache the module
     MODULE_CACHE[module] = virt
@@ -272,7 +276,7 @@ def dylink_import_global(module, module_context,new_callfunc="import"):
 
 
 # Packages the module being imported into a module like object
-def dylink_import_module(module,import_context, new_callfunc="import"):
+def dylink_import_module(module,import_context, new_callfunc="import", additional_globals=[]):
   """
   <Purpose>
     Imports modules dynamically into a bundles module like object.
@@ -288,6 +292,11 @@ def dylink_import_module(module,import_context, new_callfunc="import"):
           The value to use for callfunc during the import.
           Defaults to "import".
 
+    additional_globals:
+          An array of string globals which will be provided to the imported module.
+          E.g. if the current context defines "foo" and this should be made available
+          in addition to the Stock repy API, this can be provided as ["foo"]
+
   <Exceptions>
     Raises an exception if the module cannot be found, or if there is a problem
     initializing a VirtualNamespace around the module. See VirtualNamespace. See dylink_import_global. 
@@ -299,7 +308,7 @@ def dylink_import_module(module,import_context, new_callfunc="import"):
   module_name = _dy_module_name(module)
 
   # Construct a new context
-  new_context = _default_context(import_context)
+  new_context = _default_context(import_context, additional_globals)
 
   # Populate the context
   dylink_import_global(module_name, new_context, new_callfunc)
@@ -384,8 +393,8 @@ def init_dylink(import_context, child_context):
   """
 
   # Define closures around dy_* functions
-  def _dy_import_module(module,new_callfunc="import"):
-    return dylink_import_module(module,import_context,new_callfunc)
+  def _dy_import_module(module,new_callfunc="import",additional_globals=[]):
+    return dylink_import_module(module,import_context,new_callfunc,additional_globals)
 
   def _dy_import_global(module,new_callfunc="import"):
     return dylink_import_global(module,import_context,new_callfunc)
@@ -468,6 +477,8 @@ def get_DylinkNamespace(*args,**kwargs):
 if callfunc == "initialize":
   CHILD_CONTEXT["VirtualNamespace"] = get_DylinkNamespace
 
-# Evaluate the next module
-dylink_dispatch(CHILD_CONTEXT, _context)
+# DEPRECATING "exit" callfunc
+if callfunc != "exit":
+  # Evaluate the next module
+  dylink_dispatch(CHILD_CONTEXT, _context)
 
