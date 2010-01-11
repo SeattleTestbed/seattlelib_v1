@@ -49,7 +49,7 @@ if callfunc == 'initialize':
 
   try:
     # start up http retrieve to retieve the content from http server
-    recv_msg = httpretrieve_get_string('http://127.0.0.1:12345/', http_query=None, http_post=None, http_header=None, header_timeout=30, content_timeout=4)
+    recv_msg = httpretrieve_get_string('http://127.0.0.1:12345/', timeout=30)
 
   #catch the right Exception if there is a different exception print failed_error_msg
   except HttpContentReceivingError, e:

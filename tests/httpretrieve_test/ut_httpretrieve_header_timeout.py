@@ -30,10 +30,10 @@ if callfunc == 'initialize':
   # a timeout exception, print failed_error_msg
   failed_error_msg = 'Failed: HttpContentReceivingError should have raised a timeout exception'
   try:
-    recv_msg = httpretrieve_get_string('http://127.0.0.1:12345', http_query=None, http_post=None, http_header=None, header_timeout=5)  
+    recv_msg = httpretrieve_get_string('http://127.0.0.1:12345', timeout=5)  
 
   # catch the right Exception(HttpHeaderReceivingError) if there is a different exception print failed_error_msg
-  except HttpHeaderReceivingError, e:
+  except SocketTimeoutError, e:
     # check if the error message is correct    
     if 'Timeout Error on receiving header' not in str(e): 
       print failed_error_msg + ' :Raised: ' + str(e)  

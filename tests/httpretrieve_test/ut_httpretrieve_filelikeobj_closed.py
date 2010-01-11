@@ -35,10 +35,9 @@ if callfunc == 'initialize':
     filelikeobj.read()
 
   #catch the right Exception(HttpUserInputError) if there is a different exception print failed_error_msg
-  except HttpUserInputError, e:
+  except ValueError, e:
     # check if the error message is correct    
-    if 'filelikeobj is closed' not in str(e): 
-      print failed_error_msg + ' :Raised: ' + str(e) 
+    pass
   except Exception, e:
     print failed_error_msg + ' :Raised: ' + str(e)  
   else:

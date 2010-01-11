@@ -35,7 +35,7 @@ def client_request(client_conn):
 
 def httpresponse(sock):
   # sends response to http retrieve with a content length longer than the http header content length  
-  httpheader = 'HTTP/1.1 301 Moved Permanently\n\n'
+  httpheader = 'HTTP/1.1 301 Moved Permanently\r\n\r\n'
   # normal server should include the http redirect location over here 
 
   httpcontent = 'will not give the http redirect location' 
@@ -58,10 +58,7 @@ if callfunc == 'initialize':
     recv_msg = httpretrieve_get_string('http://127.0.0.1:12345/')
 
   #catch the right Exception if there is a different exception print failed_error_msg
-  except HttpHeaderFormatError, e:
-    # check if the error message is correct    
-    if 'http redirect header didnt include the location' not in str(e): 
-      print failed_error_msg + ' :Raised: ' + str(e)
+  except HttpBrokenServerError, e:
     pass  
   except Exception, e:
     print failed_error_msg + ' :Raised: ' + str(e)  
