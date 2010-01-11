@@ -135,9 +135,8 @@ def _DORadvertise_command(parameters, timeout=None):
   # the results we can glean from it.
 
   post_result = httpretrieve_get_string(DORadvertise_FORM_LOCATION, \
-      http_post=parameters, header_timeout=timeout, \
-      content_timeout=timeout, \
-      http_header={"Content-Type": "application/x-www-form-urlencoded"})
+      postdata=parameters, timeout=timeout, \
+      httpheaders={"Content-Type": "application/x-www-form-urlencoded"})
 
   # Parse the result to check for success. Throw several exceptions to
   # ensure the XML we're reading makes sense.
