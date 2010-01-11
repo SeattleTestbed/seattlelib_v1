@@ -106,7 +106,8 @@ def httpretrieve_open(url, postdata=None, querydata=None, \
   parsedurl = urlparse_urlsplit(url)
   host = parsedurl['hostname']
   path = parsedurl['path']
-  port = parsedurl.get('port', 80)
+  port = parsedurl.get('port')
+  port = port or 80
 
   if parsedurl['scheme'] != 'http':
     raise ValueError("URL doesn't seem to be for the HTTP protocol.")
