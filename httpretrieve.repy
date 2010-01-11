@@ -150,7 +150,7 @@ def httpretrieve_open(url, postdata=None, querydata=None, \
       raise TypeError("Expected HTTP headers as a dictionary.")
     else:
       if "Host" not in httpheaders:
-        httpheader += "Host: " + host + ':' + port + "\r\n"
+        httpheader += "Host: " + host + ':' + str(port) + "\r\n"
       for key, val in httpheaders.items():
         httpheader += key + ": " + val + '\r\n'
 
