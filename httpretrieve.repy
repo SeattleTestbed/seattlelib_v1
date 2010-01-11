@@ -250,8 +250,8 @@ def httpretrieve_save_file(url, filename, querydata=None, postdata=None, \
   httpcontent = ''
   newfile = open(filename, 'w')
 
-  http_obj = httpretrieve_open(url, querydata, postdata, httpheaders, \
-      timeout)
+  http_obj = httpretrieve_open(url, querydata=querydata, postdata=postdata, \
+      httpheaders=httpheaders, timeout=timeout)
 
   # Read from the file-like HTTP object into our file.
   while True:
@@ -287,8 +287,8 @@ def httpretrieve_get_string(url, querydata=None, postdata=None, \
     Returns the body of the HTTP response (no headers).
   """
 
-  http_obj = httpretrieve_open(url, querydata, postdata, httpheaders, \
-      timeout)
+  http_obj = httpretrieve_open(url, querydata=querydata, postdata=postdata, \
+      httpheaders=httpheaders, timeout=timeout)
   httpcontent = http_obj.read()
   http_obj.close()
   return httpcontent
