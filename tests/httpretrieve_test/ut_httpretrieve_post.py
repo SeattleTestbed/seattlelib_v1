@@ -4,11 +4,8 @@
 # prints failed error msg if httpretrieve failes the test and just excutes if the
 # test pass's the test
 
-
 include httpretrieve.repy
 include registerhttpcallback.repy
-include urllib.repy
-
 
 
 def server_test_content(httprequest_dictionary, http_query, http_post):
@@ -32,7 +29,7 @@ if callfunc == 'initialize':
 
   try:
     # use httpretrieve to retrieve the content form the server.(which is the posted data)  
-    recv_msg = httpretrieve_get_string('http://127.0.0.1:12345', postdata=http_post)   
+    recv_msg = httpretrieve_get_string('http://127.0.0.1:12345', None, http_post)   
 
   except Exception, e:
     print 'Http retrieve failed on receiving content, Raised: ' + str(e)
