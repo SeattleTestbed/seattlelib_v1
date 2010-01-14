@@ -11,7 +11,8 @@ include httpretrieve.repy
 
 def test_redirect(httprequest_dictionary, http_query, http_post):
   # server that redirects to a different server(http://127.0.0.2:12345)   
-  raise HttpError302('http://127.0.0.2:12345')
+  return ['redirecting too http://127.0.0.2:12345', {'Location': 'http://127.0.0.2:12345'}, 301]
+
 
 def test_redirected(httprequest_dictionary, http_query, http_post):
  # normal server that sends a content  

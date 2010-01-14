@@ -11,8 +11,8 @@ include httpretrieve.repy
 
 
 def test_callbackfunc_error(httprequest_dictionary, http_query, http_post):
-  # server that raises an exception    
-  raise HttpError404('The file no longer exists')
+  # server sends a 404 error to the client    
+  return['The file no longer exists', None, 404]
    
 
     
