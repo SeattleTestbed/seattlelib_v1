@@ -52,7 +52,7 @@ class _httpserver_ServerError(Exception):
 
 
 
-class _httpserver_BadTransferEncoding(Exception):
+class _httpserver_BadTransferCoding(Exception):
   # Raised internally when the request's encoding is something we can't
   # handle (most everything at the time of writing).
   pass
@@ -172,8 +172,8 @@ def _httpserver_socketcb(remoteip, remoteport, sock, ch, listench, httpdid):
       try:
         result = cbfunc(reqinfo)
       except Exception, e:
-        raise _httpserver_ServerError("httpserver: Callback function raised an " + \
-            "exception: " + str(e))
+        raise _httpserver_ServerError("httpserver: Callback function " + \
+            "raised an exception: " + str(e))
 
       # Interpret result of callback function
       try:
@@ -183,8 +183,8 @@ def _httpserver_socketcb(remoteip, remoteport, sock, ch, listench, httpdid):
         headers = result['headers']
         message = result['message']
       except:
-        raise _httpserver_ServerError("httpserver: Callback function returned " + \
-            "malformed dictionary")
+        raise _httpserver_ServerError("httpserver: Callback function " + \
+            "returned malformed dictionary")
 
       if reqinfo['version'] == "1.0" and version == "1.1":
         version = "1.0"
@@ -206,6 +206,8 @@ def _httpserver_socketcb(remoteip, remoteport, sock, ch, listench, httpdid):
         response = "HTTP/1.1 " + str(statuscode) + " " + statusmsg + "\r\n"
         for key, val in headers.items():
           response += key + ": " + val + "\r\n"
+        if "Content-Length" not in headers:
+          response += "Content-Length: %d\r\n" % len(message)
         response += "\r\n"
         response += message
         try:
@@ -220,19 +222,21 @@ def _httpserver_socketcb(remoteip, remoteport, sock, ch, listench, httpdid):
 
     except _httpserver_BadRequest, br:
       response = "HTTP/1.0 400 Bad Request\r\n" + \
-          "Content-Type: text/plain\r\n\r\n" + str(br)
+          "Content-Type: text/plain\r\n\r\n" + str(br) + "\r\n"
       _httpserver_sendAll(sock, response, besteffort=True)
       break
     
     except _httpserver_ServerError, se:
       response = "HTTP/1.0 500 Internal Server Error\r\n" + \
-          "Content-Type: text/plain\r\n\r\n" + str(se)
+          "Content-Type: text/plain\r\n\r\n" + str(se) + "\r\n"
       _httpserver_sendAll(sock, response, besteffort=True)
       break
     
-    except _httpserver_BadTransferEncoding, bte:
+    except _httpserver_BadTransferCoding, bte:
       response = "HTTP/1.1 510 Unimplemented\r\n" + \
-          "Content-Type: text/plain\r\n\r\n" + str(bte)
+          ("Content-Length: %d\r\n" % (len(str(bte)) + 2)) + \
+          "Connection: close\r\n" + \
+          "Content-Type: text/plain\r\n\r\n" + str(bte) + "\r\n"
       _httpserver_sendAll(sock, response, besteffort=True)
       break
 
@@ -346,16 +350,17 @@ def _httpserver_getHTTPbody(sock, data, verb, headers):
   # Deal with methods that cannot send a message body:
   if verb in ("GET", "HEAD", "TRACE", "DELETE"):
     if "Content-Length" in headers or "Transfer-Encoding" in headers:
-      raise _httpserver_BadRequest("Method '%s' cannot send an entity-body and " + \
-          "therefore a Content-Length or Transfer-Encoding header is " + \
-          "invalid." % verb)
+      raise _httpserver_BadRequest("Method '" + verb + "' cannot send " + \
+          "an entity-body and therefore a Content-Length or " + \
+          "Transfer-Encoding header is invalid.")
     else:
       return (None, data)
 
   # Deal with methods that send a message body.
   if "Content-Length" not in headers and "Transfer-Encoding" not in headers:
-    raise _httpserver_BadRequest("Method '%s' can send an entity-body and " + \
-        "requires a Content-Length or Transfer-Encoding header." % verb)
+    raise _httpserver_BadRequest("Method '" + str(verb) + "' can send an " + \
+        "entity-body and requires a Content-Length or Transfer-Encoding " + \
+        "header.")
 
   rawdata = data
   if "Transfer-Encoding" in headers:
@@ -378,8 +383,8 @@ def _httpserver_getHTTPbody(sock, data, verb, headers):
         realcodings.append(coding)
     
     if len(realcodings) > 1 or realcodings[0] != "chunked":
-      raise _BadTransferCoding("Cannot handle any transfer codings " + \
-          "other than chunked.")
+      raise _httpserver_BadTransferCoding("Cannot handle any transfer " + \
+          "codings other than chunked.")
 
     # Loop through chunks
     data = ""
@@ -426,9 +431,10 @@ def _httpserver_getHTTPbody(sock, data, verb, headers):
     msglen = headers["Content-Length"]
 
     if len(msglen) != 1:
-      raise _httpserver_BadRequest("Multiple Content-Length headers is unacceptable.")
+      raise _httpserver_BadRequest("Multiple Content-Length headers is " + \
+          "unacceptable.")
     
-    msglen = msglen[0]
+    msglen = int(msglen[0])
     return _httpserver_getblock(msglen, sock, rawdata)
 
 
@@ -437,13 +443,19 @@ def _httpserver_getHTTPbody(sock, data, verb, headers):
 def _httpserver_getline(sock, data):
   # Reads a line out of data (if possible), or failing that, gets more from
   # the socket. Returns (line, extra).
-  newdata = ""
-  while True:
-    end = data.find("\n", -len(newdata))
-    if end != -1:
-      return (data[:end], data[end+1:])
-    newdata = sock.recv(4096)
-    data += newdata
+
+  try:
+    newdata = ""
+    while True:
+      end = data.find("\n", -len(newdata))
+      if end != -1:
+        return (data[:end], data[end+1:])
+      newdata = sock.recv(4096)
+      data += newdata
+  except Exception, e:
+    if "Socket closed" in str(e) and len(data) != 0:
+      return (data, "")
+    raise
 
 
 
@@ -452,10 +464,15 @@ def _httpserver_getblock(size, sock, data):
   # Reads a block of size size out of data (if possible), or failing that,
   # gets more from the socket. Returns (block, extra).
 
-  while len(data) < size:
-    data += sock.recv(4096)
+  try:
+    while len(data) < size:
+      data += sock.recv(4096)
 
-  return (data[:size], data[size:])
+    return (data[:size], data[size:])
+  except Exception, e:
+    if "Socket closed" in str(e) and len(data) != 0:
+      return (data, "")
+    raise
 
 
 
