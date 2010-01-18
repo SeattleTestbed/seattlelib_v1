@@ -424,6 +424,10 @@ def _httpretrieve_parse_responseheaders(headerlines):
   lastheader = None
   lastheader_str = ""
   res = {}
+  
+  if len(headerlines) == 0:
+    return {}
+
   try:
     while True:
       # non-CRLF whitespace characters
