@@ -90,11 +90,12 @@ def _replace_include(code):
 # Constructs a "default" context from the given context
 # Additional_globals can be an array of "extra" globals, which are
 # copied in addition to the STOCK_API
-def _default_context(import_context, additional_globals=[]):
+def _default_context(import_context, additional_globals=None):
   # Construct a new context based on the importer's context
   new_context = SafeDict()
-  all_globals = set(additional_globals)
-  all_globals.update(STOCK_API)
+  all_globals = set(STOCK_API)
+  if additional_globals is not None:
+    all_globals.update(additional_globals)
   for func in all_globals:
     if func in import_context:
       new_context[func] = import_context[func]
@@ -276,7 +277,7 @@ def dylink_import_global(module, module_context,new_callfunc="import"):
 
 
 # Packages the module being imported into a module like object
-def dylink_import_module(module,import_context, new_callfunc="import", additional_globals=[]):
+def dylink_import_module(module,import_context, new_callfunc="import", additional_globals=None):
   """
   <Purpose>
     Imports modules dynamically into a bundles module like object.
@@ -393,7 +394,7 @@ def init_dylink(import_context, child_context):
   """
 
   # Define closures around dy_* functions
-  def _dy_import_module(module,new_callfunc="import",additional_globals=[]):
+  def _dy_import_module(module,new_callfunc="import",additional_globals=None):
     return dylink_import_module(module,import_context,new_callfunc,additional_globals)
 
   def _dy_import_global(module,new_callfunc="import"):
