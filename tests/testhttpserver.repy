@@ -118,13 +118,85 @@ def test4():
 
 
 
+def test5():
+  # Test a basic chunked HTTP/1.1 PUT request
+  test5 = \
+      "PUT /test5 HTTP/1.1\r\n" + \
+      "Connection: close\r\n" + \
+      "Transfer-Encoding: chunked\r\n" + \
+      "\r\n" + \
+      "A\r\n" + \
+      "1234567890\r\n" + \
+      "0\r\n" + \
+      "\r\n"
+
+  test5exp = \
+      "HTTP/1.1 200 OK\r\n" + \
+      "Content-Type: text/html\r\n" + \
+      "Content-Length: 7\r\n" + \
+      "\r\n" + \
+      "/test5\n"
+
+  return (test5, test5exp)
+
+
+
+def test6():
+  # Test a more complex chunked HTTP/1.1 POST request
+  test6 = \
+      "POST /test6 HTTP/1.1\r\n" + \
+      "Connection: close\r\n" + \
+      "Transfer-Encoding: chunked\r\n" + \
+      "\r\n" + \
+      "2\r\n" + \
+      "12\r\n" + \
+      "5\r\n" + \
+      "12345\r\n" + \
+      "0\r\n" + \
+      "\r\n"
+
+  test6exp = \
+      "HTTP/1.1 200 OK\r\n" + \
+      "Content-Type: text/html\r\n" + \
+      "Content-Length: 9\r\n" + \
+      "\r\n" + \
+      "/test6\n" + \
+      "7\n"
+
+  return (test6, test6exp)
+
+
+
+def test7():
+  # Tests correct RFC 822 header handling
+  test7 = \
+      "GET /test7 HTTP/1.1\r\n" + \
+      "Connection:\r\n" + \
+      "    close\r\n" + \
+      "Content-Type: who cares?\r\n" + \
+      "Accept-Encoding:\r\n" + \
+      "\t*\r\n" + \
+      "X-Foobar-Hdr: Baz\r\n" + \
+      "\r\n"
+
+  test7exp = \
+      "HTTP/1.1 200 OK\r\n" + \
+      "Content-Type: text/html\r\n" + \
+      "Content-Length: 7\r\n" + \
+      "\r\n" + \
+      "/test7\n"
+
+  return (test7, test7exp)
+
+
+
 
 
 def tests():
   id = httpserver_registercallback(('127.0.0.1', 12345), func1)
 
   failed = []
-  for test in [test1, test2, test3, test4]:
+  for test in [test1, test2, test3, test4, test5, test6, test7]:
     a = openconn('127.0.0.1', 12345)
     send, expected = test()
     sendall(a, send)
