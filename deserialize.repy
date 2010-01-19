@@ -224,7 +224,7 @@ def deserialize_removeStringObjects(strIn, partitions):
 
 # Removes all lists and dictionary objects from the string, begins deserializing
 # objects from the innermost depth upward
-def deserialize_removeObjects(strIn, partitions=[]):  
+def deserialize_removeObjects(strIn, partitions):  
   # Find all the sub objects
   subObjs = deserialize_findSubObjs(strIn)
   
