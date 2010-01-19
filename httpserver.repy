@@ -212,8 +212,10 @@ def _httpserver_socketcb(remoteip, remoteport, sock, ch, listench, httpdid):
         response += message
         try:
           _httpserver_sendAll(sock, response)
-          if "Connection" in headers and "close" in headers["Connection"]:
-            break
+          if ("Connection" in headers and "close" == headers["Connection"]) \
+              or ("Connection" in reqinfo['headers'] and "close" in \
+              reqinfo['headers']["Connection"]):
+                break
         except:
           break
       else:
@@ -335,7 +337,6 @@ def _httpserver_sendAll(sock, data, besteffort=False):
   try:
     while len(data) > 0:
       data = data[sock.send(data):]
-      sleep(0.1)
   except:
     if not besteffort:
       raise

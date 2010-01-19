@@ -1,0 +1,151 @@
+"""
+httpserver.repy unit tests
+"""
+
+
+
+include httpserver.repy
+
+
+
+def func1(info):
+  # Basic callback function
+  res = {}
+  res["version"] = "1.1"
+  res["statuscode"] = 200
+  res["statusmsg"] = "OK"
+  res["headers"] = {"Content-Type": "text/html"}
+  res["message"] = str(info['path']) + "\n"
+  if info['verb'] == "POST":
+    res["message"] += str(len(info["poststr"])) + "\n"
+  return res
+
+
+
+def sendall(sock, data):
+  while len(data) > 0:
+    data = data[sock.send(data):]
+
+
+
+def recvall(sock):
+  data = ""
+  try:
+    while True:
+      data += sock.recv(4096)
+  except Exception, e:
+    if "Socket closed" in str(e):
+      return data
+    raise
+
+
+
+def test1():
+  # Test a basic HTTP/1.0 GET request
+  test1 = \
+      "GET /test1 HTTP/1.0\r\n" + \
+      "\r\n"
+
+  test1exp = \
+      "HTTP/1.0 200 OK\r\n" + \
+      "Content-Type: text/html\r\n" + \
+      "\r\n" + \
+      "/test1\n"
+
+  return (test1, test1exp)
+
+
+
+def test2():
+  # Test a basic HTTP/1.0 POST request
+  test2 = \
+      "POST /test2 HTTP/1.0\r\n" + \
+      "Content-Length: 5\r\n" + \
+      "\r\n" + \
+      "12345"
+
+  test2exp = \
+      "HTTP/1.0 200 OK\r\n" + \
+      "Content-Type: text/html\r\n" + \
+      "\r\n" + \
+      "/test2\n" + \
+      "5\n"
+
+  return (test2, test2exp)
+
+
+
+def test3():
+  # Test a basic HTTP/1.1 GET request
+  test3 = \
+      "GET /test3 HTTP/1.1\r\n" + \
+      "Connection: close\r\n" + \
+      "\r\n"
+
+  test3exp = \
+      "HTTP/1.1 200 OK\r\n" + \
+      "Content-Type: text/html\r\n" + \
+      "Content-Length: 7\r\n" + \
+      "\r\n" + \
+      "/test3\n"
+
+  return (test3, test3exp)
+
+
+
+def test4():
+  # Test two pipelined HTTP/1.1 GET requests
+  test4 = \
+      "GET /test4a HTTP/1.1\r\n" + \
+      "\r\n" + \
+      "GET /test4b HTTP/1.1\r\n" + \
+      "Connection: close\r\n" + \
+      "\r\n"
+
+  test4exp = \
+      "HTTP/1.1 200 OK\r\n" + \
+      "Content-Type: text/html\r\n" + \
+      "Content-Length: 8\r\n" + \
+      "\r\n" + \
+      "/test4a\n" + \
+      "HTTP/1.1 200 OK\r\n" + \
+      "Content-Type: text/html\r\n" + \
+      "Content-Length: 8\r\n" + \
+      "\r\n" + \
+      "/test4b\n"
+
+  return (test4, test4exp)
+
+
+
+
+
+def tests():
+  id = httpserver_registercallback(('127.0.0.1', 12345), func1)
+
+  failed = []
+  for test in [test1, test2, test3, test4]:
+    a = openconn('127.0.0.1', 12345)
+    send, expected = test()
+    sendall(a, send)
+    actual = recvall(a)
+    try:
+      assert (actual == expected)
+    except AssertionError, ae:
+      failed.append((str(test), expected, actual))
+    a.close()
+
+  httpserver_stopcallback(id)
+
+  for failure in failed:
+    print "A test failed:"
+    print failure[0]
+    print "Expected:"
+    print failure[1]
+    print "Actual:"
+    print failure[2]
+
+
+
+if callfunc == "initialize":
+  tests()
