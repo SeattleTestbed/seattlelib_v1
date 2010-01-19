@@ -190,13 +190,94 @@ def test7():
 
 
 
+def test8():
+  # Tests HTTP/0.9 requests (we handle these as misformed requests)
+  test8 = \
+      "GET /test8\r\n"
+
+  test8exp = \
+      "HTTP/1.0 400 Bad Request\r\n" + \
+      "Content-Type: text/plain\r\n" + \
+      "\r\n" + \
+      "HTTP/0.9 or malformed request.\r\n"
+
+  return (test8, test8exp)
+
+
+
+def test9():
+  # Tests some garbage
+  test9 = \
+      "12315125021453\r\n23042086235"
+
+  test9exp = \
+      "HTTP/1.0 400 Bad Request\r\n" + \
+      "Content-Type: text/plain\r\n" + \
+      "\r\n" + \
+      "HTTP/0.9 or malformed request.\r\n"
+
+  return (test9, test9exp)
+
+
+
+def test10():
+  # Tests handling of Content-Length + Transfer-Encoding.
+  # (This is against the spec, but HTTP/1.1 servers *should* ignore
+  # Content-Length and follow Transfer-Encoding.)
+  test10 = \
+      "POST /test10 HTTP/1.1\r\n" + \
+      "Transfer-Encoding: chunked\r\n" + \
+      "Content-Length: 10\r\n" + \
+      "Connection: close\r\n" + \
+      "\r\n" + \
+      "1C\r\n" + \
+      "1234567890123456789012345678\r\n" + \
+      "0\r\n" + \
+      "\r\n"
+
+  test10exp = \
+      "HTTP/1.1 200 OK\r\n" + \
+      "Content-Type: text/html\r\n" + \
+      "Content-Length: 11\r\n" + \
+      "\r\n" + \
+      "/test10\n28\n"
+
+  return (test10, test10exp)
+
+
+
+def test11():
+  # Tests handling of unsupported Transfer-Encodings.
+  test11 = \
+      "POST /test11 HTTP/1.1\r\n" + \
+      "Transfer-Encoding: gzip, chunked\r\n" + \
+      "Connection: close\r\n" + \
+      "\r\n" + \
+      "1C\r\n" + \
+      "1234567890123456789012345678\r\n" + \
+      "0\r\n" + \
+      "\r\n"
+
+  test11exp = \
+      "HTTP/1.1 501 Not Implemented\r\n" + \
+      "Content-Length: 56\r\n" + \
+      "Connection: close\r\n" + \
+      "Content-Type: text/plain\r\n" + \
+      "\r\n" + \
+      "Cannot handle any transfer-codings other than chunked.\r\n"
+
+  return (test11, test11exp)
+
+
+
 
 
 def tests():
   id = httpserver_registercallback(('127.0.0.1', 12345), func1)
 
   failed = []
-  for test in [test1, test2, test3, test4, test5, test6, test7]:
+  for test in [test1, test2, test3, test4, test5, test6, test7, test8, \
+      test9, test10, test11]:
     a = openconn('127.0.0.1', 12345)
     send, expected = test()
     sendall(a, send)

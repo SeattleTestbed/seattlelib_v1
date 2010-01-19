@@ -235,7 +235,7 @@ def _httpserver_socketcb(remoteip, remoteport, sock, ch, listench, httpdid):
       break
     
     except _httpserver_BadTransferCoding, bte:
-      response = "HTTP/1.1 510 Unimplemented\r\n" + \
+      response = "HTTP/1.1 501 Not Implemented\r\n" + \
           ("Content-Length: %d\r\n" % (len(str(bte)) + 2)) + \
           "Connection: close\r\n" + \
           "Content-Type: text/plain\r\n\r\n" + str(bte) + "\r\n"
@@ -269,6 +269,7 @@ def _httpserver_readHTTPheader(sock, data):
   # (data_before, data_after).
 
   headers = []
+  command = True
   while True:
     line, data = _httpserver_getline(sock, data)
     if len(line) == 0:
@@ -277,6 +278,11 @@ def _httpserver_readHTTPheader(sock, data):
     # Be a well-behaved server, and handle normal newlines and telnet-style
     # newlines in the same fashion.
     line = line.rstrip("\r")
+    if command:
+      splitln = line.split(" ", 2)
+      if len(splitln) < 3:
+        raise _httpserver_BadRequest("HTTP/0.9 or malformed request.")
+      command = False
 
     if len(line) == 0:
       break
@@ -384,7 +390,7 @@ def _httpserver_getHTTPbody(sock, data, verb, headers):
         realcodings.append(coding)
     
     if len(realcodings) > 1 or realcodings[0] != "chunked":
-      raise _httpserver_BadTransferCoding("Cannot handle any transfer " + \
+      raise _httpserver_BadTransferCoding("Cannot handle any transfer-" + \
           "codings other than chunked.")
 
     # Loop through chunks
