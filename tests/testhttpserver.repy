@@ -270,6 +270,24 @@ def test11():
 
 
 
+def test12():
+  # Wrong protocol!
+  test12 = \
+      "210 PORT EHLO\r\n"
+
+  test12exp = \
+      "HTTP/1.0 400 Bad Request\r\n" + \
+      "Content-Type: text/plain\r\n" + \
+      "\r\n" + \
+      "Malformed request.\r\n"
+
+  return (test12, test12exp)
+
+
+
+
+
+
 
 
 def tests():
@@ -277,7 +295,7 @@ def tests():
 
   failed = []
   for test in [test1, test2, test3, test4, test5, test6, test7, test8, \
-      test9, test10, test11]:
+      test9, test10, test11, test12]:
     a = openconn('127.0.0.1', 12345)
     send, expected = test()
     sendall(a, send)

@@ -279,9 +279,11 @@ def _httpserver_readHTTPheader(sock, data):
     # newlines in the same fashion.
     line = line.rstrip("\r")
     if command:
-      splitln = line.split(" ", 2)
-      if len(splitln) < 3:
+      splitln = line.split(" ")
+      if len(splitln) != 3:
         raise _httpserver_BadRequest("HTTP/0.9 or malformed request.")
+      if not splitln[2].lower().startswith("http/1."):
+        raise _httpserver_BadRequest("Malformed request.")
       command = False
 
     if len(line) == 0:
