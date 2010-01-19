@@ -182,7 +182,7 @@ def _try_advertise_lookup(args):
 
 
 
-def advertise_lookup(key, maxvals=100, lookuptype=['central','opendht','DOR'], \
+def advertise_lookup(key, maxvals=100, lookuptype=None, \
     concurrentevents=2, graceperiod=10, timeout=60):
   """
   <Purpose>
@@ -219,6 +219,9 @@ def advertise_lookup(key, maxvals=100, lookuptype=['central','opendht','DOR'], \
   <Returns>
     All unique values stored at the key.
   """
+
+  if lookuptype is None:
+    lookuptype = ['central','opendht','DOR']
 
   parallel_worksets = []
   start_time = getruntime()
