@@ -154,7 +154,7 @@ def _DORadvertise_command(parameters, timeout=None):
   # values from the server.
   error_msg = ""
   error = None
-  values = None
+  values = []
 
   for xmlchild in xmltree.children:
     # Read the numeric error code.
