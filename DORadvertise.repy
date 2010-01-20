@@ -167,7 +167,6 @@ def _DORadvertise_command(parameters, timeout=None):
 
     # We found a <values> tag. Let's try and get some values.
     elif xmlchild.tag_name == "values" and xmlchild.children is not None:
-      values = []
       for valuenode in xmlchild.children:
         if valuenode.tag_name != "value":
           raise DORadvertise_XMLError(
