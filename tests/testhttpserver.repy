@@ -17,7 +17,7 @@ def func1(info):
   res["headers"] = {"Content-Type": "text/html"}
   res["message"] = str(info['path']) + "\n"
   if info['verb'] == "POST":
-    res["message"] += str(len(info["poststr"])) + "\n"
+    res["message"] += str(len(info["datastream"].read())) + "\n"
   return res
 
 

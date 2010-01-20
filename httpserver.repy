@@ -86,10 +86,11 @@ def httpserver_registercallback(socket, cbfunc):
           'querystr': 'foo=bar&baz',
           'querydict': { 'foo': 'bar', 'baz': None }
           'version': '0.9',
-          'poststr': 'BAR',
-          'postdict': { 'BAR': None },
+          'datastream': object with a file-like read() method,
           'headers': { 'Content-Type': 'application/x-xmlrpc-data'}
         }
+      ('datastream' is a stream of any HTTP message body data sent by the
+      client.)
 
       It is expected that this callback function returns a dictionary of:
         {
@@ -158,15 +159,9 @@ def _httpserver_socketcb(remoteip, remoteport, sock, ch, listench, httpdid):
       # Read HTTP request off the socket
       headerdata, extradata = _httpserver_readHTTPheader(sock, extradata)
       reqinfo = _httpserver_parseHTTPheader(headerdata)
-      messagebody, extradata = _httpserver_getHTTPbody(sock, extradata, \
-          reqinfo['verb'], reqinfo['headers'])
-
-      # Try and decode POSTed form data
-      reqinfo['poststr'] = messagebody
-      try:
-        reqinfo['postdict'] = urllib_unquote_parameters(messagebody)
-      except:
-        reqinfo['postdict'] = None
+      messagebodystream = _httpserver_bodystream(sock, \
+          extradata, reqinfo['verb'], reqinfo['headers'])
+      reqinfo['datastream'] = messagebodystream
 
       # Send request to callback
       try:
@@ -174,6 +169,8 @@ def _httpserver_socketcb(remoteip, remoteport, sock, ch, listench, httpdid):
       except Exception, e:
         raise _httpserver_ServerError("httpserver: Callback function " + \
             "raised an exception: " + str(e))
+
+      extradata = messagebodystream.get_extra()
 
       # Interpret result of callback function
       try:
@@ -352,103 +349,6 @@ def _httpserver_sendAll(sock, data, besteffort=False):
 
 
 
-def _httpserver_getHTTPbody(sock, data, verb, headers):
-  # Reads the rest of the HTTP request from the socket, erroring
-  # appropriately. Understands transfer-coding.
-
-  # Deal with methods that cannot send a message body:
-  if verb in ("GET", "HEAD", "TRACE", "DELETE"):
-    if "Content-Length" in headers or "Transfer-Encoding" in headers:
-      raise _httpserver_BadRequest("Method '" + verb + "' cannot send " + \
-          "an entity-body and therefore a Content-Length or " + \
-          "Transfer-Encoding header is invalid.")
-    else:
-      return (None, data)
-
-  # Deal with methods that send a message body.
-  if "Content-Length" not in headers and "Transfer-Encoding" not in headers:
-    raise _httpserver_BadRequest("Method '" + str(verb) + "' can send an " + \
-        "entity-body and requires a Content-Length or Transfer-Encoding " + \
-        "header.")
-
-  rawdata = data
-  if "Transfer-Encoding" in headers:
-    # Decode Transfer-coded messages
-    if len(headers["Transfer-Encoding"]) != 1:
-      raise _httpserver_BadRequest("Multiple Transfer-Encoding headers is " + \
-          "unacceptable.")
-
-    # "chunked" must be in the codings list, and it must be last.
-    codings = headers["Transfer-Encoding"][0].split(",")
-    codings.reverse()
-
-    realcodings = []
-
-    # Strip 'identity' codings.
-    for coding in codings:
-      coding = coding.strip().lower()
-      token = coding.split(None, 1)
-      if token != "identity":
-        realcodings.append(coding)
-    
-    if len(realcodings) > 1 or realcodings[0] != "chunked":
-      raise _httpserver_BadTransferCoding("Cannot handle any transfer-" + \
-          "codings other than chunked.")
-
-    # Loop through chunks
-    data = ""
-    while True:
-      line, rawdata = _httpserver_getline(sock, rawdata)
-      chunksz = int(line.split(";", 1)[0].strip(), 16)
-
-      if chunksz == 0:
-        break
-
-      chunk, rawdata = _httpserver_getblock(chunksz+2, sock, rawdata)
-      data += chunk[:-2]  # remove CRLF
-
-    # Read 'trailer' headers.
-    while True:
-      line, rawdata = _httpserver_getline(sock, rawdata)
-      if len(line.strip("\r")) == 0:
-        break
-      # Check for a multi-line header by peeking ahead:
-      while True:
-        nextchar, rawdata = _httpserver_getblock(1, sock, rawdata)
-        rawdata = nextchar + rawdata
-        if nextchar in (" ", "\t"):
-          line2, rawdata = _httpserver_getline(sock, rawdata)
-          line += " " + line2
-        else:
-          break
-
-      # Insert header into existing headers
-      hdrname, hdrval = line.split(":", 1)
-      if hdrname not in headers:
-        headers[hdrname] = []
-      headers[hdrname].append(hdrval)
-
-    # Set new content-length, remove transfer-encoding.
-    headers["Content-Length"] = [len(data)]
-    del headers["Transfer-Encoding"]
-
-    return (data, rawdata)
-
-  else:
-    # If we get here, that means we have a Content-Length and no Transfer-
-    # Encoding, so we can read the message body directly.
-    msglen = headers["Content-Length"]
-
-    if len(msglen) != 1:
-      raise _httpserver_BadRequest("Multiple Content-Length headers is " + \
-          "unacceptable.")
-    
-    msglen = int(msglen[0])
-    return _httpserver_getblock(msglen, sock, rawdata)
-
-
-
-
 def _httpserver_getline(sock, data):
   # Reads a line out of data (if possible), or failing that, gets more from
   # the socket. Returns (line, extra).
@@ -512,3 +412,225 @@ def httpserver_stopcallback(id):
     del _httpserver_context['cbfuncs'][id]
   finally:
     _httpserver_context['lock'].release()
+
+
+
+
+class _httpserver_bodystream:
+  # Reads the rest of the HTTP request from the socket, erroring
+  # appropriately. Understands transfer-coding. Returns chunks
+  # at a time.
+
+  def __init__(self, sock, data, verb, headers):
+    self._sock = sock
+    self._rawdata = data
+    self._verb = verb
+    self._headers = headers
+    self._leftinchunk = None
+    self._nobody = False
+    self._chunked = False
+    self._done = False
+    self._lock = getlock()
+    self._trailersread = False
+
+    # Deal with methods that cannot send a message body:
+    if verb in ("GET", "HEAD", "TRACE", "DELETE"):
+      if "Content-Length" in headers or \
+          "Transfer-Encoding" in headers:
+            raise _httpserver_BadRequest("Method '" + verb + \
+                "' cannot send an entity-body and therefore a " + \
+                "Content-Length or Transfer-Encoding header is invalid.")
+      else:
+        self._nobody = True
+        self._done = True
+        return
+
+    # Deal with methods that send a message body.
+    if "Content-Length" not in headers and "Transfer-Encoding" not in headers:
+      raise _httpserver_BadRequest("Method '" + str(verb) + \
+          "' can send an entity-body and requires a Content-Length " + \
+          "or Transfer-Encoding header.")
+
+    if "Transfer-Encoding" in headers:
+      # Decode Transfer-coded messages
+      if len(headers["Transfer-Encoding"]) != 1:
+        raise _httpserver_BadRequest("Multiple Transfer-Encoding headers " + \
+            "is unacceptable.")
+
+      # "chunked" must be in the codings list, and it must be last.
+      codings = headers["Transfer-Encoding"][0].split(",")
+      codings.reverse()
+
+      realcodings = []
+
+      # Strip 'identity' codings.
+      for coding in codings:
+        coding = coding.strip().lower()
+        token = coding.split(None, 1)
+        if token != "identity":
+          realcodings.append(coding)
+      
+      if len(realcodings) > 1 or realcodings[0] != "chunked":
+        raise _httpserver_BadTransferCoding("Cannot handle any transfer-" + \
+            "codings other than chunked.")
+
+      self._chunked = True
+
+    else:
+      # If we get here, that means we have a Content-Length and no Transfer-
+      # Encoding, so we can read the message body directly.
+      msglen = headers["Content-Length"]
+
+      if len(msglen) != 1:
+        raise _httpserver_BadRequest("Multiple Content-Length headers is " + \
+            "unacceptable.")
+      
+      self._leftinchunk = int(msglen[0])
+
+
+
+  def read(self, size=None):
+    self._lock.acquire()  # Serialize file-like object reads.
+
+    try:
+      headers = self._headers
+      verb = self._verb
+
+      if self._done:
+        return ""
+
+      if size is not None and size == 0:
+        return ""
+
+      if not self._chunked:
+        # Plain Content-Length message body.
+        toyieldlen = self._leftinchunk
+        if size is not None:
+          toyieldlen = min(size, toyieldlen)
+
+        toyield, self._rawdata = _httpserver_getblock(toyieldlen, \
+            self._sock, self._rawdata)
+        self._leftinchunk -= len(toyield)
+
+        if self._leftinchunk == 0:
+          self._done = True
+
+        return toyield
+
+      else:
+        # Chunked message body.
+        self._data = ""
+        while size is None or len(self._data) < size:
+          if self._leftinchunk > 0:
+            sz = self._leftinchunk
+            if size is not None:
+              sz = min(self._leftinchunk, size)
+            chunk, self._rawdata = _httpserver_getblock(sz, self._sock, \
+                self._rawdata)
+            self._leftinchunk -= len(chunk)
+            self._data += chunk
+            if len(chunk) < sz:
+              break
+          else:
+            if self._leftinchunk is not None:
+              # Read off trailing "\r\n":
+              _, self._rawdata = _httpserver_getblock(2, self._sock, \
+                  self._rawdata)
+            
+            # Read the next chunk's size information:
+            line, self._rawdata = _httpserver_getline(self._sock, \
+                self._rawdata)
+            # Remove optional chunk extensions (";" -> newline) that we don't
+            # understand, and read the hex chunk size:
+            self._leftinchunk = int(line.split(";", 1)[0].strip(), 16)
+            if self._leftinchunk == 0:
+              # Chunked stream is finished.
+              self._done = True
+              break
+
+        retlen = len(self._data)
+        if size is not None:
+          retlen = min(size, retlen)
+
+        retval, self._data = self._data[:retlen], self._data[retlen:]
+        return retval
+
+    finally:
+      self._lock.release()
+
+
+
+  def get_trailers(self):
+    # Reads the rest of the message, and then reads and returns any trailer
+    # headers (only sent in chunked messages).
+
+    # Discard extra message without filling RAM. No-op if the user function
+    # has already read the entire stream.
+    while True:
+      a = self.read(4096)
+      if len(a) == 0:
+        break
+
+    if not self._chunked:
+      return {}
+
+    if self._trailersread:
+      return {}
+
+    trailers = {}
+
+    # Read 'trailer' headers.
+    while True:
+      line, self._rawdata = _httpserver_getline(self._sock, self._rawdata)
+
+      # Empty line? Then the trailers are done.
+      if len(line.strip("\r")) == 0:
+        break
+
+      # Check for a multi-line header by peeking ahead:
+      while True:
+        nextchar, self._rawdata = _httpserver_getblock(1, self._sock, \
+            self._rawdata)
+        self._rawdata = nextchar + self._rawdata
+        if nextchar in (" ", "\t"):
+          line2, rawdata = _httpserver_getline(sock, rawdata)
+          line += " " + line2.lstrip()
+        else:
+          break
+
+      # Insert header into existing headers
+      hdrname, hdrval = line.split(":", 1)
+      if hdrname not in trailers:
+        trailers[hdrname] = []
+      trailers[hdrname].append(hdrval.strip())
+
+    # get_extra() expects extra data in self._data.
+    self._data = self._rawdata
+    self._trailersread = True
+    return trailers
+
+
+
+
+  def get_extra(self):
+    # Private function of httpserver, *should not be used by callback
+    # functions*! NOT parallel-safe, NOT meant to be called more than
+    # once.
+
+    # Read the socket up to (at least) the end of the current message;
+    # if we read beyond the end of our message, return any extra.
+    
+    # Discard extra message without filling RAM
+    while True:
+      a = self.read(4096)
+      if len(a) == 0:
+        break
+
+    # Discard trailers, if any are left:
+    if self._chunked:
+      self.get_trailers()
+
+    rawdata = self._rawdata
+    self._rawdata = ""
+
+    return rawdata
