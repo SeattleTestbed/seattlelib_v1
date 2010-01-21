@@ -152,21 +152,34 @@ def _DORadvertise_command(parameters, timeout=None):
 
   # We expect to get an error code, an error string, and possibly some
   # values from the server.
-  error_msg = ""
+  error_msg = None
   error = None
-  values = []
+  values = None
+
+  numxmlchildren = len(xmltree.children)
+  if numxmlchildren not in [2, 3]:
+    raise DORadvertise_XMLError("Root XML node contains inappropriate " + \
+        "number of child nodes.")
 
   for xmlchild in xmltree.children:
     # Read the numeric error code.
     if xmlchild.tag_name == "status" and xmlchild.content is not None:
+      if error is not None:
+        raise DORadvertise_XMLError("XML contains multiple status tags")
       error = int(xmlchild.content.strip())
 
     # String error message (description:status as strerror:errno).
     elif xmlchild.tag_name == "description":
+      if error_msg is not None:
+        raise DORadvertise_XMLError("XML contains multiple description tags")
       error_msg = xmlchild.content
 
     # We found a <values> tag. Let's try and get some values.
     elif xmlchild.tag_name == "values" and xmlchild.children is not None:
+      if values is not None:
+        raise DORadvertise_XMLError("XML contains multiple values tags")
+
+      values = []
       for valuenode in xmlchild.children:
         if valuenode.tag_name != "value":
           raise DORadvertise_XMLError(
@@ -181,5 +194,9 @@ def _DORadvertise_command(parameters, timeout=None):
 
   if error is not 0:
     raise DORadvertise_BadRequest(error, error_msg)
+
+  # This happens when the server returns <values></values>
+  if values is None:
+    return []
 
   return values
