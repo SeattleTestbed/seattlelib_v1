@@ -189,26 +189,64 @@ def _httpserver_socketcb(remoteip, remoteport, sock, ch, listench, httpdid):
       # Send response as instructed by callback
       if version == "0.9":
         # HTTP/0.9 doesn't have response headers.
-        _httpserver_sendAll(sock, message, besteffort=True)
+        if type(message) is str:
+          _httpserver_sendAll(sock, message, besteffort=True)
+        else:
+          while True:
+            chunk = message.read(4096)
+            if len(chunk) == 0:
+              break
+            _httpserver_sendAll(sock, chunk, besteffort=True)
         break
       elif version == "1.0":
         response = "HTTP/1.0 " + str(statuscode) + " " + statusmsg + "\r\n"
         for key, val in headers.items():
           response += key + ": " + val + "\r\n"
         response += "\r\n"
-        response += message
-        _httpserver_sendAll(sock, response, besteffort=True)
+        if type(message) is str:
+          response += message
+          _httpserver_sendAll(sock, response, besteffort=True)
+        else:
+          _httpserver_sendAll(sock, response, besteffort=True)
+          while True:
+            chunk = message.read(4096)
+            if len(chunk) == 0:
+              break
+            _httpserver_sendAll(sock, chunk, besteffort=True)
         break
       elif version == "1.1":
         response = "HTTP/1.1 " + str(statuscode) + " " + statusmsg + "\r\n"
         for key, val in headers.items():
           response += key + ": " + val + "\r\n"
-        if "Content-Length" not in headers:
-          response += "Content-Length: %d\r\n" % len(message)
-        response += "\r\n"
-        response += message
         try:
-          _httpserver_sendAll(sock, response)
+          if type(message) is str:
+            if "Content-Length" not in headers:
+              response += "Content-Length: %d\r\n" % len(message)
+            response += "\r\n"
+            response += message
+            _httpserver_sendAll(sock, response)
+          else:
+            # Read chunks from the callback and efficiently send them to
+            # the client using HTTP/1.1 chunked encoding.
+            response += "Transfer-Encoding: chunked\r\n"
+            response += "\r\n"
+            _httpserver_sendAll(sock, response)
+            totallen = 0
+            while True:
+              chunk = message.read(4096)
+              if len(chunk) == 0:
+                break
+              # encode as HTTP/1.1 chunks:
+              totallen += len(chunk)
+              chunk = "%X\r\n%s\r\n" % (len(chunk), chunk)
+              _httpserver_sendAll(sock, chunk)
+            lastchunk = "0\r\n"
+            lastchunk += ("Content-Length: %d\r\n" % totallen)
+            lastchunk += "\r\n"
+            _httpserver_sendAll(sock, lastchunk)
+
+          # Close client socket if they or the callback function asked us
+          # to close.
           if ("Connection" in headers and "close" == headers["Connection"]) \
               or ("Connection" in reqinfo['headers'] and "close" in \
               reqinfo['headers']["Connection"]):

@@ -22,6 +22,34 @@ def func1(info):
 
 
 
+class stringio:
+  def __init__(self, string):
+    self._string = string
+
+  def read(self, size=None):
+    if size is None:
+      retval = self._string
+    else:
+      retval = self._string[:size]
+
+    self._string = self._string[len(retval):]
+    return retval
+
+
+
+def func2(info):
+  # Streaming callback function
+  res = {}
+  res["version"] = "1.1"
+  res["statuscode"] = 200
+  res["statusmsg"] = "OK"
+  res["headers"] = {"Content-Type": "text/html"}
+  res["message"] = stringio("Hello!\r\n")
+  return res
+
+
+
+
 def sendall(sock, data):
   while len(data) > 0:
     data = data[sock.send(data):]
@@ -285,7 +313,25 @@ def test12():
 
 
 
+def test13():
+  # Test file-like object for callback function response messages
+  test13 = \
+      "GET /test13 HTTP/1.1\r\n" + \
+      "Connection: close\r\n" + \
+      "\r\n"
 
+  test13exp = \
+      "HTTP/1.1 200 OK\r\n" + \
+      "Content-Type: text/html\r\n" + \
+      "Transfer-Encoding: chunked\r\n" + \
+      "\r\n" + \
+      "8\r\n" + \
+      "Hello!\r\n\r\n" + \
+      "0\r\n" + \
+      "Content-Length: 8\r\n" + \
+      "\r\n"
+
+  return (test13, test13exp)
 
 
 
@@ -296,6 +342,20 @@ def tests():
   failed = []
   for test in [test1, test2, test3, test4, test5, test6, test7, test8, \
       test9, test10, test11, test12]:
+    a = openconn('127.0.0.1', 12345)
+    send, expected = test()
+    sendall(a, send)
+    actual = recvall(a)
+    try:
+      assert (actual == expected)
+    except AssertionError, ae:
+      failed.append((str(test), expected, actual))
+    a.close()
+
+  httpserver_stopcallback(id)
+  id = httpserver_registercallback(('127.0.0.1', 12345), func2)
+
+  for test in [test13]:
     a = openconn('127.0.0.1', 12345)
     send, expected = test()
     sendall(a, send)
