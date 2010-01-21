@@ -192,6 +192,11 @@ def _DORadvertise_command(parameters, timeout=None):
 
         values.append(content)
 
+    # Check for tags we do not expect.
+    elif xmlchild.tag_name not in ("status", "description", "values"):
+      raise DORadvertise_XMLError("Unexpected tag '" + \
+          str(xmlchild.tag_name) + "' while parsing response.")
+
   if error is not 0:
     raise DORadvertise_BadRequest(error, error_msg)
 
