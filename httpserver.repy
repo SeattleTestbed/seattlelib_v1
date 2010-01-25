@@ -6,7 +6,6 @@
   July 29, 2009
 
 <Author>
-  Yafete Yemuru
   Conrad Meyer
 
 <Purpose>
@@ -120,8 +119,16 @@ def httpserver_registercallback(socket, cbfunc):
 
     # Keep track of this server's id in a closure:
     def _httpserver_cbclosure(remoteip, remoteport, sock, ch, listench):
+      # Do the actual processing on the request.
       _httpserver_socketcb(remoteip, remoteport, sock, ch, listench, \
           newhttpdid)
+
+      # Close the socket afterwards.
+      try:
+        sock.close()
+      except:
+        pass    # Best effort.
+
 
     _httpserver_context['handles'][newhttpdid] = \
         waitforconn(socket[0], socket[1], _httpserver_cbclosure)
@@ -154,122 +161,39 @@ def _httpserver_socketcb(remoteip, remoteport, sock, ch, listench, httpdid):
 
   extradata = ""
 
+  # HTTP/1.0 and HTTP/1.1 Connection: close requests break out of this
+  # loop immediately; HTTP/1.1 clients can keep sending requests and
+  # receiving responses in this loop indefinitely.
   while True:
     try:
-      # Read HTTP request off the socket
-      headerdata, extradata = _httpserver_readHTTPheader(sock, extradata)
-      reqinfo = _httpserver_parseHTTPheader(headerdata)
-      messagebodystream = _httpserver_bodystream(sock, \
-          extradata, reqinfo['verb'], reqinfo['headers'])
-      reqinfo['datastream'] = messagebodystream
+      # Reads request headers, parses them, lets callback handle headers
+      # and possible request body, sends the response that the callback
+      # function tells it to send. On error, may raise one of many
+      # exceptions, which we deal with here:
+      closeconn, extradata = \
+          _httpserver_process_single_request(sock, cbfunc, extradata)
 
-      # Send request to callback
-      try:
-        result = cbfunc(reqinfo)
-      except Exception, e:
-        raise _httpserver_ServerError("httpserver: Callback function " + \
-            "raised an exception: " + str(e))
-
-      extradata = messagebodystream.get_extra()
-
-      # Interpret result of callback function
-      try:
-        version = result['version']
-        statuscode = result['statuscode']
-        statusmsg = result['statusmsg']
-        headers = result['headers']
-        message = result['message']
-      except:
-        raise _httpserver_ServerError("httpserver: Callback function " + \
-            "returned malformed dictionary")
-
-      if reqinfo['version'] == "1.0" and version == "1.1":
-        version = "1.0"
-
-      # Send response as instructed by callback
-      if version == "0.9":
-        # HTTP/0.9 doesn't have response headers.
-        if type(message) is str:
-          _httpserver_sendAll(sock, message, besteffort=True)
-        else:
-          while True:
-            chunk = message.read(4096)
-            if len(chunk) == 0:
-              break
-            _httpserver_sendAll(sock, chunk, besteffort=True)
+      if closeconn:
         break
-      elif version == "1.0":
-        response = "HTTP/1.0 " + str(statuscode) + " " + statusmsg + "\r\n"
-        for key, val in headers.items():
-          response += key + ": " + val + "\r\n"
-        response += "\r\n"
-        if type(message) is str:
-          response += message
-          _httpserver_sendAll(sock, response, besteffort=True)
-        else:
-          _httpserver_sendAll(sock, response, besteffort=True)
-          while True:
-            chunk = message.read(4096)
-            if len(chunk) == 0:
-              break
-            _httpserver_sendAll(sock, chunk, besteffort=True)
-        break
-      elif version == "1.1":
-        response = "HTTP/1.1 " + str(statuscode) + " " + statusmsg + "\r\n"
-        for key, val in headers.items():
-          response += key + ": " + val + "\r\n"
-        try:
-          if type(message) is str:
-            if "Content-Length" not in headers:
-              response += "Content-Length: %d\r\n" % len(message)
-            response += "\r\n"
-            response += message
-            _httpserver_sendAll(sock, response)
-          else:
-            # Read chunks from the callback and efficiently send them to
-            # the client using HTTP/1.1 chunked encoding.
-            response += "Transfer-Encoding: chunked\r\n"
-            response += "\r\n"
-            _httpserver_sendAll(sock, response)
-            totallen = 0
-            while True:
-              chunk = message.read(4096)
-              if len(chunk) == 0:
-                break
-              # encode as HTTP/1.1 chunks:
-              totallen += len(chunk)
-              chunk = "%X\r\n%s\r\n" % (len(chunk), chunk)
-              _httpserver_sendAll(sock, chunk)
-            lastchunk = "0\r\n"
-            lastchunk += ("Content-Length: %d\r\n" % totallen)
-            lastchunk += "\r\n"
-            _httpserver_sendAll(sock, lastchunk)
-
-          # Close client socket if they or the callback function asked us
-          # to close.
-          if ("Connection" in headers and "close" == headers["Connection"]) \
-              or ("Connection" in reqinfo['headers'] and "close" in \
-              reqinfo['headers']["Connection"]):
-                break
-        except:
-          break
-      else:
-        raise _httpserver_ServerError("httpserver: Callback function gave " + \
-            "invalid HTTP version")
 
     except _httpserver_BadRequest, br:
+      # There was some sort of flaw in the client's request.
       response = "HTTP/1.0 400 Bad Request\r\n" + \
           "Content-Type: text/plain\r\n\r\n" + str(br) + "\r\n"
       _httpserver_sendAll(sock, response, besteffort=True)
       break
     
     except _httpserver_ServerError, se:
+      # The callback function raised an exception or returned some object
+      # we didn't expect.
       response = "HTTP/1.0 500 Internal Server Error\r\n" + \
           "Content-Type: text/plain\r\n\r\n" + str(se) + "\r\n"
       _httpserver_sendAll(sock, response, besteffort=True)
       break
     
     except _httpserver_BadTransferCoding, bte:
+      # The HTTP/1.1 client sent us something with a Transport-Encoding we
+      # can't handle.
       response = "HTTP/1.1 501 Not Implemented\r\n" + \
           ("Content-Length: %d\r\n" % (len(str(bte)) + 2)) + \
           "Connection: close\r\n" + \
@@ -284,16 +208,12 @@ def _httpserver_socketcb(remoteip, remoteport, sock, ch, listench, httpdid):
     except Exception, e:
       if "Socket closed" in str(e):
         break
-      raise
 
-      # Any other error? Disconnect and quit.
+      # We shouldn't encounter these, other than 'Socket closed' ones. They
+      # represent a bug in our code somewhere, and shouldn't leak information
+      # to the client, so we just disconnect. Ideally, we'll add logging
+      # to this module some time and log these errors there.
       break
-
-  # After while loop is done, close the socket.
-  try:
-    sock.close()
-  except:
-    pass #don't care
 
 
 
@@ -672,3 +592,175 @@ class _httpserver_bodystream:
     self._rawdata = ""
 
     return rawdata
+
+
+
+
+class _httpserver_StringIO:
+  # Implements a read-only file-like object encapsulating a string.
+  def __init__(self, string):
+    self._data = string
+    self._closed = False
+
+
+
+  def read(self, limit=None):
+    if limit is None:
+      limit = 4096
+
+    if self._closed:
+      raise ValueError("Trying to read from a closed StringIO object.")
+
+    res, self._data = self._data[:limit], self._data[limit:]
+    return res
+
+
+
+  def close(self):
+    if self._closed:
+      raise ValueError("Trying to close a closed StringIO object.")
+    self._closed = True
+
+
+
+
+def _httpserver_sendfile(sock, file):
+  # Attempts to forward all of the data from file to sock.
+  while True:
+    chunk = file.read(4096)
+    if len(chunk) == 0:
+      break
+    _httpserver_sendAll(sock, chunk, besteffort=True)
+
+
+
+
+def _httpserver_sendfile_chunked(sock, file):
+  # Attempts to forward all of the data from file to sock, using chunked
+  # encoding.
+  totallen = 0
+  while True:
+    chunk = file.read(4096)
+    if len(chunk) == 0:
+      break
+    # encode as HTTP/1.1 chunks:
+    totallen += len(chunk)
+    chunk = "%X\r\n%s\r\n" % (len(chunk), chunk)
+    _httpserver_sendAll(sock, chunk)
+
+  lastchunk = "0\r\n"
+  lastchunk += ("Content-Length: %d\r\n" % totallen)
+  lastchunk += "\r\n"
+  _httpserver_sendAll(sock, lastchunk)
+
+
+
+
+def _httpserver_process_single_request(sock, cbfunc, extradata):
+  # This function processes a single request in from sock, and either
+  # puts a response to the socket and returns, or raises an exception.
+
+  # Read HTTP request off the socket
+  headerdata, extradata = _httpserver_readHTTPheader(sock, extradata)
+
+  # Interpret the header.
+  reqinfo = _httpserver_parseHTTPheader(headerdata)
+
+  # Wrap the (possibly) remaining data into a file-like object.
+  messagebodystream = _httpserver_bodystream(sock, \
+      extradata, reqinfo['verb'], reqinfo['headers'])
+  reqinfo['datastream'] = messagebodystream
+
+  # By default, we don't want to close the connection. (Though, nearly
+  # every case will change this to True -- only HTTP/1.1 sockets
+  # that don't set Connection: close will keep this False.)
+  closeconn = False
+
+  # Send request information to callback.
+  try:
+    result = cbfunc(reqinfo)
+
+  except Exception, e:
+    raise _httpserver_ServerError("httpserver: Callback function " + \
+        "raised an exception: " + str(e))
+
+  # Get any extra data consumed from sock by the message body stream object,
+  # but that was not actually part of the message body.
+  extradata = messagebodystream.get_extra()
+
+  # Interpret result of callback function
+  try:
+    version = result['version']
+    statuscode = result['statuscode']
+    statusmsg = result['statusmsg']
+    headers = result['headers']
+    message = result['message']
+  except:
+    raise _httpserver_ServerError("httpserver: Callback function " + \
+        "returned malformed dictionary")
+
+  # Don't let the callback function serve HTTP/1.1 responses to an HTTP/1.0
+  # request.
+  if reqinfo['version'] == "1.0" and version == "1.1":
+    version = "1.0"
+
+  # If the message object is a string, wrap it in a file-like object.
+  if type(message) is str:
+    message = _httpserver_StringIO(message)
+
+  # Send response as instructed by callback
+  if version == "0.9":
+    # HTTP/0.9 doesn't have response headers.
+    _httpserver_sendfile(sock, message)
+    closeconn = True
+
+  elif version == "1.0":
+    # Send the response headers:
+    response = "HTTP/1.0 " + str(statuscode) + " " + statusmsg + "\r\n"
+    for key, val in headers.items():
+      response += key + ": " + val + "\r\n"
+    response += "\r\n"
+    _httpserver_sendAll(sock, response, besteffort=True)
+
+    # Send the response body:
+    _httpserver_sendfile(sock, message)
+    closeconn = True
+
+  elif version == "1.1":
+    response = "HTTP/1.1 " + str(statuscode) + " " + statusmsg + "\r\n"
+    for key, val in headers.items():
+      response += key + ": " + val + "\r\n"
+    response += "Transfer-Encoding: chunked\r\n"
+    response += "\r\n"
+
+    # Close client socket if they or the callback function asked us
+    # to close.
+    if ("Connection" in headers and "close" == headers["Connection"]) \
+        or ("Connection" in reqinfo['headers'] and "close" in \
+        reqinfo['headers']["Connection"]):
+          closeconn = True
+
+    try:
+      # Send response headers.
+      _httpserver_sendAll(sock, response)
+
+      # Read chunks from the callback and efficiently send them to
+      # the client using HTTP/1.1 chunked encoding.
+      _httpserver_sendfile_chunked(sock, message)
+
+    except:
+      # The reason we care about the data actually going through for HTTP/1.1
+      # is that we keep connections open. If there is an error, we shouldn't
+      # keep going, so we indicate that the socket should be closed.
+      closeconn = True
+
+  else:
+    # If the cbfunc's response dictionary didn't specify 0.9, 1.0, or 1.1,
+    # it's an error.
+    raise _httpserver_ServerError("httpserver: Callback function gave " + \
+        "invalid HTTP version")
+
+  # Clean up open file handles:
+  message.close()
+
+  return (closeconn, extradata)

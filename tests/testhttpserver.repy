@@ -113,9 +113,13 @@ def test3():
   test3exp = \
       "HTTP/1.1 200 OK\r\n" + \
       "Content-Type: text/html\r\n" + \
-      "Content-Length: 7\r\n" + \
+      "Transfer-Encoding: chunked\r\n" + \
       "\r\n" + \
-      "/test3\n"
+      "7\r\n" + \
+      "/test3\n\r\n" + \
+      "0\r\n" + \
+      "Content-Length: 7\r\n" + \
+      "\r\n"
 
   return (test3, test3exp)
 
@@ -133,14 +137,22 @@ def test4():
   test4exp = \
       "HTTP/1.1 200 OK\r\n" + \
       "Content-Type: text/html\r\n" + \
+      "Transfer-Encoding: chunked\r\n" + \
+      "\r\n" + \
+      "8\r\n" + \
+      "/test4a\n\r\n" + \
+      "0\r\n" + \
       "Content-Length: 8\r\n" + \
       "\r\n" + \
-      "/test4a\n" + \
       "HTTP/1.1 200 OK\r\n" + \
       "Content-Type: text/html\r\n" + \
-      "Content-Length: 8\r\n" + \
+      "Transfer-Encoding: chunked\r\n" + \
       "\r\n" + \
-      "/test4b\n"
+      "8\r\n" + \
+      "/test4b\n\r\n" + \
+      "0\r\n" + \
+      "Content-Length: 8\r\n" + \
+      "\r\n"
 
   return (test4, test4exp)
 
@@ -161,9 +173,13 @@ def test5():
   test5exp = \
       "HTTP/1.1 200 OK\r\n" + \
       "Content-Type: text/html\r\n" + \
-      "Content-Length: 7\r\n" + \
+      "Transfer-Encoding: chunked\r\n" + \
       "\r\n" + \
-      "/test5\n"
+      "7\r\n" + \
+      "/test5\n\r\n" + \
+      "0\r\n" + \
+      "Content-Length: 7\r\n" + \
+      "\r\n"
 
   return (test5, test5exp)
 
@@ -186,10 +202,13 @@ def test6():
   test6exp = \
       "HTTP/1.1 200 OK\r\n" + \
       "Content-Type: text/html\r\n" + \
-      "Content-Length: 9\r\n" + \
+      "Transfer-Encoding: chunked\r\n" + \
       "\r\n" + \
-      "/test6\n" + \
-      "7\n"
+      "9\r\n" + \
+      "/test6\n7\n\r\n" + \
+      "0\r\n" + \
+      "Content-Length: 9\r\n" + \
+      "\r\n"
 
   return (test6, test6exp)
 
@@ -210,9 +229,13 @@ def test7():
   test7exp = \
       "HTTP/1.1 200 OK\r\n" + \
       "Content-Type: text/html\r\n" + \
-      "Content-Length: 7\r\n" + \
+      "Transfer-Encoding: chunked\r\n" + \
       "\r\n" + \
-      "/test7\n"
+      "7\r\n" + \
+      "/test7\n\r\n" + \
+      "0\r\n" + \
+      "Content-Length: 7\r\n" + \
+      "\r\n"
 
   return (test7, test7exp)
 
@@ -266,9 +289,13 @@ def test10():
   test10exp = \
       "HTTP/1.1 200 OK\r\n" + \
       "Content-Type: text/html\r\n" + \
-      "Content-Length: 11\r\n" + \
+      "Transfer-Encoding: chunked\r\n" + \
       "\r\n" + \
-      "/test10\n28\n"
+      "B\r\n" + \
+      "/test10\n28\n\r\n" + \
+      "0\r\n" + \
+      "Content-Length: 11\r\n" + \
+      "\r\n"
 
   return (test10, test10exp)
 
