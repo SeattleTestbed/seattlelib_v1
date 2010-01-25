@@ -125,44 +125,12 @@ def httpretrieve_open(url, postdata=None, querydata=None, \
       raise HttpConnectionError("Socket timed out connecting to host/port.")
     raise
 
-  # build an HTTP request using the given port, host, path and query
-  method = "GET"
-  if postdata is not None:
-    method = "POST"
-    if type(postdata) is dict:
-      postdata = urllib_quote_parameters(postdata)
-    if type(postdata) is not str:
-      raise TypeError("postdata should be a dict of form data or string")
-  else:
-    postdata = ""
+  # Builds the HTTP request:
+  httprequest = _httpretrieve_build_request(host, port, path, querydata, \
+      postdata, httpheaders)
 
-  if path == "":
-    raise ValueError("Invalid path -- empty string.")
-  if type(querydata) is dict:
-    querydata = urllib_quote_parameters(querydata)
-  if type(querydata) is str and querydata != "":
-    encquerydata = "?" + querydata
-  else:
-    encquerydata = ""
-
-  httpheader = method + ' ' + path + encquerydata + ' HTTP/1.0\r\n'
-  if httpheaders is not None:
-    if type(httpheaders) is not dict:
-      raise TypeError("Expected HTTP headers as a dictionary.")
-    else:
-      if "Host" not in httpheaders:
-        httpheader += "Host: " + host + ':' + str(port) + "\r\n"
-      for key, val in httpheaders.items():
-        httpheader += key + ": " + val + '\r\n'
-
-  if method == "POST":
-    httpheader += 'Content-Length: ' + str(len(postdata)) + '\r\n'
-  httpheader += '\r\n'
-  if method == "POST":
-    httpheader += postdata
-
-  # send HTTP request to the web server
-  sock.send(httpheader)
+  # Send HTTP request to the web server
+  _httpretrieve_sendall(sock, httprequest)
 
   # receive the header lines from the web server
   if timeout is None:
@@ -408,6 +376,16 @@ class _httpretrieve_filelikeobject:
 
 
 
+def _httpserver_put_in_headerdict(res, lastheader, lastheader_str):
+  # Tries to put the header into dictionary of lists, 'res'.
+  if lastheader is not None:
+    if lastheader not in res:
+      res[lastheader] = []
+    res[lastheader].append(lastheader_str.strip())
+
+
+
+
 def _httpretrieve_parse_responseheaders(headerlines):
   # Parse rfc822-style headers (this could be abstracted out to an rfc822
   # library that would be quite useful for internet protocols). Returns
@@ -420,7 +398,6 @@ def _httpretrieve_parse_responseheaders(headerlines):
   #
   # Becomes: {"Foo": ["a"], "Bar": ["b", "c"]}
 
-  i = 0
   lastheader = None
   lastheader_str = ""
   res = {}
@@ -429,24 +406,74 @@ def _httpretrieve_parse_responseheaders(headerlines):
     return {}
 
   try:
-    while True:
-      # non-CRLF whitespace characters
+    # Iterate over the request header lines:
+    for i in range(len(headerlines)):
+      # Lines with leading non-CRLF whitespace characters are part of the
+      # previous line.
       if headerlines[i][0] in (" ", "\t") and lastheader is not None:
         lastheader_str += headerlines[i]
       else:
-        if lastheader is not None:
-          if lastheader not in res:
-            res[lastheader] = []
-          res[lastheader].append(lastheader_str.strip())
+        _httpserver_put_in_headerdict(res, lastheader, lastheader_str)
         lastheader, lastheader_str = headerlines[i].split(":", 1)
-      i += 1
-      if i >= len(headerlines):
-        if lastheader is not None:
-          if lastheader not in res:
-            res[lastheader] = []
-          res[lastheader].append(lastheader_str.strip())
-        break
+
+    # Add the last line to the dictionary.
+    _httpserver_put_in_headerdict(res, lastheader, lastheader_str)
+
     return res
   except IndexError, idx:
     raise HttpBrokenServerError("Server returned garbage for HTTP" + \
         " response. Bad header.")
+
+
+
+
+def _httpretrieve_build_request(host, port, path, querydata, postdata, \
+    httpheaders):
+  # Builds an HTTP request from these parameters, returning it as
+  # a string.
+
+  method = "GET"
+  if postdata is not None:
+    method = "POST"
+    if type(postdata) is dict:
+      postdata = urllib_quote_parameters(postdata)
+    if type(postdata) is not str:
+      raise TypeError("postdata should be a dict of form data or string")
+
+  # Encode path / querystring part.
+  if path == "":
+    raise ValueError("Invalid path -- empty string.")
+  if type(querydata) is dict:
+    querydata = urllib_quote_parameters(querydata)
+  if type(querydata) is str and querydata != "":
+    encquerydata = "?" + querydata
+  else:
+    encquerydata = ""
+
+  # Encode the request line and headers:
+  httpheader = method + ' ' + path + encquerydata + ' HTTP/1.0\r\n'
+  if httpheaders is not None:
+    if type(httpheaders) is not dict:
+      raise TypeError("Expected HTTP headers as a dictionary.")
+    else:
+      if "Host" not in httpheaders:
+        httpheader += "Host: " + host + ':' + str(port) + "\r\n"
+      for key, val in httpheaders.items():
+        httpheader += key + ": " + val + '\r\n'
+
+  # Affix post-data related headers and content:
+  if method == "POST":
+    httpheader += 'Content-Length: ' + str(len(postdata)) + '\r\n'
+  httpheader += '\r\n'
+  if method == "POST":
+    httpheader += postdata
+
+  return httpheader
+
+
+
+
+def _httpretrieve_sendall(sock, data):
+  # Attempts to send all of data to sock.
+  while len(data) > 0:
+    data = data[sock.send(data):]
