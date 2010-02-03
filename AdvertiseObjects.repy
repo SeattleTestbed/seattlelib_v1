@@ -128,7 +128,7 @@ class AdvertisePipe():
           advertise_announce(key,value,self.ttlv)
   
       # now wait until redo time has expired
-      while getruntime() - start < self.redo:
+      while getruntime() - start < self.redo and self.state['run']:
         sleep(10)
           
 
@@ -156,8 +156,8 @@ class AdvertisePipe():
     # if the advertise thread is not running start it
     self.state_lock.acquire()
     if not self.state['run']:
-      settimer(0,self._advertise_thread,[])
       self.state['run'] = True
+      settimer(0,self._advertise_thread,[])
     self.state_lock.release()    
     
     # return the handle
