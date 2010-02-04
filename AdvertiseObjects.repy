@@ -7,20 +7,30 @@
   Jan 29 2010
 
 <Purpose>
-  Provied 2 objects built off of advertise.repy to make more efficent use of
-  resouces
+  Provied 2 objects to make more efficent use of resouces when using advertising
+  or looking up values.
 
-  LookupCache provides cacheing of lookups done using advertise.repy to 
-  lower the overhead of programs that need to lookup the same value frequently.
-  the lookup cache is global so any instance of the object will have the same
-  cache.
+  LookupCache: 
 
-  AdvertisePipe uses a shared queue of object and a thread to advertise key,
-  value pairs.  Multiple parts of a program can create an instance of
-  AdvertisePipe and insert key value pairs to be advertised, and a single
-  thread is shared between all instances.
-  After inserting a key,value pair to be advertised the object returns a handle
-  which can be used to stop the advertisement.
+  Provide cacheing of lookups to reduce the time spent doing
+  lookups by programs that need to lookup the same value frequently.
+  The cache is global so any instance of the object will have the same
+  values stored in the cache.
+
+  usage:  Call lookup_obj.lookup(key) to perform a lookup of key using
+          advertise_lookup with default arguments.  Values will be returned
+          from the cache if they are available and not too old.
+
+  AdvertisePipe:
+
+  Stores a list of (key,value) tuples and uses a single thread to advertise
+  each tuple in the list.  This prevents a program from using multiple threads
+  to repeatedly advertise values.
+
+  usage:  Call ad_obj.add(key,value) to add (key,value) to the list of tuples
+          to be advertised.  This call returns an ad_handle which can be used
+          with a call to ad_obj.remove(ad_handle) to remove (key,value) from 
+          the list.
 
 """
 
@@ -110,6 +120,11 @@ class AdvertisePipe():
 
 
   def _advertise_thread(self):
+    # add a short sleep so that key,value pairs added 
+    # close to the same time will be advertised together
+    #without waiting for the next cycle
+    sleep(2)   
+
     # advertise values stored in the advertise_dict
     while self.state['run']:
       
@@ -122,12 +137,14 @@ class AdvertisePipe():
       for entry_key in entry_keys:
         try:
           (key,value) = self.advertise_dict[entry_key]
+          advertise_announce(key,value,self.ttlv)
         except:
           pass #the key must have been deleted
-        else:
-          advertise_announce(key,value,self.ttlv)
+    
+          
   
       # now wait until redo time has expired
+      # if run has gone to false we want to stop sleeping and kill the thread
       while getruntime() - start < self.redo and self.state['run']:
         sleep(10)
           
