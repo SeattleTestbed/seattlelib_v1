@@ -695,7 +695,7 @@ def _httpserver_process_single_request(sock, cbfunc, extradata):
     statusmsg = result['statusmsg']
     headers = result['headers']
     message = result['message']
-  except:
+  except (KeyError, TypeError):
     raise _httpserver_ServerError("httpserver: Callback function " + \
         "returned malformed dictionary")
 
@@ -749,6 +749,9 @@ def _httpserver_process_single_request(sock, cbfunc, extradata):
       _httpserver_sendfile_chunked(sock, message)
 
     except:
+      # The exception we're trying to catch here is anything sock.send()
+      # raises. However, it just raises plain exceptions.
+
       # The reason we care about the data actually going through for HTTP/1.1
       # is that we keep connections open. If there is an error, we shouldn't
       # keep going, so we indicate that the socket should be closed.
