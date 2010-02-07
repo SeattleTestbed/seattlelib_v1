@@ -251,35 +251,35 @@ def _httpserver_readHTTPheader(sock, data):
 
 
 
-def _httpserver_parseHTTPheader(headerdata):
-  lines = headerdata
-  command = lines[0]
-  otherheaders = lines[1:]
+def _httpserver_parseHTTPheader(headerdatalist):
+  lineslist = headerdatalist
+  commandstr = lineslist[0]
+  otherheaderslist = lineslist[1:]
 
   infodict = {}
 
-  verb, rawpath, version = command.split(" ", 2)
+  verbstr, rawpathstr, versionstr = commandstr.split(" ", 2)
   
-  infodict['verb'] = verb
+  infodict['verb'] = verbstr
 
-  if len(version) != len("HTTP/1.1"):
+  if len(versionstr) != len("HTTP/1.1"):
     raise _httpserver_BadRequest("Bad HTTP command")
-  version = version.upper()
-  if version == "HTTP/1.0":
+  versionstr = versionstr.upper()
+  if versionstr == "HTTP/1.0":
     infodict['version'] = '1.0'
-  elif version == "HTTP/1.1":
+  elif versionstr == "HTTP/1.1":
     infodict['version'] = '1.1'
   else:
     raise _httpserver_BadRequest("Unrecognized HTTP version")
 
-  if rawpath.find("?") != -1:
-    infodict['path'], infodict['querystr'] = rawpath.split("?", 1)
+  if rawpathstr.find("?") != -1:
+    infodict['path'], infodict['querystr'] = rawpathstr.split("?", 1)
   else:
-    infodict['path'] = rawpath
+    infodict['path'] = rawpathstr
     infodict['querystr'] = None
 
   try:
-    infodict['headers'] = _httpretrieve_parse_responseheaders(otherheaders)
+    infodict['headers'] = _httpretrieve_parse_responseheaders(otherheaderslist)
   except HttpBrokenServerError:
     raise _httpserver_BadRequest("Request headers are misformed.")
 
@@ -294,12 +294,12 @@ def _httpserver_parseHTTPheader(headerdata):
 
 
 
-def _httpserver_sendAll(sock, data, besteffort=False):
-  # Sends all the data to sock. If besteffort is True,
+def _httpserver_sendAll(sock, datastr, besteffort=False):
+  # Sends all the data in datastr to sock. If besteffort is True,
   # we don't care if it fails or not.
   try:
-    while len(data) > 0:
-      data = data[sock.send(data):]
+    while len(datastr) > 0:
+      datastr = datastr[sock.send(datastr):]
   except:
     if not besteffort:
       raise
@@ -307,50 +307,50 @@ def _httpserver_sendAll(sock, data, besteffort=False):
 
 
 
-def _httpserver_getline(sock, data):
-  # Reads a line out of data (if possible), or failing that, gets more from
+def _httpserver_getline(sock, datastr):
+  # Reads a line out of datastr (if possible), or failing that, gets more from
   # the socket. Returns (line, extra).
 
   try:
-    newdata = ""
+    newdatastr = ""
     while True:
-      end = data.find("\n", -len(newdata))
-      if end != -1:
-        return (data[:end], data[end+1:])
-      newdata = sock.recv(4096)
-      data += newdata
+      endloc = datastr.find("\n", -len(newdatastr))
+      if endloc != -1:
+        return (datastr[:endloc], datastr[endloc+1:])
+      newdatastr = sock.recv(4096)
+      datastr += newdatastr
   except Exception, e:
-    if "Socket closed" in str(e) and len(data) != 0:
-      return (data, "")
+    if "Socket closed" in str(e) and len(datastr) != 0:
+      return (datastr, "")
     raise
 
 
 
 
-def _httpserver_getblock(size, sock, data):
-  # Reads a block of size size out of data (if possible), or failing that,
-  # gets more from the socket. Returns (block, extra).
+def _httpserver_getblock(blocksize, sock, datastr):
+  # Reads a block of size blocksize out of datastr (if possible), or failing
+  # that, gets more from the socket. Returns (block, extra).
 
   try:
-    while len(data) < size:
-      data += sock.recv(4096)
+    while len(datastr) < blocksize:
+      datastr += sock.recv(4096)
 
-    return (data[:size], data[size:])
+    return (datastr[:blocksize], datastr[blocksize:])
   except Exception, e:
-    if "Socket closed" in str(e) and len(data) != 0:
-      return (data, "")
+    if "Socket closed" in str(e) and len(datastr) != 0:
+      return (datastr, "")
     raise
 
 
 
 
-def httpserver_stopcallback(id):
+def httpserver_stopcallback(callbackid):
   """
   <Purpose>
     Removes an existing callback function.
 
   <Arguments>
-    id:
+    callbackid:
       The id returned by httpserver_registercallback().
 
   <Exceptions>
@@ -365,9 +365,9 @@ def httpserver_stopcallback(id):
   """
   _httpserver_context['lock'].acquire()
   try:
-    stopcomm(_httpserver_context['handles'][id])
-    del _httpserver_context['handles'][id]
-    del _httpserver_context['cbfuncs'][id]
+    stopcomm(_httpserver_context['handles'][callbackid])
+    del _httpserver_context['handles'][callbackid]
+    del _httpserver_context['cbfuncs'][callbackid]
   finally:
     _httpserver_context['lock'].release()
 
@@ -450,44 +450,51 @@ class _httpserver_bodystream:
   def read(self, size=None):
     self._lock.acquire()  # Serialize file-like object reads.
 
-    try:
-      headers = self._headers
-      verb = self._verb
+    # Keep the same API as file(), but use a more understandable variable
+    # name through this method.
+    requestsize = size
 
+    try:
       if self._done:
         return ""
 
-      if size is not None and size == 0:
+      if requestsize is not None and requestsize == 0:
         return ""
 
       if not self._chunked:
         # Plain Content-Length message body.
         toyieldlen = self._leftinchunk
-        if size is not None:
-          toyieldlen = min(size, toyieldlen)
+        if requestsize is not None:
+          toyieldlen = min(requestsize, toyieldlen)
 
-        toyield, self._rawdata = _httpserver_getblock(toyieldlen, \
+        # toyieldstr is the string we will return to the user this time,
+        # as if this were a python generator (which is a nice way to think
+        # about it).
+        toyieldstr, self._rawdata = _httpserver_getblock(toyieldlen, \
             self._sock, self._rawdata)
-        self._leftinchunk -= len(toyield)
+        self._leftinchunk -= len(toyieldstr)
 
         if self._leftinchunk == 0:
           self._done = True
 
-        return toyield
+        return toyieldstr
 
       else:
         # Chunked message body.
         self._data = ""
-        while size is None or len(self._data) < size:
+
+        # Read until there isn't anymore, OR until we have enough to satisfy
+        # the user's request.
+        while requestsize is None or len(self._data) < requestsize:
           if self._leftinchunk > 0:
-            sz = self._leftinchunk
-            if size is not None:
-              sz = min(self._leftinchunk, size)
-            chunk, self._rawdata = _httpserver_getblock(sz, self._sock, \
+            nextblocksize = self._leftinchunk
+            if requestsize is not None:
+              nextblocksize = min(self._leftinchunk, requestsize)
+            chunkstr, self._rawdata = _httpserver_getblock(nextblocksize, self._sock, \
                 self._rawdata)
-            self._leftinchunk -= len(chunk)
-            self._data += chunk
-            if len(chunk) < sz:
+            self._leftinchunk -= len(chunkstr)
+            self._data += chunkstr
+            if len(chunkstr) < nextblocksize:
               break
           else:
             if self._leftinchunk is not None:
@@ -506,9 +513,11 @@ class _httpserver_bodystream:
               self._done = True
               break
 
+        # Determine how much data we should return, and how much we should
+        # keep around for the next read.
         retlen = len(self._data)
-        if size is not None:
-          retlen = min(size, retlen)
+        if requestsize is not None:
+          retlen = min(requestsize, retlen)
 
         retval, self._data = self._data[:retlen], self._data[retlen:]
         return retval
