@@ -150,7 +150,7 @@ def advertise_announce(key, value, ttlval, concurrentevents=2, \
   parallelize_closefunction(ph)
 
   if exceptions[0] != '':
-    raise AdvertiseError, exceptions
+    raise AdvertiseError(exceptions)
 
   return None
 
