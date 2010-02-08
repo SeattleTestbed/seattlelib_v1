@@ -40,8 +40,6 @@ def getvesselresources_portnum(portnum, ipaddr=getmyip(), portval=1224):
 	
     #get a list of all the vessels
     vessel_list = nmclient_getvesseldict(nmhandle)
-  except Exception, e:
-    raise
   finally:
     nmclient_destroyhandle(nmhandle)	
 
@@ -92,7 +90,7 @@ def getvesselresources_vesselname(vesselname, ipaddr=getmyip(), portval=1224):
     #dictionary that contains all the resources for the vessel
     resultdict={}
 
-    #initialize the list for the vessel that the user is looking for  
+    #initialize the dictionary for the vessel that the user is looking for  
     resultdict[vesselname]={}
 	
     #if vessel name is invalid, throw a value error
