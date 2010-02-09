@@ -385,7 +385,6 @@ class _httpserver_bodystream:
     self._verb = verb
     self._headers = headers
     self._leftinchunk = None
-    self._nobody = False
     self._chunked = False
     self._done = False
     self._lock = getlock()
@@ -399,7 +398,6 @@ class _httpserver_bodystream:
                 "' cannot send an entity-body and therefore a " + \
                 "Content-Length or Transfer-Encoding header is invalid.")
       else:
-        self._nobody = True
         self._done = True
         return
 
@@ -534,8 +532,8 @@ class _httpserver_bodystream:
     # Discard extra message without filling RAM. No-op if the user function
     # has already read the entire stream.
     while True:
-      a = self.read(4096)
-      if len(a) == 0:
+      unuseddatastr = self.read(4096)
+      if len(unuseddatastr) == 0:
         break
 
     if not self._chunked:
