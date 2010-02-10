@@ -215,10 +215,10 @@ def _httpserver_socketcb(remoteip, remoteport, sock, ch, listench, httpdid):
         break
 
       # We shouldn't encounter these, other than 'Socket closed' ones. They
-      # represent a bug in our code somewhere, and shouldn't leak information
-      # to the client, so we just disconnect. Ideally, we'll add logging
-      # to this module some time and log these errors there.
-      break
+      # represent a bug in our code somewhere. However, not raising the
+      # exception makes HTTP server software incredibly unintuitive to
+      # debug.
+      raise
 
 
 

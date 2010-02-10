@@ -34,6 +34,9 @@ class stringio:
 
     self._string = self._string[len(retval):]
     return retval
+  
+  def close(self):
+    pass
 
 
 
