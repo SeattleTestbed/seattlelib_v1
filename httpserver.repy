@@ -383,14 +383,38 @@ class _httpserver_bodystream:
   # at a time.
 
   def __init__(self, sock, data, verb, headers):
+    # The socket object for communicating with the client:
     self._sock = sock
+    # And any data we have already read off the socket, but has not been
+    # consumed (we read data in 4 kilobyte chunks and keep the extra
+    # around for later use).
     self._rawdata = data
+
+    # The HTTP request verb (GET, POST, etc); a string.
     self._verb = verb
+
+    # A dictionary of the client's request headers, as parsed by
+    # _httpretrieve_parse_responseheaders() (this is a function which
+    # should be moved elsewhere; for example, an http_common.repy
+    # library would work).
     self._headers = headers
+
+    # The number of bytes left in the current chunk, if the client's
+    # request body is transfer-encoded (integer, or None).
     self._leftinchunk = None
+
+    # Whether or not the client's request body was transfer-encoded.
     self._chunked = False
+
+    # A flag set when we know we have finished reading the current
+    # request body, so we can return the empty string.
     self._done = False
+
+    # A lock used to serialize reads from this file-like object.
     self._lock = getlock()
+
+    # A flag set when we are finished reading HTTP "trailers". Only applies
+    # to client requests sent with chunked transfer-encoding.
     self._trailersread = False
 
     # Deal with methods that cannot send a message body:
