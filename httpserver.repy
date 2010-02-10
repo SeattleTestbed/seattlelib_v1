@@ -104,6 +104,9 @@ def httpserver_registercallback(addresstuple, cbfunc):
     TypeError, ValueError, KeyError, IndexError if arguments to this
     function are malformed.
 
+    Raises any exception waitforconn() will raise if the (hostname, port)
+    tuple is restricted, already taken, etc.
+
   <Side Effects>
     Starts a listener on the given host and port.
 
