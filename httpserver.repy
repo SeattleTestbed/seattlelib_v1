@@ -671,7 +671,7 @@ class _httpserver_bodystream:
             self._rawdata)
         self._rawdata = nextchar + self._rawdata
         if nextchar in (" ", "\t"):
-          line2, rawdata = _httpserver_getline(sock, rawdata)
+          line2, self._rawdata = _httpserver_getline(self._sock, self._rawdata)
           line += " " + line2.lstrip()
         else:
           break

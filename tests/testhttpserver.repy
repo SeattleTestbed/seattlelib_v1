@@ -402,13 +402,40 @@ def test15():
 
 
 
+def test16():
+  # Test that trailer-parsing of multi-line headers works.
+  test16 = \
+      "POST /test16 HTTP/1.1\r\n" + \
+      "Connection: close\r\n" + \
+      "Transfer-Encoding: chunked\r\n" + \
+      "\r\n" + \
+      "0\r\n" + \
+      "Content-length:\r\n" + \
+      "  67\r\n" + \
+      "\r\n"
+
+  test16exp = \
+      "HTTP/1.1 200 OK\r\n" + \
+      "Content-Type: text/html\r\n" + \
+      "Transfer-Encoding: chunked\r\n" + \
+      "\r\n" + \
+      "A\r\n" + \
+      "/test16\n0\n\r\n" + \
+      "0\r\n" + \
+      "Content-Length: 10\r\n" + \
+      "\r\n"
+
+  return (test16, test16exp)
+
+
+
 def tests():
   id = httpserver_registercallback(('127.0.0.1', 12345), func1)
 
   # Test some basic HTTP behavior:
   failed = []
   for test in [test1, test2, test3, test4, test5, test6, test7, test8, \
-      test9, test10, test11, test12]:
+      test9, test10, test11, test12, test16]:
     a = openconn('127.0.0.1', 12345)
     send, expected = test()
     sendall(a, send)
