@@ -819,24 +819,24 @@ def _httpserver_process_single_request(sock, cbfunc, extradata):
     statuscode = result['statuscode']
     statusmsg = result['statusmsg']
     headers = result['headers']
-    message = result['message']
+    messagestream = result['message']
   except (KeyError, TypeError):
     raise _httpserver_ServerError("httpserver: Callback function " + \
         "returned malformed dictionary")
+
+  # If the message object is a string, wrap it in a file-like object.
+  if type(messagestream) is str:
+    messagestream = _httpserver_StringIO(messagestream)
 
   # Don't let the callback function serve HTTP/1.1 responses to an HTTP/1.0
   # request.
   if reqinfo['version'] == "1.0" and version == "1.1":
     version = "1.0"
 
-  # If the message object is a string, wrap it in a file-like object.
-  if type(message) is str:
-    message = _httpserver_StringIO(message)
-
   # Send response as instructed by callback
   if version == "0.9":
     # HTTP/0.9 doesn't have response headers.
-    _httpserver_sendfile(sock, message)
+    _httpserver_sendfile(sock, messagestream)
     closeconn = True
 
   elif version == "1.0":
@@ -848,7 +848,7 @@ def _httpserver_process_single_request(sock, cbfunc, extradata):
     _httpserver_sendAll(sock, response, besteffort=True)
 
     # Send the response body:
-    _httpserver_sendfile(sock, message)
+    _httpserver_sendfile(sock, messagestream)
     closeconn = True
 
   elif version == "1.1":
@@ -871,7 +871,7 @@ def _httpserver_process_single_request(sock, cbfunc, extradata):
 
       # Read chunks from the callback and efficiently send them to
       # the client using HTTP/1.1 chunked encoding.
-      _httpserver_sendfile_chunked(sock, message)
+      _httpserver_sendfile_chunked(sock, messagestream)
 
     except Exception, e:
       if "socket" not in str(e).lower():
@@ -892,6 +892,6 @@ def _httpserver_process_single_request(sock, cbfunc, extradata):
         "invalid HTTP version")
 
   # Clean up open file handles:
-  message.close()
+  messagestream.close()
 
   return (closeconn, extradata)
