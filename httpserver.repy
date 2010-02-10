@@ -389,6 +389,14 @@ def httpserver_stopcallback(callbackid):
 
 
 class _httpserver_bodystream:
+  """
+  _httpserver_bodystream is a helper class passed as the 'datastream' entry
+  in the dictionary sent to user callback functions. It has a read() method
+  that behaves very similarly to file.read() Other than that, this object
+  is nothing like Python's file.
+
+  """
+
   # Reads the rest of the HTTP request from the socket, erroring
   # appropriately. Understands transfer-coding. Returns chunks
   # at a time.
