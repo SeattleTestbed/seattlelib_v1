@@ -66,14 +66,14 @@ _httpserver_context = {
 
 
 
-def httpserver_registercallback(socket, cbfunc):
+def httpserver_registercallback(addresstuple, cbfunc):
   """
   <Purpose>
-    Registers a callback function on the socket.
+    Registers a callback function on the (host, port).
 
   <Arguments>
-    socket:
-      A socket 2-tuple to bind to: ('host', port).
+    addresstuple:
+      An address 2-tuple to bind to: ('host', port).
 
     cbfunc:
       The callback function to process requests. It takes one argument,
@@ -131,7 +131,7 @@ def httpserver_registercallback(socket, cbfunc):
 
 
     _httpserver_context['handles'][newhttpdid] = \
-        waitforconn(socket[0], socket[1], _httpserver_cbclosure)
+        waitforconn(addresstuple[0], addresstuple[1], _httpserver_cbclosure)
     _httpserver_context['cbfuncs'][newhttpdid] = cbfunc
 
     return newhttpdid
@@ -631,10 +631,10 @@ class _httpserver_StringIO:
 
 
 
-def _httpserver_sendfile(sock, file):
-  # Attempts to forward all of the data from file to sock.
+def _httpserver_sendfile(sock, filelikeobj):
+  # Attempts to forward all of the data from filelikeobj to sock.
   while True:
-    chunk = file.read(4096)
+    chunk = filelikeobj.read(4096)
     if len(chunk) == 0:
       break
     _httpserver_sendAll(sock, chunk, besteffort=True)
@@ -642,12 +642,12 @@ def _httpserver_sendfile(sock, file):
 
 
 
-def _httpserver_sendfile_chunked(sock, file):
-  # Attempts to forward all of the data from file to sock, using chunked
+def _httpserver_sendfile_chunked(sock, filelikeobj):
+  # Attempts to forward all of the data from filelikeobj to sock, using chunked
   # encoding.
   totallen = 0
   while True:
-    chunk = file.read(4096)
+    chunk = filelikeobj.read(4096)
     if len(chunk) == 0:
       break
     # encode as HTTP/1.1 chunks:
