@@ -671,15 +671,13 @@ class _httpserver_bodystream:
         trailers[hdrname] = []
       trailers[hdrname].append(hdrval.strip())
 
-    # get_extra() expects extra data in self._data.
-    self._data = self._rawdata
     self._trailersread = True
     return trailers
 
 
 
 
-  def get_extra(self):
+  def _get_extra(self):
     # Private function of httpserver, *should not be used by callback
     # functions*! NOT parallel-safe, NOT meant to be called more than
     # once.
@@ -795,7 +793,7 @@ def _httpserver_process_single_request(sock, cbfunc, extradata):
 
   # Get any extra data consumed from sock by the message body stream object,
   # but that was not actually part of the message body.
-  extradata = messagebodystream.get_extra()
+  extradata = messagebodystream._get_extra()
 
   # Interpret result of callback function
   try:
