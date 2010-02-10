@@ -400,7 +400,9 @@ class _httpserver_bodystream:
     self._headers = headers
 
     # The number of bytes left in the current chunk, if the client's
-    # request body is transfer-encoded (integer, or None).
+    # request body is transfer-encoded (integer, or None), or the
+    # number of bytes in the entire request body if it is not transfer-
+    # encoded.
     self._leftinchunk = None
 
     # Whether or not the client's request body was transfer-encoded.
@@ -416,6 +418,11 @@ class _httpserver_bodystream:
     # A flag set when we are finished reading HTTP "trailers". Only applies
     # to client requests sent with chunked transfer-encoding.
     self._trailersread = False
+
+    # For chunked transfers only: Keep a queue of unconsumed but decoded
+    # data (string).
+    self._data = ""
+
 
     # Deal with methods that cannot send a message body:
     if verb in ("GET", "HEAD", "TRACE", "DELETE"):
@@ -479,62 +486,84 @@ class _httpserver_bodystream:
     # name through this method.
     requestsize = size
 
+    # The following 'Try' block is used to always unlock self._lock, no
+    # matter how we return up the stack:
     try:
+      # If we already know we are finished, simply return the empty string.
       if self._done:
         return ""
 
-      if requestsize is not None and requestsize == 0:
+      if requestsize == 0:
         return ""
 
+      # If the client's request was not chunked, but instead they specified
+      # the Content-length header:
       if not self._chunked:
-        # Plain Content-Length message body.
+        # toyieldstr is the string we will return to the user this time,
+        # as if this were a python generator (which is a nice way to think
+        # about it). We determine the amount to return, toyieldlen:
         toyieldlen = self._leftinchunk
         if requestsize is not None:
           toyieldlen = min(requestsize, toyieldlen)
 
-        # toyieldstr is the string we will return to the user this time,
-        # as if this were a python generator (which is a nice way to think
-        # about it).
+        # And strive to return as much of it as possible:
         toyieldstr, self._rawdata = _httpserver_getblock(toyieldlen, \
             self._sock, self._rawdata)
         self._leftinchunk -= len(toyieldstr)
 
+        # If there is nothing left in the request, we're done; keep a note
+        # for future read() calls.
         if self._leftinchunk == 0:
           self._done = True
 
         return toyieldstr
 
+      # If the client's request was chunked:
       else:
-        # Chunked message body.
-        self._data = ""
-
         # Read until there isn't anymore, OR until we have enough to satisfy
         # the user's request.
         while requestsize is None or len(self._data) < requestsize:
+          # If we have more raw bytes to read from the socket before
+          # reaching the end of this chunk:
           if self._leftinchunk > 0:
+            # Determine how many bytes to (attempt to) read from the client:
             nextblocksize = self._leftinchunk
             if requestsize is not None:
               nextblocksize = min(self._leftinchunk, requestsize)
+
+            # Try and request the rest of the chunk, or as much as is
+            # needed to fulfill the caller's request.
             chunkstr, self._rawdata = _httpserver_getblock(nextblocksize, self._sock, \
                 self._rawdata)
             self._leftinchunk -= len(chunkstr)
             self._data += chunkstr
+
+            # We stop trying if we can't get as much data as we wanted to,
+            # because this means that the client has closed the socket.
             if len(chunkstr) < nextblocksize:
               break
+
+          # We are finished with this chunk; now we must determine if there
+          # is another chunk, and what its length is.
           else:
+            # HTTP chunks have "\r\n" appended to the end of them; if we
+            # just finished reading a chunk, read off the trailing "\r\n"
+            # and discard it.
             if self._leftinchunk is not None:
-              # Read off trailing "\r\n":
               _, self._rawdata = _httpserver_getblock(2, self._sock, \
                   self._rawdata)
             
             # Read the next chunk's size information:
             line, self._rawdata = _httpserver_getline(self._sock, \
                 self._rawdata)
+
             # Remove optional chunk extensions (";" -> newline) that we don't
-            # understand, and read the hex chunk size:
+            # understand (this is advised by the HTTP 1.1 RFC), and read the
+            # hex chunk size:
             self._leftinchunk = int(line.split(";", 1)[0].strip(), 16)
+
+            # A chunk size of '0' indicates the end of a chunked message:
             if self._leftinchunk == 0:
-              # Chunked stream is finished.
               self._done = True
               break
 
