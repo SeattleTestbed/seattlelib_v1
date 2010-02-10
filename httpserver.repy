@@ -392,7 +392,7 @@ class _httpserver_bodystream:
   """
   _httpserver_bodystream is a helper class passed as the 'datastream' entry
   in the dictionary sent to user callback functions. It has a read() method
-  that behaves very similarly to file.read() Other than that, this object
+  that behaves very similarly to file.read(). Other than that, this object
   is nothing like Python's file.
 
   """
