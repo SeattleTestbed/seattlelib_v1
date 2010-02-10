@@ -480,6 +480,27 @@ class _httpserver_bodystream:
 
 
   def read(self, size=None):
+    """
+    <Purpose>
+      Read a sequence of bytes from an HTTP request body.
+
+    <Arguments>
+      size (optional):
+        An upper limit on the number of bytes to return.
+
+    <Exceptions>
+      Any raised by socket.read().
+
+    <Side Effects>
+      Possibly reads more from the socket that the HTTP request is passed
+      on.
+
+    <Returns>
+      A string of bytes comprising part of the HTTP message body. Does not
+      include any chunked encoding trailers.
+
+    """
+
     self._lock.acquire()  # Serialize file-like object reads.
 
     # Keep the same API as file(), but use a more understandable variable
@@ -582,6 +603,31 @@ class _httpserver_bodystream:
 
 
   def get_trailers(self):
+    """
+    <Purpose>
+      Read any 'trailers' sent by the client. The caller does not need to
+      ensure that the entire message body has been read first, though they
+      should be aware that calling this method consumes any remaining
+      message body and immediately forgets it.
+
+      Note: not multithread safe, not multi-call safe (calls after the
+      first call will simply return the empty dictionary).
+
+    <Arguments>
+      None.
+
+    <Exceptions>
+      Any raised by socket.read().
+
+    <Side Effects>
+      Possibly reads more from the socket that the HTTP request is passed
+      on.
+
+    <Returns>
+      A dictionary of headers in the same style as
+      _httpretrieve_parse_responseheaders().
+
+    """
     # Reads the rest of the message, and then reads and returns any trailer
     # headers (only sent in chunked messages).
 
