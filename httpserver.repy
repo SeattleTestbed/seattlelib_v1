@@ -129,7 +129,9 @@ def httpserver_registercallback(addresstuple, cbfunc):
       # Close the socket afterwards.
       try:
         sock.close()
-      except:
+      except Exception, e:
+        if "socket" not in str(e).lower():
+          raise
         pass    # Best effort.
 
 
@@ -288,7 +290,7 @@ def _httpserver_parseHTTPheader(headerdatalist):
 
   try:
     infodict['querydict'] = urllib_unquote_parameters(infodict['querystr'])
-  except:
+  except (ValueError, AttributeError):
     infodict['querydict'] = None
 
   return infodict
@@ -303,7 +305,9 @@ def _httpserver_sendAll(sock, datastr, besteffort=False):
   try:
     while len(datastr) > 0:
       datastr = datastr[sock.send(datastr):]
-  except:
+  except Exception, e:
+    if "socket" not in str(e).lower():
+      raise
     if not besteffort:
       raise
 
@@ -854,7 +858,10 @@ def _httpserver_process_single_request(sock, cbfunc, extradata):
       # the client using HTTP/1.1 chunked encoding.
       _httpserver_sendfile_chunked(sock, message)
 
-    except:
+    except Exception, e:
+      if "socket" not in str(e).lower():
+        raise
+
       # The exception we're trying to catch here is anything sock.send()
       # raises. However, it just raises plain exceptions.
 
