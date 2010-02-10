@@ -365,10 +365,47 @@ def test13():
 
 
 
+def test14():
+  # Test that callback functions that don't take parameters show an error.
+  def callback():
+    pass
+
+  test14 = "GET / HTTP/1.0\r\n" + \
+      "\r\n"
+
+  test14exp = "HTTP/1.0 500 Internal Server Error\r\n" + \
+      "Content-Type: text/plain\r\n" + \
+      "\r\n" + \
+      "httpserver: Callback function raised an exception: callback() " + \
+      "takes no arguments (1 given)\r\n"
+
+  return (callback, test14, test14exp)
+
+
+
+def test15():
+  # Test that callback functions that don't return a dictionary with
+  # all of the needed values raise an exception.
+  
+  def callback(msg):
+    return None
+
+  test15 = "GET / HTTP/1.0\r\n" + \
+      "\r\n"
+
+  test15exp = "HTTP/1.0 500 Internal Server Error\r\n" + \
+      "Content-Type: text/plain\r\n" + \
+      "\r\n" + \
+      "httpserver: Callback function returned malformed dictionary\r\n"
+
+  return (callback, test15, test15exp)
+
+
 
 def tests():
   id = httpserver_registercallback(('127.0.0.1', 12345), func1)
 
+  # Test some basic HTTP behavior:
   failed = []
   for test in [test1, test2, test3, test4, test5, test6, test7, test8, \
       test9, test10, test11, test12]:
@@ -385,6 +422,7 @@ def tests():
   httpserver_stopcallback(id)
   id = httpserver_registercallback(('127.0.0.1', 12345), func2)
 
+  # More HTTP tests:
   for test in [test13]:
     a = openconn('127.0.0.1', 12345)
     send, expected = test()
@@ -397,6 +435,23 @@ def tests():
     a.close()
 
   httpserver_stopcallback(id)
+
+  # Test behavior of server in response to callback functions (specifically
+  # errors sent to the user):
+  for test in [test14, test15]:
+    cbfunc, send, experror = test()
+    id = httpserver_registercallback(('127.0.0.1', 12345), cbfunc)
+    a = openconn('127.0.0.1', 12345)
+
+    sendall(a, send)
+    actual = recvall(a)
+    try:
+      assert (actual == experror)
+    except AssertionError, ae:
+      failed.append((str(test), experror, actual))
+    a.close()
+    httpserver_stopcallback(id)
+    
 
   for failure in failed:
     print "A test failed:"
