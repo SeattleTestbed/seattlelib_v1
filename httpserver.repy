@@ -687,8 +687,7 @@ class _httpserver_bodystream:
     
     # Discard extra message without filling RAM
     while True:
-      a = self.read(4096)
-      if len(a) == 0:
+      if len(self.read(4096)) == 0:
         break
 
     # Discard trailers, if any are left:
