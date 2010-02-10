@@ -59,6 +59,13 @@ class _httpserver_BadTransferCoding(Exception):
 
 
 
+# This global dictionary is used to keep track of open HTTP callbacks.
+# The 'lock' entry is used to serialize changes to the other entries.
+# The 'handles' dictionary maps numeric ids we hand out in
+# httpserver_registercallback() and take in httpserver_stopcallback()
+# to ids returned and used by waitforconn(). The 'cbfuncs' entry
+# maps httpserver numeric ids to the callback function associated
+# with them.
 _httpserver_context = {
     'handles': {},
     'cbfuncs': {},
