@@ -28,6 +28,7 @@ NAT_ADVERTISE_POOL = {}
 # Run controls the advertisement thread, False will stop the thread
 NAT_ADVERTISE_STATE = {"enable":False,"run":False}
 
+
 # Registers the forwarder so that clients using the NATLayer can find us
 def nat_forwarder_advertise(ip, serverport, clientport):
   # Generate the value to advertise
@@ -55,27 +56,8 @@ def nat_stop_server_advertise(key):
   
   if key in NAT_ADVERTISE_POOL:
     del NAT_ADVERTISE_POOL[key]
-    
-# Lookup a forwarder so that we can connect
-def nat_forwarder_lookup():
-  # Get the list of forwarders
-  forwarders = advertise_lookup(NAT_FORWARDER_ADVERTISE_KEY, NAT_MAX_LOOKUP)
+ 
 
-  # Safety check..
-  if len(forwarders) <= 1 and forwarders[0] == '':
-    raise Exception, "No forwarders could be found!"
-  
-  # Grab a random forwarder
-  index = int(randomfloat() * (len(forwarders)-1))
-
-  # Get the info
-  forwarderInfo = forwarders[index]
-  
-  try:
-    (ip,server_port,client_port) = forwarderInfo.split('*')
-  except ValueError:
-    raise Exception, 'Forwarder lookup returned unexpected value'
-  
 
 
 # Lookup a forwarder so that we can connect
@@ -84,7 +66,7 @@ def nat_forwarder_list_lookup():
   forwarders = advertise_lookup(NAT_FORWARDER_ADVERTISE_KEY, NAT_MAX_LOOKUP)
 
   # Safety check..
-  if len(forwarders) <= 1 and forwarders[0] == '':
+  if len(forwarders) ==0:
     raise Exception, "No forwarders could be found!"
   
 
@@ -96,11 +78,13 @@ def nat_forwarder_list_lookup():
   
     try:
       (ip,server_port,client_port) = forwarderInfo.split('*')
-    except ValueError:
-      raise Exception, 'Forwarder lookup returned unexpected value'
+    except:
+      pass # ignore invalid items in lookup
     else:
       list.append((ip,server_port,client_port))
    
+  if len(list) == 0:
+    raise Exception("No valid forwareder results found be lookup!")
 
   # Return a tuple containing the IP and port for server and client
   return list
