@@ -84,7 +84,7 @@ def nat_forwarder_list_lookup():
       list.append((ip,server_port,client_port))
    
   if len(list) == 0:
-    raise Exception("No valid forwareder results found be lookup!")
+    raise Exception("No valid forwareder results found by lookup!")
 
   # Return a tuple containing the IP and port for server and client
   return list
