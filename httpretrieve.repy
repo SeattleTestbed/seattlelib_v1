@@ -153,7 +153,7 @@ def httpretrieve_open(url, postdata=None, querydata=None, \
         raise
 
   httpheaderlines = headers_str.split("\r\n")
-  while httpheaderlines[-1] == "":
+  while len(httpheaderlines) > 0 and httpheaderlines[-1] == "":
     httpheaderlines = httpheaderlines[:-1]
 
   # get the status code and status message from the HTTP response
