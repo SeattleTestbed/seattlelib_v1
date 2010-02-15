@@ -93,7 +93,8 @@ def httpserver_registercallback(addresstuple, cbfunc):
           'querydict': { 'foo': 'bar', 'baz': None }
           'version': '0.9',
           'datastream': object with a file-like read() method,
-          'headers': { 'Content-Type': 'application/x-xmlrpc-data'}
+          'headers': { 'Content-Type': 'application/x-xmlrpc-data'},
+          'httpdid': 17
         }
       ('datastream' is a stream of any HTTP message body data sent by the
       client.)
@@ -118,7 +119,8 @@ def httpserver_registercallback(addresstuple, cbfunc):
     Starts a listener on the given host and port.
 
   <Returns>
-    A handle for the listener. This can be used to stop the server.
+    A handle for the listener (an httpdid). This can be used to stop the
+    server.
 
   """
 
@@ -183,7 +185,7 @@ def _httpserver_socketcb(remoteip, remoteport, sock, ch, listench, httpdid):
       # function tells it to send. On error, may raise one of many
       # exceptions, which we deal with here:
       closeconn, extradata = \
-          _httpserver_process_single_request(sock, cbfunc, extradata)
+          _httpserver_process_single_request(sock, cbfunc, extradata, httpdid)
 
       if closeconn:
         break
@@ -781,7 +783,7 @@ def _httpserver_sendfile_chunked(sock, filelikeobj):
 
 
 
-def _httpserver_process_single_request(sock, cbfunc, extradata):
+def _httpserver_process_single_request(sock, cbfunc, extradata, httpdid):
   # This function processes a single request in from sock, and either
   # puts a response to the socket and returns, or raises an exception.
 
@@ -795,6 +797,7 @@ def _httpserver_process_single_request(sock, cbfunc, extradata):
   messagebodystream = _httpserver_bodystream(sock, \
       extradata, reqinfo['verb'], reqinfo['headers'])
   reqinfo['datastream'] = messagebodystream
+  reqinfo['httpdid'] = httpdid
 
   # By default, we don't want to close the connection. (Though, nearly
   # every case will change this to True -- only HTTP/1.1 sockets

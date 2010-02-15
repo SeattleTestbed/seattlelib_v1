@@ -429,6 +429,30 @@ def test16():
 
 
 
+def test17():
+  # Test that callback functions get the httpdid as an entry in the
+  # request dictionary.
+  
+  def callback(msg):
+    if "httpdid" not in msg:
+      raise Exception("httpdid not in info dict.")
+    if msg["httpdid"] not in _httpserver_context["handles"]:
+      raise Exception("httpdid invalid.")
+    return func1(msg)
+
+  test17 = "GET /test17 HTTP/1.0\r\n" + \
+      "\r\n"
+
+  test17exp = \
+      "HTTP/1.0 200 OK\r\n" + \
+      "Content-Type: text/html\r\n" + \
+      "\r\n" + \
+      "/test17\n"
+
+  return (callback, test17, test17exp)
+
+
+
 def tests():
   id = httpserver_registercallback(('127.0.0.1', 12345), func1)
 
@@ -465,7 +489,7 @@ def tests():
 
   # Test behavior of server in response to callback functions (specifically
   # errors sent to the user):
-  for test in [test14, test15]:
+  for test in [test14, test15, test17]:
     cbfunc, send, experror = test()
     id = httpserver_registercallback(('127.0.0.1', 12345), cbfunc)
     a = openconn('127.0.0.1', 12345)
