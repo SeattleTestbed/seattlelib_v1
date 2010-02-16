@@ -1,0 +1,48 @@
+"""
+<Program Name>
+  test_geoip_client.repy
+
+<Started>
+  Feb 15, 2010
+
+<Author>
+  Evan Meagher
+
+<Purpose>
+  Runs unit tests on geoip_client.repy.
+
+  These tests assume the presence of a working remote geoip server.
+"""
+
+#pragma repy
+
+include geoip_client.repy
+
+if callfunc == 'initialize':
+  geoip_init_client('http://geoip.cs.washington.edu:12679')
+
+  # Test geoip_record_by_name method by verifying location info of google.com
+  location_dict = geoip_record_by_name('google.com')
+  expected_result = {'city': 'Mountain View', 'region_name': 'CA', 'area_code': 650, 'longitude': -122.0574, 'country_code3': 'USA', 'country_name': 'United States', 'postal_code': '94043', 'dma_code': 807, 'country_code': 'US', 'latitude': 37.419199999999989}
+  assert(expected_result == location_dict)
+
+  # Test geoip_location_str method
+  assert(geoip_location_str(location_dict) == "Mountain View, CA, United States")
+  
+  # Test geoip_record_by_name method by verifying location info of
+  # 128.208.3.200 (cs.washington.edu)
+  expected_result = {'city': 'Seattle', 'region_name': 'WA', 'area_code': 206, 'longitude': -122.2919, 'country_code3': 'USA', 'country_name': 'United States', 'postal_code': '98105', 'dma_code': 819, 'country_code': 'US', 'latitude': 47.660599999999988}
+  location_dict = geoip_record_by_addr('128.208.3.200')
+  assert(expected_result == location_dict)
+
+  # Test geoip_location_str method
+  assert(geoip_location_str(location_dict) == "Seattle, WA, United States")
+  
+  # Try to connect to an invalid ip:port
+  geoip_init_client('http://geoip.cs.washington.edu:1010')
+  try:
+    location_dict = geoip_record_by_name('amazon.com')
+  except Exception, e:
+    pass
+  else:
+    raise Exception
