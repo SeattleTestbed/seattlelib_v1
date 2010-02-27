@@ -153,6 +153,8 @@ def httpretrieve_open(url, postdata=None, querydata=None, \
   headersstr = ""
   while not headersstr.endswith("\r\n\r\n"):
     try:
+      # This should probably be replaced with page-sized reads in the future,
+      # but for now, the behavior is at least correct.
       headersstr += sockobj.recv(1)
     except Exception, e:
       if str(e) == "Socket closed":
@@ -177,6 +179,7 @@ def httpretrieve_open(url, postdata=None, querydata=None, \
   if len(statuslinelist) < 3:
     raise HttpBrokenServerError("Server returned garbage for HTTP " + \
         "response (status line missing one or more fields).")
+
   if not statuslinelist[0].startswith('HTTP'):
     raise HttpBrokenServerError("Server returned garbage for HTTP " + \
         "response (invalid response protocol in status line).")
@@ -244,21 +247,20 @@ def httpretrieve_save_file(url, filename, querydata=None, postdata=None, \
     None
   """
 
-  httpcontent = ''
-  newfile = open(filename, 'w')
-
-  http_obj = httpretrieve_open(url, querydata=querydata, postdata=postdata, \
+  # Open the output file object and http file-like object.
+  outfileobj = open(filename, 'w')
+  httpobj = httpretrieve_open(url, querydata=querydata, postdata=postdata, \
       httpheaders=httpheaders, timeout=timeout)
 
-  # Read from the file-like HTTP object into our file.
-  while True:
-    httpcontent = http_obj.read(4096)
-    if httpcontent == '':
-      # we're done reading
-      newfile.close()
-      http_obj.close()
-      break
-    newfile.write(httpcontent)
+  # Repeatedly read from the file-like HTTP object into our file, until the
+  # response is finished.
+  responsechunkstr = None
+  while responsechunkstr != '':
+    responsechunkstr = httpobj.read(4096)
+    outfileobj.write(responsechunkstr)
+
+  outfileobj.close()
+  httpobj.close()
 
 
 
@@ -284,11 +286,15 @@ def httpretrieve_get_string(url, querydata=None, postdata=None, \
     Returns the body of the HTTP response (no headers).
   """
 
-  http_obj = httpretrieve_open(url, querydata=querydata, postdata=postdata, \
+  # Open a read-only file-like object for the HTTP request.
+  httpobj = httpretrieve_open(url, querydata=querydata, postdata=postdata, \
       httpheaders=httpheaders, timeout=timeout)
-  httpcontent = http_obj.read()
-  http_obj.close()
-  return httpcontent
+
+  # Read all of the response and return it.
+  try:
+    return httpobj.read()
+  finally:
+    httpobj.close()
 
 
 
@@ -298,11 +304,26 @@ class _httpretrieve_filelikeobject:
   # requests and retrieving responses.
 
   def __init__(self, sock, headers, httpstatus):
-    self._sock = sock
+    # The socket-like object connected to the HTTP server. Headers have
+    # already been read.
+    self._sockobj = sock
+
+    # If this is set, the close() method has already been called, so we
+    # don't accept future reads.
     self._fileobjclosed = False
+
+    # This flag is set if we've finished recieving the entire response
+    # from the server.
     self._totalcontentisreceived = False
+
+    # This integer represents the number of bytes read so far.
     self._totalread = 0
+
+    # This is the dictionary of HTTP response headers associated with this
+    # file-like object.
     self.headers = headers
+
+    # The HTTP status tuple of this response, e.g. ("HTTP/1.0", 200, "OK")
     self.httpstatus = httpstatus
 
 
@@ -329,33 +350,35 @@ class _httpretrieve_filelikeobject:
       See file.read().
     """
 
-    if self._fileobjclosed == True:
+    # Raise an error if the caller has already close()d this object.
+    if self._fileobjclosed:
       raise ValueError("I/O operation on closed file")
 
+    # If we've finished reading everything we can from the server, return the
+    # empty string.
     if self._totalcontentisreceived:
       return ''
 
+    lefttoread = None
     if limit is not None:
-      # Sanity check type/value of limit
-      if type(limit) is not int:
-        raise TypeError("Expected an integer or None for limit")
-      elif limit < 0:
-        raise ValueError("Expected a non-negative integer for limit")
-
       lefttoread = limit
-    else:
-      lefttoread = None
+
+      # Sanity check type/value of limit.
+      if type(limit) is not int:
+        raise TypeError("Expected an integer or None for read() limit")
+      elif limit < 0:
+        raise ValueError("Expected a non-negative integer for read() limit")
 
     if timeout is None:
-      self._sock.settimeout(0)
+      self._sockobj.settimeout(0)
     else:
-      self._sock.settimeout(timeout)
+      self._sockobj.settimeout(timeout)
 
     # Try to read up to limit, or until there is nothing left.
-    httpcontent = ''
+    httpcontentstr = ''
     while True:
       try:
-        content = self._sock.recv(lefttoread or 4096)
+        contentchunkstr = self._sockobj.recv(lefttoread or 4096)
       except Exception, e:
         if str(e) == "Socket closed":
           self._totalcontentisreceived = True
@@ -363,18 +386,18 @@ class _httpretrieve_filelikeobject:
         else:
           raise
       
-      httpcontent += content
-      self._totalread += len(content)
+      httpcontentstr += content
+      self._totalread += len(contentchunkstr)
       if limit is not None:
-        if len(content) == lefttoread:
+        if len(contentchunkstr) == lefttoread:
           break
         else:
-          lefttoread -= len(content)
-      if content == "":
+          lefttoread -= len(contentchunkstr)
+      if contentchunkstr == "":
         self._totalcontentisreceived = True
         break
 
-    return httpcontent
+    return httpcontentstr
 
 
 
@@ -396,16 +419,14 @@ class _httpretrieve_filelikeobject:
       Nothing
     """
     self._fileobjclosed = True
-    try:
-      self._sock.close()
-    except Exception, e:
-      pass # don't care
+    self._sockobj.close()
 
 
 
 
 def _httpserver_put_in_headerdict(res, lastheader, lastheader_str):
-  # Tries to put the header into dictionary of lists, 'res'.
+  # Helper function that tries to put the header into a dictionary of lists,
+  # 'res'.
   if lastheader is not None:
     if lastheader not in res:
       res[lastheader] = []
@@ -426,8 +447,15 @@ def _httpretrieve_parse_responseheaders(headerlines):
   #
   # Becomes: {"Foo": ["a"], "Bar": ["b", "c"]}
 
-  lastheader = None
-  lastheader_str = ""
+  # These variables represent the key and value of the last header we found,
+  # unless we are parsing the very first header. E.g., if we've just read:
+  #   Content-Type: text/html
+  # Then, lastheaderkeystr == "Content-Type",
+  # lastheadervaluestr == "text/html"
+
+  lastheaderkeystr = None
+  lastheadervaluestr = ""
+
   res = {}
   
   if len(headerlines) == 0:
@@ -437,20 +465,21 @@ def _httpretrieve_parse_responseheaders(headerlines):
     # Iterate over the request header lines:
     for i in range(len(headerlines)):
       # Lines with leading non-CRLF whitespace characters are part of the
-      # previous line.
-      if headerlines[i][0] in (" ", "\t") and lastheader is not None:
-        lastheader_str += headerlines[i]
+      # previous line (see rfc822 for details).
+      if headerlines[i][0] in (" ", "\t") and lastheaderkeystr is not None:
+        lastheadervaluestr += headerlines[i]
       else:
-        _httpserver_put_in_headerdict(res, lastheader, lastheader_str)
-        lastheader, lastheader_str = headerlines[i].split(":", 1)
+        _httpserver_put_in_headerdict(res, lastheaderkeystr, lastheadervaluestr)
+        lastheaderkeystr, lastheadervaluestr = headerlines[i].split(":", 1)
 
-    # Add the last line to the dictionary.
-    _httpserver_put_in_headerdict(res, lastheader, lastheader_str)
+    # Add the last line to the result dictionary.
+    _httpserver_put_in_headerdict(res, lastheaderkeystr, lastheadervaluestr)
 
     return res
+
   except IndexError, idx:
     raise HttpBrokenServerError("Server returned garbage for HTTP" + \
-        " response. Bad header.")
+        " response. Bad headers.")
 
 
 
