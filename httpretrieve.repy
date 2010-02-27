@@ -456,7 +456,7 @@ def _httpretrieve_parse_responseheaders(headerlines):
   lastheaderkeystr = None
   lastheadervaluestr = ""
 
-  res = {}
+  resdict = {}
   
   if len(headerlines) == 0:
     return {}
@@ -469,13 +469,13 @@ def _httpretrieve_parse_responseheaders(headerlines):
       if headerlines[i][0] in (" ", "\t") and lastheaderkeystr is not None:
         lastheadervaluestr += headerlines[i]
       else:
-        _httpserver_put_in_headerdict(res, lastheaderkeystr, lastheadervaluestr)
+        _httpserver_put_in_headerdict(resdict, lastheaderkeystr, lastheadervaluestr)
         lastheaderkeystr, lastheadervaluestr = headerlines[i].split(":", 1)
 
     # Add the last line to the result dictionary.
-    _httpserver_put_in_headerdict(res, lastheaderkeystr, lastheadervaluestr)
+    _httpserver_put_in_headerdict(resdict, lastheaderkeystr, lastheadervaluestr)
 
-    return res
+    return resdict
 
   except IndexError, idx:
     raise HttpBrokenServerError("Server returned garbage for HTTP" + \
@@ -489,48 +489,65 @@ def _httpretrieve_build_request(host, port, path, querydata, postdata, \
   # Builds an HTTP request from these parameters, returning it as
   # a string.
 
-  method = "GET"
-  if postdata is not None:
-    method = "POST"
-    if type(postdata) is dict:
-      postdata = urllib_quote_parameters(postdata)
-    if type(postdata) is not str:
-      raise TypeError("postdata should be a dict of form data or string")
-
-  # Encode path / querystring part.
+  # Sanity checks:
   if path == "":
     raise ValueError("Invalid path -- empty string.")
+  if postdata is not None and type(postdata) not in (str, dict):
+    raise TypeError("Postdata should be a dict of form-data or a string")
+  if querydata is not None and type(querydata) not in (str, dict):
+    raise TypeError("Querydata should be a dict of form-data or a string")
+  if httpheaders is not None and type(httpheaders) is not dict:
+    raise TypeError("Expected HTTP headers as a dictionary.")
+
+  # Type-conversions:
   if type(querydata) is dict:
     querydata = urllib_quote_parameters(querydata)
-  if type(querydata) is str and querydata != "":
-    encquerydata = "?" + querydata
-  else:
-    encquerydata = ""
+  elif querydata is None:
+    querydata = ""
 
-  # Encode the request line and headers:
-  httpheader = method + ' ' + path + encquerydata + ' HTTP/1.0\r\n'
+  if type(postdata) is dict:
+    postdata = urllib_quote_parameters(postdata)
+
+  # Default to GET, unless the caller specifies a message body to send.
+  methodstr = "GET"
+  if postdata is not None:
+    methodstr = "POST"
+
+  # Encode the path and querystring part of the request.
+  resourcestr = querydata
+  if querydata != "":
+    resourcestr = "?" + resourcestr
+
+  # Encode the HTTP request line and headers:
+  requeststr = methodstr + ' ' + path + resourcestr + ' HTTP/1.0\r\n'
   if httpheaders is not None:
-    if type(httpheaders) is not dict:
-      raise TypeError("Expected HTTP headers as a dictionary.")
-    else:
-      if "Host" not in httpheaders:
-        httpheader += "Host: " + host + ':' + str(port) + "\r\n"
-      for key, val in httpheaders.items():
-        httpheader += key + ": " + val + '\r\n'
+    # Most servers require a 'Host' header for normal functionality
+    # (especially in the case of multiple domains being hosted on a
+    # single server).
+    if "Host" not in httpheaders:
+      requeststr += "Host: " + host + ':' + str(port) + "\r\n"
+
+    for key, val in httpheaders.items():
+      requeststr += key + ": " + val + '\r\n'
 
   # Affix post-data related headers and content:
-  if method == "POST":
-    httpheader += 'Content-Length: ' + str(len(postdata)) + '\r\n'
-  httpheader += '\r\n'
-  if method == "POST":
-    httpheader += postdata
+  if methodstr == "POST":
+    requeststr += 'Content-Length: ' + str(len(postdata)) + '\r\n'
 
-  return httpheader
+  # The empty line terminates HTTP headers.
+  requeststr += '\r\n'
+
+  # If we're a POST request, affix any requested data to the message body.
+  if methodstr == "POST":
+    requeststr += postdata
+
+  return requeststr
 
 
 
 
-def _httpretrieve_sendall(sock, data):
-  # Attempts to send all of data to sock.
-  while len(data) > 0:
-    data = data[sock.send(data):]
+def _httpretrieve_sendall(sockobj, datastr):
+  # Helper function that attempts to dump all of the data in datastr to the
+  # socket sockobj (data is any arbitrary bytes).
+  while len(datastr) > 0:
+    datastr = datastr[sockobj.send(datastr):]
