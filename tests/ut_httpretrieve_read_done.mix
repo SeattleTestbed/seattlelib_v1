@@ -1,3 +1,5 @@
+#pragma repy
+
 # checks httpretrieves filelikeobj read returns a empty string when called after all
 # content is received
 

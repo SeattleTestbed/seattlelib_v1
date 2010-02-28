@@ -1,3 +1,5 @@
+#pragma repy
+
 # checks httpretrieves filelikeobj read raises an excepion when called after 
 # file like object is closed 
 

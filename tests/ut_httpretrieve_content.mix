@@ -1,3 +1,5 @@
+#pragma repy
+
 # checks if httpretrieve receives the right content as sent from the http server
 
 

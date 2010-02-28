@@ -1,3 +1,5 @@
+#pragma repy
+
 # checks if filelikeobj read called with a limit higher than the actual content of the
 # server excute without raising an exception. 
 

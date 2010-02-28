@@ -169,7 +169,7 @@ def httpretrieve_open(url, postdata=None, querydata=None, \
     httpheaderlist = httpheaderlist[:-1]
 
   # Get the status code and status message from the HTTP response.
-  statuslinestr, httpheaderlines = httpheaderlines[0], httpheaderlines[1:]
+  statuslinestr, httpheaderlist = httpheaderlist[0], httpheaderlist[1:]
 
   # The status line should be in the form: "HTTP/1.X NNN SSSSS", where
   # X is 0 or 1, NNN is a 3-digit status code, and SSSSS is a 'user-friendly'
@@ -191,7 +191,7 @@ def httpretrieve_open(url, postdata=None, querydata=None, \
     raise HttpBrokenServerError("Server returned garbage for HTTP " + \
         "response (status code isn't integer).")
 
-  httpheaderdict = _httpretrieve_parse_responseheaders(httpheaderlines)
+  httpheaderdict = _httpretrieve_parse_responseheaders(httpheaderlist)
 
   # If we got any sort of redirect response, follow the redirect. Note: we
   # do *not* handle the 305 status code (use the proxy as specified in the

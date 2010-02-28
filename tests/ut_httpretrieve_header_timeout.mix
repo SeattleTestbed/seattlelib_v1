@@ -1,3 +1,5 @@
+#pragma repy
+
 # checks if httpretrieve raises an timeout exception if the http header isnt sent by the server 
 
 # prints failed error msg if httpretrieve fails the test and excutes without printing
