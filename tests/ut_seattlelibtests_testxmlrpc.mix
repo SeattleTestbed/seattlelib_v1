@@ -1,36 +1,97 @@
 """
 <Program Name>
-  $Id: testxmlrpc_common.repy 2385 2009-06-18 17:08:23Z cemeyer $
+  ut_seattlelibtests_testxmlrpc.mix
 
 <Started>
-  May 3, 2009
+  Sat Feb 27, 2010
 
 <Author>
+  Conrad Meyer
   Michael Phan-Ba
 
 <Purpose>
-  Runs unit tests on xmlrpc_common.repy.
-
-<Changes>
-
-  2009-05-03  Michael Phan-Ba  <mdphanba@gmail.com>
-
-  * Initial release
-
-  2009-05-24  Michael Phan-Ba  <mdphanba@gmail.com>
-
-  * Added change log
-  * Set property svn:keyword to "Id" 
+  Runs unit tests for the xmlrpc code.
 
 """
 
 #pragma repy
 
-include xmlrpc_server.repy
 include xmlrpc_client.repy
+include xmlrpc_server.repy
 
+def echo(arg):
+  return arg
+
+def a():
+  return 5
+
+def foo(i):
+  return i == 42
+
+def struct_setter(s):
+  s["foo"] = "bar"
+  return s
+
+def test(a,b,c,d,e):
+  return a == 5 and b == 6.5 and c == "hi" and d == [1,2] and e == {"1":2}
 
 if callfunc == 'initialize':
+  server = xmlrpc_server_SimpleXMLRPCServer(("127.0.0.1", 12345))
+  server.register_function(echo, "echo")
+  server.register_function(a, "a")
+  server.register_function(foo, "foo")
+  server.register_function(test, "test")
+  server.register_function(struct_setter, "struct_setter")
+  server.serve_nonblocking()
+
+  client = xmlrpc_client_Client("http://127.0.0.1:12345/")
+
+  # Test the client for functionality with scalars.
+
+  expected_result = 1
+  actual_result = client.send_request("echo", (expected_result,))
+  assert(expected_result == actual_result)
+
+  expected_result = False
+  actual_result = client.send_request("echo", (expected_result,))
+  assert(expected_result == actual_result)
+
+  # Test the client for functionality with lists and dictionaries.
+
+  expected_result = [1, 2, 3]
+  actual_result = client.send_request("echo", (expected_result,))
+  assert(expected_result == actual_result)
+
+  expected_result = [1, 2, 3, [1, 2, 3]]
+  actual_result = client.send_request("echo", (expected_result,))
+  assert(expected_result == actual_result)
+
+  expected_result = {"A": "foo", "B": "bar", "C": "baz"}
+  actual_result = client.send_request("echo", (expected_result,))
+  assert(expected_result == actual_result)
+
+  expected_result = {"A": "foo", "B": "bar", "C": "baz",
+    "D": {"A": "foo", "B": "bar", "C": "baz"}}
+  actual_result = client.send_request("echo", (expected_result,))
+  assert(expected_result == actual_result)
+
+  # Test for proper errors.
+
+  # No such method.
+  error_raised = False
+  try:
+    client.send_request("foobar", (1,))
+  except xmlrpc_common_Fault:
+    error_raised = True
+  assert(error_raised)
+
+  # Not enough arguments.
+  error_raised = False
+  try:
+    client.send_request("echo", ())
+  except xmlrpc_common_Fault, inst:
+    error_raised = True
+  assert(error_raised)
 
   # Test _xmlrpc_common_value2xml for correctness.
 
@@ -252,7 +313,7 @@ fault</string></value></member></struct></value></fault>\
   expected_output_faultString = "foo fault"
   expected_output_faultCode = -1
   actual_output = xmlrpc_common_response2python(test_input)
-  assert(expected_output_faultString == actual_output.message)
+  assert(expected_output_faultString == actual_output.strerror)
   assert(expected_output_faultCode == actual_output.code)
 
 
@@ -318,17 +379,20 @@ fault</string></value></member></struct></value></fault>\
   assert(error_raised)
 
   # Test to make sure xmlrpc handles functions of zero parameters.
-
-  def a():
-    return 5
-
-  server = xmlrpc_server_SimpleXMLRPCServer(("localhost", 12345))
-  server.register_function(a)
-  server.serve_nonblocking()
-  sleep(0.2)
-  client = xmlrpc_client_Client("http://localhost:12345")
   client.send_request("a", ())
-  sleep(0.2)
-  server.shutdown()
 
-  print "All tests passed"
+  # More xmlrpc_server tests:
+  assert(client.send_request("foo", [42]))
+  assert(not client.send_request("foo", [41]))
+
+  mystruct = {"a": "b", "c": "d", "foo": "baz"}
+  newstruct = client.send_request("struct_setter", [mystruct])
+  for key in mystruct.keys():
+    if key == "foo":
+      assert(newstruct[key] == "bar")
+    else:
+      assert(newstruct[key] == mystruct[key])
+
+  assert(client.send_request("test", [5, 6.5, "hi", [1,2], {"1": 2}]))
+
+  server.shutdown()

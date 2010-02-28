@@ -282,11 +282,19 @@ class xmlrpc_server_SimpleXMLRPCServer:
     # Make the method call, get the result.
     try:
       result = self._call_function(methodname, params)
-    except Exception:
-      result = None   # Maybe we should send a fault back to the client?
 
-    # Encode the result and send it back to the client.
-    xmlresponse = xmlrpc_common_response2xml(result)
+      # Encode the result and send it back to the client.
+      xmlresponse = xmlrpc_common_response2xml(result)
+    except xmlrpc_server_ClientError:
+      xmlresponse = "<?xml version=\"1.0\"?><methodResponse><fault>" + \
+          _xmlrpc_common_value2xml(\
+          {"faultCode": 1, "faultString": "No such function."}) + \
+          "</fault></methodResponse>"
+    except Exception:
+      xmlresponse = "<?xml version=\"1.0\"?><methodResponse><fault>" + \
+          _xmlrpc_common_value2xml(\
+          {"faultCode": 2, "faultString": "Exception occurred."}) + \
+          "</fault></methodResponse>"
 
     response = "HTTP/1.1 200 OK\r\nServer: SimpleXMLRPCServer on Repy\r\n" + \
       "Content-type: text/xml\r\nContent-length: %i\r\n\r\n%s" % \
