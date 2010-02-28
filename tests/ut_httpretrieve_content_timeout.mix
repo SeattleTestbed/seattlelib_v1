@@ -35,27 +35,23 @@ def client_request(client_conn):
 
 
 def httpresponse(sock):
-  # sends http header with no conent to check if the httpretrieve timout works  
+  # delay to verify that timeout works
+  sleep(5)
   httpheader = 'HTTP/1.1 200 Ok\n\n'
   # send the http content and http header to http retrieve
   sock.send(httpheader)
-  # normal server will send the content followed by closing the conneciton
+  sock.close()
 
 
 if callfunc == 'initialize':
-  # wait for a connection and start up the http server(that doesnt send http content)   
+  # wait for a connection and start up the slow http server
   listencommhandle = waitforconn('127.0.0.1', 12345, runhttpserver)
-
-  # prints this failed msg if the http retrieve doesnt raise HttpContentLengthError 
-  failed_error_msg = 'Failed: should have raised timeout exception' 
+  failed_error_msg = 'Failed: should have raised timeout exception'
 
   try:
-    # start up http retrieve to retieve the content from http server
-    recv_msg = httpretrieve_get_string('http://127.0.0.1:12345/', timeout=30)
+    recv_msg = httpretrieve_get_string('http://127.0.0.1:12345/', timeout=1)
 
-  #catch the right Exception if there is a different exception print failed_error_msg
   except SocketTimeoutError, e:
-    # check if the error message is correct    
     pass  
   except Exception, e:
     print failed_error_msg + ' :Raised: ' + str(e)  
