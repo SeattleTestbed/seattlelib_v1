@@ -386,7 +386,7 @@ class _httpretrieve_filelikeobject:
         else:
           raise
       
-      httpcontentstr += content
+      httpcontentstr += contentchunkstr
       self._totalread += len(contentchunkstr)
       if limit is not None:
         if len(contentchunkstr) == lefttoread:
