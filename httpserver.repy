@@ -317,6 +317,10 @@ def _httpserver_sendAll(sock, datastr, besteffort=False):
   except Exception, e:
     if "socket" not in str(e).lower():
       raise
+
+    # If the caller didn't want this function to raise an exception for
+    # any reason, we don't, and instead return silently. If they are ok
+    # with exceptions, we re-raise.
     if not besteffort:
       raise
 
