@@ -2,6 +2,7 @@
 httpserver.repy unit tests
 """
 
+#pragma repy
 
 
 include httpserver.repy
