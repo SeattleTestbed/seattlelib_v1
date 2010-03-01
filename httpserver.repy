@@ -453,9 +453,9 @@ class _httpserver_bodystream:
     if verb in ("GET", "HEAD", "TRACE", "DELETE"):
       if "Content-Length" in headers or \
           "Transfer-Encoding" in headers:
-            raise _httpserver_BadRequest("Method '" + verb + \
-                "' cannot send an entity-body and therefore a " + \
-                "Content-Length or Transfer-Encoding header is invalid.")
+        raise _httpserver_BadRequest("Method '" + verb + \
+            "' cannot send an entity-body and therefore a " + \
+            "Content-Length or Transfer-Encoding header is invalid.")
       else:
         self._done = True
         return
@@ -870,7 +870,7 @@ def _httpserver_process_single_request(sock, cbfunc, extradata, httpdid):
     if ("Connection" in headers and "close" == headers["Connection"]) \
         or ("Connection" in reqinfo['headers'] and "close" in \
         reqinfo['headers']["Connection"]):
-          closeconn = True
+      closeconn = True
 
     try:
       # Send response headers.
