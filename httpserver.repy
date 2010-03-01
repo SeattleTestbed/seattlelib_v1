@@ -94,7 +94,9 @@ def httpserver_registercallback(addresstuple, cbfunc):
           'version': '0.9',
           'datastream': object with a file-like read() method,
           'headers': { 'Content-Type': 'application/x-xmlrpc-data'},
-          'httpdid': 17
+          'httpdid': 17,
+          'remoteipstr': '10.0.0.4',
+          'remoteportnum': 54001
         }
       ('datastream' is a stream of any HTTP message body data sent by the
       client.)
@@ -185,7 +187,8 @@ def _httpserver_socketcb(remoteip, remoteport, sock, ch, listench, httpdid):
       # function tells it to send. On error, may raise one of many
       # exceptions, which we deal with here:
       closeconn, extradata = \
-          _httpserver_process_single_request(sock, cbfunc, extradata, httpdid)
+          _httpserver_process_single_request(sock, cbfunc, extradata, \
+          httpdid, remoteip, remoteport)
 
       if closeconn:
         break
@@ -787,7 +790,8 @@ def _httpserver_sendfile_chunked(sock, filelikeobj):
 
 
 
-def _httpserver_process_single_request(sock, cbfunc, extradata, httpdid):
+def _httpserver_process_single_request(sock, cbfunc, extradata, httpdid, \
+    remoteip, remoteport):
   # This function processes a single request in from sock, and either
   # puts a response to the socket and returns, or raises an exception.
 
@@ -802,6 +806,8 @@ def _httpserver_process_single_request(sock, cbfunc, extradata, httpdid):
       extradata, reqinfo['verb'], reqinfo['headers'])
   reqinfo['datastream'] = messagebodystream
   reqinfo['httpdid'] = httpdid
+  reqinfo['remoteipstr'] = remoteip
+  reqinfo['remoteportnum'] = remoteport
 
   # By default, we don't want to close the connection. (Though, nearly
   # every case will change this to True -- only HTTP/1.1 sockets
