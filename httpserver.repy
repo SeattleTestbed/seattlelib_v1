@@ -837,6 +837,16 @@ def _httpserver_process_single_request(sock, cbfunc, extradata, httpdid, \
     raise _httpserver_ServerError("httpserver: Callback function " + \
         "returned malformed dictionary")
 
+  # Do some basic sanity checks:
+  if None in (version, statuscode, statusmsg, headers, messagestream):
+    raise _httpserver_ServerError("httpserver: Callback function " + \
+        "returned dictionary with None for some values.")
+
+  if (type(version), type(statuscode), type(statusmsg), type(headers)) != \
+      (str, int, str, dict):
+    raise _httpserver_ServerError("httpserver: Callback function " + \
+        "returned dictionary with invalid values (wrong types).")
+
   # If the message object is a string, wrap it in a file-like object.
   if type(messagestream) is str:
     messagestream = _httpserver_StringIO(messagestream)
