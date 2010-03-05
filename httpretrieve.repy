@@ -5,9 +5,10 @@
 <Started>
   August 19, 2009
 
-<Author>
+<Authors>
   Yafete Yemuru
-
+  Conrad Meyer
+  
 <Purpose>
   Provides a method for retrieving content from web servers using the HTTP
   protocol. The content can be accessed as a file like object, or saved to
@@ -40,8 +41,8 @@ class HttpBrokenServerError(Exception):
 
 
 
-def httpretrieve_open(url, postdata=None, querydata=None, \
-    httpheaders=None, timeout=None):
+def httpretrieve_open(url, querydata=None, postdata=None,\
+    httpheaders=None, proxy=None, timeout=None):
   """
   <Purpose>
      Returns a file-like object that can be used to read the content from
@@ -68,6 +69,8 @@ def httpretrieve_open(url, postdata=None, querydata=None, \
     httpheaders (optional):
            A dictionary of supplemental HTTP request headers to add to the
            request.
+    proxy (optional):
+           A proxy server 2-tuple to bind to: ('host', port).       
     timeout (optional):
            A timeout for establishing a connection to the web server,
            sending headers, and reading the response headers.
@@ -121,7 +124,12 @@ def httpretrieve_open(url, postdata=None, querydata=None, \
 
   # Open connection to the web server
   try:
-    sockobj = timeout_openconn(hoststr, portint)
+    if proxy is not None:
+      # if there is a proxy, open a connection with the proxy instead of the actual server
+      sockobj = timeout_openconn(proxy[0], proxy[1])  
+    else:
+      # if there is no proxy open a connection with server directly
+      sockobj = timeout_openconn(hoststr, portint)
 
   except Exception, e:
     if repr(e).startswith("timeout("):
@@ -130,7 +138,7 @@ def httpretrieve_open(url, postdata=None, querydata=None, \
 
   # Builds the HTTP request:
   httprequeststr = _httpretrieve_build_request(hoststr, portint, pathstr, \
-      querydata, postdata, httpheaders)
+      querydata, postdata, httpheaders, proxy)
 
   # Send the full HTTP request to the web server.
   _httpretrieve_sendall(sockobj, httprequeststr)
@@ -221,7 +229,7 @@ def httpretrieve_open(url, postdata=None, querydata=None, \
 
 
 def httpretrieve_save_file(url, filename, querydata=None, postdata=None, \
-    httpheaders=None, timeout=None):
+    httpheaders=None, proxy=None, timeout=None):
   """
   <Purpose>
     Perform an HTTP request, and save the content of the response to a
@@ -250,7 +258,7 @@ def httpretrieve_save_file(url, filename, querydata=None, postdata=None, \
   # Open the output file object and http file-like object.
   outfileobj = open(filename, 'w')
   httpobj = httpretrieve_open(url, querydata=querydata, postdata=postdata, \
-      httpheaders=httpheaders, timeout=timeout)
+      httpheaders=httpheaders, proxy=proxy, timeout=timeout)
 
   # Repeatedly read from the file-like HTTP object into our file, until the
   # response is finished.
@@ -266,7 +274,7 @@ def httpretrieve_save_file(url, filename, querydata=None, postdata=None, \
 
 
 def httpretrieve_get_string(url, querydata=None, postdata=None, \
-    httpheaders=None, timeout=30):
+    httpheaders=None, proxy=None, timeout=30):
   """
   <Purpose>
     Performs an HTTP request on the given URL, using POST or GET,
@@ -288,7 +296,7 @@ def httpretrieve_get_string(url, querydata=None, postdata=None, \
 
   # Open a read-only file-like object for the HTTP request.
   httpobj = httpretrieve_open(url, querydata=querydata, postdata=postdata, \
-      httpheaders=httpheaders, timeout=timeout)
+      httpheaders=httpheaders, proxy=proxy, timeout=timeout)
 
   # Read all of the response and return it.
   try:
@@ -485,7 +493,7 @@ def _httpretrieve_parse_responseheaders(headerlines):
 
 
 def _httpretrieve_build_request(host, port, path, querydata, postdata, \
-    httpheaders):
+    httpheaders, proxy):
   # Builds an HTTP request from these parameters, returning it as
   # a string.
 
@@ -519,7 +527,13 @@ def _httpretrieve_build_request(host, port, path, querydata, postdata, \
     resourcestr = "?" + resourcestr
 
   # Encode the HTTP request line and headers:
-  requeststr = methodstr + ' ' + path + resourcestr + ' HTTP/1.0\r\n'
+  if proxy is not None:
+    # proxy exists thus the request header should include the original requested url  
+    requeststr = methodstr + ' http://' + host + ':' + str(port) + path + resourcestr + ' HTTP/1.0\r\n'
+  else:
+    # there is no proxy; send normal http request   
+    requeststr = methodstr + ' ' + path + resourcestr + ' HTTP/1.0\r\n'
+    
   if httpheaders is not None:
     # Most servers require a 'Host' header for normal functionality
     # (especially in the case of multiple domains being hosted on a
