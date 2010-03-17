@@ -114,6 +114,10 @@ def advertise_announce(key, value, ttlval, concurrentevents=2, \
     None.
   """
 
+  # convert different types to strings to avoid type conversion errors #874
+  key = str(key)
+  value = str(value)
+
   # Wrapped in an array so we can modify the reference (python strings are immutable).
   exceptions = [''] # track exceptions that occur and raise them at the end
 
@@ -219,6 +223,9 @@ def advertise_lookup(key, maxvals=100, lookuptype=None, \
   <Returns>
     All unique values stored at the key.
   """
+
+  # convert different types to strings to avoid type conversion errors #874
+  key = str(key)
 
   if lookuptype is None:
     lookuptype = ['central','opendht','DOR']
