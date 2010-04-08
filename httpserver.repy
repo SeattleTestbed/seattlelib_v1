@@ -302,7 +302,7 @@ def _httpserver_parseHTTPheader(headerdatalist):
 
   try:
     infodict['querydict'] = urllib_unquote_parameters(infodict['querystr'])
-  except (ValueError, AttributeError):
+  except (ValueError, AttributeError, TypeError):
     infodict['querydict'] = None
 
   return infodict
