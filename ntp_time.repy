@@ -72,6 +72,10 @@ def ntp_time_updatetime(localport):
 
   listenhandle = recvmess(ip,localport, _time_decode_NTP_packet)
   mycontext['ntp_time_got_time'] = False
+
+  # I'm going to get the time from up to 5 sources and then use the median
+  mycontext['ntp_time_received_times'] = []
+
   # always close the handle before returning...
   try: 
     # try five random servers times...
@@ -85,13 +89,21 @@ def ntp_time_updatetime(localport):
         # most likely a lookup error...
         continue
 
-      # wait for 5 seconds for a response before retrying
-      for junkiterations in range(10):
-        sleep(.5)
+    # wait for 5 seconds for a response before retrying
+    for junkiterations in range(10):
+      sleep(.5)
 
-        if mycontext['ntp_time_got_time']:
-          # If we've had a response, we're done!
-          return
+      if mycontext['ntp_time_got_time']:
+        # If we've had a response, we sleep one second, choose the time,
+        # and then quit
+        sleep(1)
+
+        # set the time...
+        _time_choose_NTP_time_to_settime()
+
+        # clean-up and return
+        stopcomm(listenhandle)
+        return
     
     
   finally:
@@ -99,6 +111,25 @@ def ntp_time_updatetime(localport):
 
   # Failure, tried servers without luck...
   raise TimeError, "Time Server update failed.  Perhaps retry later..."
+
+
+
+# We're choosing from a list of times to avoid problems like that in #879
+def _time_choose_NTP_time_to_settime():
+  timelist = mycontext['ntp_time_received_times'][:]
+
+  # this may happen if there are concurrent calls to update the time.
+  assert(len(timelist)>0)
+  
+  timelist.sort()
+  
+  # it's better to be slightly high than slightly low...  I'll set the time
+  # to be the middle element or if there is a tie, I'll choose the bigger 
+  # 'middle' element.   That means [1,2,3] would set 2, but [1,2,3,4] would
+  # set 3.   I can get this by integer division by 2...
+
+  time_settime(timelist[len(timelist) / 2])
+  
 
 
 
@@ -113,9 +144,9 @@ def _time_convert_timestamp_to_float(timestamp):
 
 
 def _time_decode_NTP_packet(ip, port, mess, ch):
-  time_settime(_time_convert_timestamp_to_float(mess[40:48]))
+  # I got a time response packet.   Remember it and notify that I got it.
+  mycontext['ntp_time_received_times'].append(_time_convert_timestamp_to_float(mess[40:48]))
   mycontext['ntp_time_got_time'] = True
-  stopcomm(ch)
 
 
 #register the update method
