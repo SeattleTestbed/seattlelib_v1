@@ -214,6 +214,10 @@ def nmclient_safelygethandle():
     potentialhandle = randomfloat()
     while potentialhandle in nmclient_handledict:
       potentialhandle = randomfloat()
+
+    # Added to fix #885.   This ensures that the handle won't be reused
+    nmclient_handledict[potentialhandle] = {}
+
     return potentialhandle
   finally:
     nmclient_handledictlock.release()
