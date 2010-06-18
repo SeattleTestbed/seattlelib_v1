@@ -55,7 +55,7 @@ def tcp_time_updatetime(localport):
     time_settime(float(currenttime)) is called to set the time.
 
   <Returns>
-    None.
+    Returns the server ip:port that it managed to successfully connect to
 
 """
 
@@ -113,7 +113,8 @@ def tcp_time_updatetime(localport):
 
   # finally, set the time
   time_settime(currenttime)
-  
+
+  return shuffledserveraddresses[serverindex]  
 
 
 
