@@ -100,9 +100,6 @@ def httpretrieve_open(url, querydata=None, postdata=None,\
     the object.
   """
 
-  # TODO: Make sure the timeout actually works correctly everywhere it
-  # should. I'm 99% sure it's broken somewhere.
-
   starttimefloat = getruntime()
 
   # Check if the URL is valid and get host, path, port and query
@@ -126,10 +123,12 @@ def httpretrieve_open(url, querydata=None, postdata=None,\
   try:
     if proxy is not None:
       # if there is a proxy, open a connection with the proxy instead of the actual server
-      sockobj = timeout_openconn(proxy[0], proxy[1])  
+      # use the timeout we are given (or none)
+      sockobj = timeout_openconn(proxy[0], proxy[1], timeout=timeout)  
     else:
       # if there is no proxy open a connection with server directly
-      sockobj = timeout_openconn(hoststr, portint)
+      # use the timeout we are given (or none)
+      sockobj = timeout_openconn(hoststr, portint, timeout=timeout)
 
   except Exception, e:
     if repr(e).startswith("timeout("):
