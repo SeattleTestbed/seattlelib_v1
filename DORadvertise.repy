@@ -108,7 +108,8 @@ def DORadvertise_lookup(key, maxvals=100, timeout=None):
 
     timeout:
             The number of seconds to spend on this operation before failing
-            early.
+            early.   If not specified, the default is set to the default
+            timeout value for the http library (30 seconds).
 
   <Exceptions>
     xmlparse_XMLParseError if the xml returned isn't parseable by xmlparse.
@@ -134,9 +135,16 @@ def _DORadvertise_command(parameters, timeout=None):
   # Internal helper function; calls the remote command, and returns
   # the results we can glean from it.
 
-  post_result = httpretrieve_get_string(DORadvertise_FORM_LOCATION, \
-      postdata=parameters, timeout=timeout, \
-      httpheaders={"Content-Type": "application/x-www-form-urlencoded"})
+  # If there is a timeout, use it!
+  if timeout != None:
+    post_result = httpretrieve_get_string(DORadvertise_FORM_LOCATION, \
+        postdata=parameters, timeout=timeout, \
+        httpheaders={"Content-Type": "application/x-www-form-urlencoded"})
+  else:
+    post_result = httpretrieve_get_string(DORadvertise_FORM_LOCATION, \
+        postdata=parameters, \
+        httpheaders={"Content-Type": "application/x-www-form-urlencoded"})
+
 
   # Parse the result to check for success. Throw several exceptions to
   # ensure the XML we're reading makes sense.
