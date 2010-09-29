@@ -288,12 +288,19 @@ def random_int_below(upper_bound):
     Returns a random integer between [0, upper_bound).
   
   """
-  if upper_bound <= 0:
-    raise ValueError('number must be greater than zero')
-  if upper_bound != int(upper_bound):
+  
+  try:
+    upper_bound = int(upper_bound)
+  except ValueError:
     raise TypeError('number should be an integer')
   
-  # If upper_bound == 1, the math_log call would go into an infinite loop.
+  if upper_bound <= 0:
+    raise ValueError('number must be greater than zero')
+  
+    
+  # If upper_bound == 1, the math_log call will loop infinitely.
+  # The only int in [0, 1) is 0 anyway, so return 0 here.
+  # Resolves bug #927
   if upper_bound == 1:
     return 0
   

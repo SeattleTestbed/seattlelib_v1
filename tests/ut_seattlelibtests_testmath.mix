@@ -1,0 +1,66 @@
+"""
+<Started>
+  Sept 23, 2010
+
+<Purpose>
+  Test math.repy: math_ceil, math_floor
+
+<Authors>
+  John M Chilton
+
+"""
+#pragma repy
+
+include math.repy
+
+def test_math_ceil():
+  # Check a handful of cases
+  testdict = {-5.5: -5.0,
+              (-5-1./3): -5.0,
+              -1: -1.0,
+              0: 0.0,
+              1.000001: 2.0,
+              1.99999: 2.0
+              }
+  for testvalue in testdict:
+    assert(math_ceil(testvalue) == testdict[testvalue])
+    
+    
+def test_math_floor():
+  # Check a handful of cases
+  testdict = {-5.5: -6.0,
+              (-5-1./3): -6.0,
+              -1: -1.0,
+              0: 0.0,
+              1.000001: 1.0,
+              1.99999: 1.0
+              }
+  for testvalue in testdict:
+    assert(math_floor(testvalue) == testdict[testvalue])
+    
+    
+def test_math_log():
+  # Check the log domain Exception
+  try:
+    math_log(0.0)
+    assert False
+  except ValueError, e:
+    assert(str(e) == "log function domain error")
+  
+  # Check the math domain Exception
+  try:
+    math_log(0.5, 0.5)
+    assert False
+  except ValueError, e:
+    assert(str(e) == "math domain error")
+    
+  # Check that math_log produces expected output
+  assert(math_log(4.5, 4) == 1.0849625007211561)
+  
+
+if callfunc == "initialize":
+  test_math_ceil()
+  test_math_floor()
+  test_math_log()
+  
+  

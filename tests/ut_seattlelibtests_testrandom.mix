@@ -146,6 +146,23 @@ def test_random_int_below(_log=math_log, int=int):
     k = int(1.00001 + _log(n, 2))
     assert(k == numbits)        # note the stronger assertion
     assert(2**k > n > 2**(k-1))   # note the stronger assertion
+    
+def test_random_int_below_specialcases():
+  # Tests that random_int_below behaves properly in each of the
+  # cases where it doesn't run the usual algorithm
+  try:
+    random_int_below("A")
+    assert False
+  except TypeError:
+    pass
+  try:
+    random_int_below(0)
+    assert False
+  except ValueError:
+    pass
+  
+  for n in xrange(15):
+    assert(random_int_below(1) == 0)
 
 def test_random_int_below_sanitycheck():
   '''Tests to insure that random_int_below returns appropriate range'''
@@ -237,6 +254,7 @@ if callfunc == "initialize":
   test_random_nbit_int()
   test_random_nbit_int_additional()
   test_random_int_below()
+  test_random_int_below_specialcases()
   test_random_int_below_sanitycheck()
   test_randint_simple()
   test_random_randombytes()
