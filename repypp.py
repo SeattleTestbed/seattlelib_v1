@@ -132,8 +132,7 @@ def processfile(filename):
       filedata = fileobj.readlines()
       fileobj.close()
     except:
-      print "Error opening source file '"+thisfilename+"'"
-      sys.exit(1)
+      raise Exception("Error opening source file '"+thisfilename+"'")
 
     # parse the contents...
     (includelist, parsedfiledata) = processfiledata(filedata)
@@ -205,6 +204,15 @@ def main():
     print "The infile and outfile must be different files"
     sys.exit(1)
 
+  # strip out any previously included files
+  outfiledata = processfile(sys.argv[1])
+
+  # Do a sanity check to make sure, that we were able to properly
+  # process the file.
+  if len(outfiledata) == 0:
+    raise Exception("Unable to preprocess the file. Preprocessed"+
+                    " file has a length of zero.")
+
   # get the outgoing file object
   try:
     outfileobj = file(sys.argv[2],'w')
@@ -212,12 +220,11 @@ def main():
     print "Error opening out file '"+sys.argv[2]+"'"
     sys.exit(1)
 
-
-
-  # strip out any previously included files
-  outfiledata = processfile(sys.argv[1])
-
-  outfileobj.writelines(outfiledata)
+  # Write the processed program to file.
+  try:
+    outfileobj.writelines(outfiledata)
+  finally:
+    outfileobj.close()
   
 
 if __name__ == '__main__':
