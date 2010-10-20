@@ -1,6 +1,6 @@
 #pragma repy
 
-include textops.repy
+include textops.py
 
 # Tests for seattlelib/textops.repy.
 
@@ -19,11 +19,3 @@ if callfunc == "initialize":
   # textops_grep() tests:
   assert len(textops_grep("abc", textops_rawtexttolines("abc\ndef\n"))) == 1
   assert len(textops_grep("abc", textops_rawtexttolines("abc\nabc\n"))) == 2
-
-
-
-  # textops_linecount() tests:
-  assert len(textops_grep("abc", textops_rawtexttolines("abc\ndef\n"))) == \
-      textops_linecount(textops_grep("abc", textops_rawtexttolines("abc\ndef\n")))
-  assert len(textops_grep("abc", textops_rawtexttolines("abc\nabc\n"))) == \
-      textops_linecount(textops_grep("abc", textops_rawtexttolines("abc\nabc\n")))
