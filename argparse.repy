@@ -100,15 +100,15 @@ def argparse_scan_str(args_array, flag_name, default_value = False):
   for i in range(0, len(args_array)):
     if args_array[i].lower() == flag_name:
       try:
-        return_value = str(callargs[i + 1])
+        return_value = str(args_array[i + 1])
       except IndexError, e:
         # This means we're expecting a value and there isn't one..
         print e
-        raise Exception("Expected value for argument '"+callargs[i]+"'")
+        raise Exception("Expected value for argument '"+args_array[i]+"'")
       except Exception, e:
         # Some other type of error
         print e
-        raise Exception("Invalid value ("+str(callargs[i + 1])+") specified"+ \
+        raise Exception("Invalid value ("+str(args_array[i + 1])+") specified"+ \
           " for parameter "+flag_name)
       else:
         return return_value
@@ -156,20 +156,20 @@ def argparse_scan_int(args_array, flag_name, default_value = False):
     if args_array[i].lower() == flag_name:
       # the try loop checks that it's capable of being cast to an int
       try:
-        return_value = int(callargs[i + 1])
+        return_value = int(args_array[i + 1])
       except IndexError, e:
         # Expected value, but there are no more values left in args_array
         print e
-        raise Exception("Expected value for argument '"+callargs[i]+"'")
+        raise Exception("Expected value for argument '"+args_array[i]+"'")
       except Exception, e:
         # If we get here, it typically means the value is not castable to int
         # as we expect, and so we error out.
         print e
-        raise Exception("Invalid value ("+str(callargs[i + 1])+") specified"+ \
+        raise Exception("Invalid value ("+str(args_array[i + 1])+") specified"+ \
           " for parameter "+flag_name)
       else:
         # return callargs[X] and not return_value because we say we return a
         # string from this function.
-        return callargs[i + 1]
+        return args_array[i + 1]
   return default_value
 
