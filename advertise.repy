@@ -153,6 +153,11 @@ def advertise_announce(key, value, ttlval, concurrentevents=2, \
   # it says it will.
   parallelize_closefunction(ph)
 
+  # check to see if any successfully returned 
+  if onefinished == [False]:
+    raise AdvertiseError("None of the advertise services could be contacted")
+
+  # if we got an error, indicate it
   if exceptions[0] != '':
     raise AdvertiseError(str(exceptions))
 

@@ -1,0 +1,13 @@
+#pragma repy
+
+include advertise.repy
+
+if callfunc == "initialize":
+
+  # This isn't nearly long enough to advertise a key
+  try:
+    advertise_announce("ut_testkey", "test", 60,timeout=.0001)
+  except AdvertiseError:
+    pass
+  else:
+    print 'Should not be able to advertise so quickly!'
