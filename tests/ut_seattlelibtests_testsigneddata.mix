@@ -8,7 +8,7 @@ include signeddata.repy
 if callfunc == 'initialize':
 
   # set up time for expiration times...
-  time_updatetime(<connport>)
+  time_updatetime(12345)
   print time_gettime()
 
   # get keys

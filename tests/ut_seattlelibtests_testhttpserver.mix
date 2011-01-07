@@ -94,7 +94,7 @@ def test2():
       "POST /test2 HTTP/1.0\r\n" + \
       "Content-Length: 5\r\n" + \
       "\r\n" + \
-      "<connport>"
+      "12345"
 
   test2exp = \
       "HTTP/1.0 200 OK\r\n" + \
@@ -170,7 +170,7 @@ def test5():
       "Transfer-Encoding: chunked\r\n" + \
       "\r\n" + \
       "A\r\n" + \
-      "<connport>67890\r\n" + \
+      "1234567890\r\n" + \
       "0\r\n" + \
       "\r\n"
 
@@ -199,7 +199,7 @@ def test6():
       "2\r\n" + \
       "12\r\n" + \
       "5\r\n" + \
-      "<connport>\r\n" + \
+      "12345\r\n" + \
       "0\r\n" + \
       "\r\n"
 
@@ -286,7 +286,7 @@ def test10():
       "Connection: close\r\n" + \
       "\r\n" + \
       "1C\r\n" + \
-      "<connport>67890<connport>67890<connport>678\r\n" + \
+      "1234567890123456789012345678\r\n" + \
       "0\r\n" + \
       "\r\n"
 
@@ -313,7 +313,7 @@ def test11():
       "Connection: close\r\n" + \
       "\r\n" + \
       "1C\r\n" + \
-      "<connport>67890<connport>67890<connport>678\r\n" + \
+      "1234567890123456789012345678\r\n" + \
       "0\r\n" + \
       "\r\n"
 
