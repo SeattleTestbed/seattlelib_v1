@@ -45,11 +45,11 @@ def httpresponse(sock):
 
 if callfunc == 'initialize':
   # wait for a connection and start up the slow http server
-  listencommhandle = waitforconn('127.0.0.1', 12345, runhttpserver)
+  listencommhandle = waitforconn('127.0.0.1', <connport>, runhttpserver)
   failed_error_msg = 'Failed: should have raised timeout exception'
 
   try:
-    recv_msg = httpretrieve_get_string('http://127.0.0.1:12345/', timeout=1)
+    recv_msg = httpretrieve_get_string('http://127.0.0.1:<connport>/', timeout=1)
 
   except SocketTimeoutError, e:
     pass  

@@ -31,14 +31,14 @@ if callfunc == 'initialize':
     
   # build temp server that acts normal and raise an exception if the server fails
   try:    
-    handle = httpserver_registercallback(('127.0.0.1', 12345), server_test_filelikeobj)
+    handle = httpserver_registercallback(('127.0.0.1', <connport>), server_test_filelikeobj)
   except Exception, e:
     raise Exception('Server failed internally ' + str(e))  
 
   # printed only if the test doesnt pass
   failed_error_msg = 'Failed: HttpContentReceivingError should have raised a timeout exception'
   try:
-    filelikeobj = httpretrieve_open('http://127.0.0.1:12345/')
+    filelikeobj = httpretrieve_open('http://127.0.0.1:<connport>/')
     filelikeobj.close()
     # this should raise an exception since filelikeobj is closed
     filelikeobj.read()

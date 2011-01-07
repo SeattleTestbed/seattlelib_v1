@@ -131,99 +131,112 @@ def httpretrieve_open(url, querydata=None, postdata=None,\
       sockobj = timeout_openconn(hoststr, portint, timeout=timeout)
 
   except Exception, e:
+    # If a socket object was created, we want to clean in up.
+    if sockobj:
+      sockobj.close()
+
     if repr(e).startswith("timeout("):
       raise HttpConnectionError("Socket timed out connecting to host/port.")
     raise
 
-  # Builds the HTTP request:
-  httprequeststr = _httpretrieve_build_request(hoststr, portint, pathstr, \
-      querydata, postdata, httpheaders, proxy)
+  try:
+    # Builds the HTTP request:
+    httprequeststr = _httpretrieve_build_request(hoststr, portint, pathstr, \
+        querydata, postdata, httpheaders, proxy)
 
-  # Send the full HTTP request to the web server.
-  _httpretrieve_sendall(sockobj, httprequeststr)
+    # Send the full HTTP request to the web server.
+    _httpretrieve_sendall(sockobj, httprequeststr)
 
-  # Now, we're done with the HTTP request part of the session, and we need
-  # to get the HTTP response.
+    # Now, we're done with the HTTP request part of the session, and we need
+    # to get the HTTP response.
 
-  # Check if we've timed out (if the user requested a timeout); update the
-  # socket timeout to reflect the time taken sending the request.
-  if timeout is None:
-    sockobj.settimeout(0)
-  elif getruntime() - starttimefloat >= timeout:
-    raise SocketTimeoutError("Timed out")
-  else:
-    sockobj.settimeout(timeout - (getruntime() - starttimefloat))
+    # Check if we've timed out (if the user requested a timeout); update the
+    # socket timeout to reflect the time taken sending the request.
+    if timeout is None:
+      sockobj.settimeout(0)
+    elif getruntime() - starttimefloat >= timeout:
+      raise SocketTimeoutError("Timed out")
+    else:
+      sockobj.settimeout(timeout - (getruntime() - starttimefloat))
 
-  # Receive the header lines from the web server (a series of CRLF-terminated
-  # lines, terminated by an empty line, or by the server closing the
-  # connection.
-  headersstr = ""
-  while not headersstr.endswith("\r\n\r\n"):
-    try:
-      # This should probably be replaced with page-sized reads in the future,
-      # but for now, the behavior is at least correct.
-      headersstr += sockobj.recv(1)
-    except Exception, e:
-      if str(e) == "Socket closed":
-        break
-      else:
-        raise
+    # Receive the header lines from the web server (a series of CRLF-terminated
+    # lines, terminated by an empty line, or by the server closing the
+    # connection.
+    headersstr = ""
+    while not headersstr.endswith("\r\n\r\n"):
+      try:
+        # This should probably be replaced with page-sized reads in the future,
+        # but for now, the behavior is at least correct.
+        headersstr += sockobj.recv(1)
+      except Exception, e:
+        if str(e) == "Socket closed":
+          break
+        else:
+          raise
 
-  httpheaderlist = headersstr.split("\r\n")
-  # Ignore (a) trailing blank line(s) (for example, the response header-
-  # terminating blank line).
-  while len(httpheaderlist) > 0 and httpheaderlist[-1] == "":
-    httpheaderlist = httpheaderlist[:-1]
+    httpheaderlist = headersstr.split("\r\n")
+    # Ignore (a) trailing blank line(s) (for example, the response header-
+    # terminating blank line).
+    while len(httpheaderlist) > 0 and httpheaderlist[-1] == "":
+      httpheaderlist = httpheaderlist[:-1]
 
-  # Get the status code and status message from the HTTP response.
-  statuslinestr, httpheaderlist = httpheaderlist[0], httpheaderlist[1:]
+    # Get the status code and status message from the HTTP response.
+    statuslinestr, httpheaderlist = httpheaderlist[0], httpheaderlist[1:]
 
-  # The status line should be in the form: "HTTP/1.X NNN SSSSS", where
-  # X is 0 or 1, NNN is a 3-digit status code, and SSSSS is a 'user-friendly'
-  # string representation of the status code (may contain spaces).
-  statuslinelist = statuslinestr.split(' ', 2)
+    # The status line should be in the form: "HTTP/1.X NNN SSSSS", where
+    # X is 0 or 1, NNN is a 3-digit status code, and SSSSS is a 'user-friendly'
+    # string representation of the status code (may contain spaces).
+    statuslinelist = statuslinestr.split(' ', 2)
 
-  if len(statuslinelist) < 3:
-    raise HttpBrokenServerError("Server returned garbage for HTTP " + \
+    if len(statuslinelist) < 3:
+      raise HttpBrokenServerError("Server returned garbage for HTTP " + \
         "response (status line missing one or more fields).")
 
-  if not statuslinelist[0].startswith('HTTP'):
-    raise HttpBrokenServerError("Server returned garbage for HTTP " + \
-        "response (invalid response protocol in status line).")
+    if not statuslinelist[0].startswith('HTTP'):
+      raise HttpBrokenServerError("Server returned garbage for HTTP " + \
+          "response (invalid response protocol in status line).")
 
-  friendlystatusstr = statuslinelist[2]
-  try:
-    statusint = int(statuslinelist[1])
-  except ValueError, e:
-    raise HttpBrokenServerError("Server returned garbage for HTTP " + \
+    friendlystatusstr = statuslinelist[2]
+    try:
+      statusint = int(statuslinelist[1])
+    except ValueError, e:
+      raise HttpBrokenServerError("Server returned garbage for HTTP " + \
         "response (status code isn't integer).")
 
-  httpheaderdict = _httpretrieve_parse_responseheaders(httpheaderlist)
+    httpheaderdict = _httpretrieve_parse_responseheaders(httpheaderlist)
 
-  # If we got any sort of redirect response, follow the redirect. Note: we
-  # do *not* handle the 305 status code (use the proxy as specified in the
-  # Location header) at all; I think this is best handled at a higher layer
-  # anyway.
-  if statusint in (301, 302, 303, 307):
-    sockobj.close()
-    try:
-      redirecturlstr = httpheaderdict["Location"][0]
-    except (KeyError, IndexError), ke:
-      # When a server returns a redirect status code (3xx) but no Location
-      # header, some clients, e.g. Firefox, just show the response body
-      # as they would normally for a 2xx or 4xx response. So, I think we
-      # should ignore a missing Location header and just return the page
-      # to the caller.
-      pass
-    else:
-      # If the server did send a redirect location, let's go there.
-      return httpretrieve_open(redirecturlstr)
+    # If we got any sort of redirect response, follow the redirect. Note: we
+    # do *not* handle the 305 status code (use the proxy as specified in the
+    # Location header) at all; I think this is best handled at a higher layer
+    # anyway.
+    if statusint in (301, 302, 303, 307):
+      sockobj.close()
+      try:
+        redirecturlstr = httpheaderdict["Location"][0]
+      except (KeyError, IndexError), ke:
+        # When a server returns a redirect status code (3xx) but no Location
+        # header, some clients, e.g. Firefox, just show the response body
+        # as they would normally for a 2xx or 4xx response. So, I think we
+        # should ignore a missing Location header and just return the page
+        # to the caller.
+        pass
+      else:
+        # If the server did send a redirect location, let's go there.
+        return httpretrieve_open(redirecturlstr)
 
-  # If we weren't requested to redirect, and we didn't, return a read-only
-  # file-like object (representing the response body) to the caller.
-  return _httpretrieve_filelikeobject(sockobj, httpheaderdict, \
-      (statuslinelist[0], statusint, friendlystatusstr))
+    # If we weren't requested to redirect, and we didn't, return a read-only
+    # file-like object (representing the response body) to the caller.
+    return _httpretrieve_filelikeobject(sockobj, httpheaderdict, \
+        (statuslinelist[0], statusint, friendlystatusstr))
+  
+  except:
+    # If any exception occured after the socket was open, we want to make
+    # sure that the socket is cleaned up if it is still open before we
+    # raise the exception.
+    if sockobj:
+      sockobj.close()
 
+    raise
 
 
 

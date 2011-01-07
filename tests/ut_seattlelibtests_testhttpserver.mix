@@ -94,7 +94,7 @@ def test2():
       "POST /test2 HTTP/1.0\r\n" + \
       "Content-Length: 5\r\n" + \
       "\r\n" + \
-      "12345"
+      "<connport>"
 
   test2exp = \
       "HTTP/1.0 200 OK\r\n" + \
@@ -170,7 +170,7 @@ def test5():
       "Transfer-Encoding: chunked\r\n" + \
       "\r\n" + \
       "A\r\n" + \
-      "1234567890\r\n" + \
+      "<connport>67890\r\n" + \
       "0\r\n" + \
       "\r\n"
 
@@ -199,7 +199,7 @@ def test6():
       "2\r\n" + \
       "12\r\n" + \
       "5\r\n" + \
-      "12345\r\n" + \
+      "<connport>\r\n" + \
       "0\r\n" + \
       "\r\n"
 
@@ -286,7 +286,7 @@ def test10():
       "Connection: close\r\n" + \
       "\r\n" + \
       "1C\r\n" + \
-      "1234567890123456789012345678\r\n" + \
+      "<connport>67890<connport>67890<connport>678\r\n" + \
       "0\r\n" + \
       "\r\n"
 
@@ -313,7 +313,7 @@ def test11():
       "Connection: close\r\n" + \
       "\r\n" + \
       "1C\r\n" + \
-      "1234567890123456789012345678\r\n" + \
+      "<connport>67890<connport>67890<connport>678\r\n" + \
       "0\r\n" + \
       "\r\n"
 
@@ -455,13 +455,13 @@ def test17():
 
 
 def tests():
-  id = httpserver_registercallback(('127.0.0.1', 12345), func1)
+  id = httpserver_registercallback(('127.0.0.1', <connport>), func1)
 
   # Test some basic HTTP behavior:
   failed = []
   for test in [test1, test2, test3, test4, test5, test6, test7, test8, \
       test9, test10, test11, test12, test16]:
-    a = openconn('127.0.0.1', 12345)
+    a = openconn('127.0.0.1', <connport>)
     send, expected = test()
     sendall(a, send)
     actual = recvall(a)
@@ -472,11 +472,11 @@ def tests():
     a.close()
 
   httpserver_stopcallback(id)
-  id = httpserver_registercallback(('127.0.0.1', 12345), func2)
+  id = httpserver_registercallback(('127.0.0.1', <connport>), func2)
 
   # More HTTP tests:
   for test in [test13]:
-    a = openconn('127.0.0.1', 12345)
+    a = openconn('127.0.0.1', <connport>)
     send, expected = test()
     sendall(a, send)
     actual = recvall(a)
@@ -492,8 +492,8 @@ def tests():
   # errors sent to the user):
   for test in [test14, test15, test17]:
     cbfunc, send, experror = test()
-    id = httpserver_registercallback(('127.0.0.1', 12345), cbfunc)
-    a = openconn('127.0.0.1', 12345)
+    id = httpserver_registercallback(('127.0.0.1', <connport>), cbfunc)
+    a = openconn('127.0.0.1', <connport>)
 
     sendall(a, send)
     actual = recvall(a)
