@@ -119,6 +119,10 @@ def httpretrieve_open(url, querydata=None, postdata=None,\
   # Typical HTTP sessions consist of (optionally, a series of pairs of) HTTP
   # requests followed by HTTP responses. These happen serially.
 
+  # JAC: Set this up so that we can raise the right error if the 
+  # timeout_openconn doesn't work.
+  sockobj = None
+
   # Open connection to the web server
   try:
     if proxy is not None:
