@@ -25,7 +25,7 @@ geoip_clientlist = [None]
 
 
 
-def geoip_init_client(url="http://geoip.cs.washington.edu:12679"):
+def geoip_init_client(url="http://geoip.cs.washington.edu:12670"):
   """
   <Purpose>
     Create a new GeoIP XML-RPC client object.
@@ -68,8 +68,13 @@ def geoip_record_by_addr(addr):
   <Returns>
     Dictionary of location data of provided IP address.
   """
+  
+  try:
+    geoip_dict = geoip_clientlist[0].send_request("record_by_addr", (addr,))
+  except:
+    raise Exception("Unable to contact the geoip server.")
 
-  return geoip_clientlist[0].send_request("record_by_addr", (addr,))
+  return geoip_dict
 
 
 
