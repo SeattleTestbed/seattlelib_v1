@@ -34,6 +34,11 @@ events are not skipped.    The sequence numbers are a tuple: (tag, version)
 # version here...
 #include sha.repy
 
+# Should filter out a warning about sha deprecation (if applicable)
+import warnings
+
+warnings.filterwarnings("ignore",message="the sha module is deprecated")
+
 import sha as fastsha
 
 def sha_hash(data):
