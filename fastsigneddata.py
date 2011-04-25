@@ -45,9 +45,11 @@ def sha_hash(data):
   return fastsha.new(data).digest()
 
 
+from repyportability import *
+import repyhelper
 
-include rsa.repy
-include time.repy
+repyhelper.translate_and_import("rsa.repy")
+repyhelper.translate_and_import("time.repy")
 
 
 # The signature for a piece of data is appended to the end and has the format:

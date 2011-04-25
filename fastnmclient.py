@@ -15,21 +15,25 @@ that order).
 
 # JAC: This is the only change to the file over the nmclient.repy version...
 # for signing the data we send to the node manager
-include fastsigneddata.mix
-
+import fastsigneddata
+import repyhelper
 # session wrapper (breaks the stream into messages)
 # an abstracted "itemized data communication" in a separate API
-include session.repy
+repyhelper.translate_and_import("session.repy")
 
 
 
 #allow nat layer
-include NATLayer_rpc.repy
+repyhelper.translate_and_import("NATLayer_rpc.repy")
 
 
 # makes connections time out
-include sockettimeout.repy
+repyhelper.translate_and_import("sockettimeout.repy")
 
+# For rsa key conversion.
+repyhelper.translate_and_import("rsa.repy")
+
+repyhelper.translate_and_import("time.repy")
 # The idea is that this module returns "node manager handles".   A handle
 # may be used to communicate with a node manager and issue commands.   If the
 # caller wants to have a set of node managers with the same state, this can
@@ -186,7 +190,7 @@ def nmclient_signedcommunicate(nmhandle, *args):
   # always close the connobject afterwards...
   try:
     try:
-      signeddata = signeddata_signdata(datatosend, privatekey, publickey, timestamp, expirationtime, sequenceid, identity)
+      signeddata = fastsigneddata.signeddata_signdata(datatosend, privatekey, publickey, timestamp, expirationtime, sequenceid, identity)
     except ValueError, e:
       raise NMClientException, str(e)
 
