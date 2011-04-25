@@ -20,7 +20,7 @@
 
 
 """
-#pragma repy
+#pragma repy restrictions.loose
 
 include random.repy
 include math.repy

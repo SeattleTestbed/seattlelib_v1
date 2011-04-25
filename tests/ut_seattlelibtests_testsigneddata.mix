@@ -1,4 +1,4 @@
-#pragma repy
+#pragma repy restrictions.loose
 #pragma out
 
 include rsa.repy
