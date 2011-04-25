@@ -11,14 +11,15 @@
 include cv.repy
 
 
+global_container = []
   
-def _cv_functor(condition, number, container):
+def _cv_functor(condition, number):
   """
-  Internal function that adds the specified number to the specified
+  Internal function that adds the specified number to the global
   container only when it receives a notification for a given condition.
   """
   cv_wait(condition)
-  container.append(number)
+  global_container.append(number)
 
 
 
@@ -32,11 +33,10 @@ def cv_test_notify_all():
   since we know that FIFO order is preserved.
   """
   condition = cv_create()
-  container = []
   limit = 5
   
   for count in range(limit):
-    settimer(0.0, _cv_functor, (condition, count, container,))
+    settimer(0.0, _cv_functor, (condition, count,))
   
   sleep(1)
   cv_notify_all(condition)
@@ -44,7 +44,7 @@ def cv_test_notify_all():
   
   cv_destroy(condition)
   
-  if len(container) == limit:
+  if len(global_container) == limit:
     pass
   else:
     print "fail: notify_all failed: some threads were never executed"
