@@ -22,12 +22,12 @@ if callfunc == 'initialize':
   geoip_init_client('http://geoip.cs.washington.edu:12679')
 
   # Test geoip_record_by_name method by verifying location info of google.com
-  location_dict = geoip_record_by_name('google.com')
-  expected_result = {'city': 'Mountain View', 'region_name': 'CA', 'area_code': 650, 'longitude': -122.0574, 'country_code3': 'USA', 'country_name': 'United States', 'postal_code': '94043', 'dma_code': 807, 'country_code': 'US', 'latitude': 37.419199999999989}
+  location_dict = geoip_record_by_name('poly.edu')
+  expected_result = {'area_code': 718, 'city': 'Brooklyn', 'country_code': 'US', 'country_code3': 'USA', 'country_name': 'United States', 'dma_code': 501, 'latitude': 40.694400000000002, 'longitude': -73.990600000000001, 'postal_code': '11201', 'region_name': 'NY'}
   assert(expected_result == location_dict)
 
   # Test geoip_location_str method
-  assert(geoip_location_str(location_dict) == "Mountain View, CA, United States")
+  assert(geoip_location_str(location_dict) == "Brooklyn, NY, United States")
   
   # Test geoip_record_by_name method by verifying location info of
   # 128.208.3.200 (cs.washington.edu)
