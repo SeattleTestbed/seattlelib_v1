@@ -310,7 +310,7 @@ def struct_unpack(formatstring, packedstring):
         thisnumber = _convert_big_endian_string_to_number(thisnumberstring)
  
 
-        if typetounpack == 'i' and thisnumber > 2**31:
+        if typetounpack == 'i' and thisnumber >= 2**31:
           # if signed let's do a conversion to an unsigned!
           # Magic code!   Subtract UINT_MAX - 1!
           thisnumber = thisnumber - 2**32 
