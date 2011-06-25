@@ -27,6 +27,7 @@ def _convert_number_to_big_endian_string(numbertoconvert,numberofbytes):
 
     currentstring = chr(thisbyte) + currentstring
 
+  # shouldn't be hit because the caller should check
   assert(currentnumber == 0)
   return currentstring
 
@@ -36,8 +37,8 @@ def _convert_number_to_big_endian_string(numbertoconvert,numberofbytes):
 def _convert_big_endian_string_to_number(stringtoconvert):
   # a helper to convert a number to bytes (big endian).   The number is always
   # unsigned Thus:
-  # _convert_number_to_big_endian_string("\x00\x00\x00\x01") -> 1
-  # _convert_number_to_big_endian_string("\xff\xff") -> 65536
+  # _convert_big_endian_string_to_number("\x00\x00\x00\x01") -> 1
+  # _convert_big_endian_string_to_number("\xff\xff") -> 65536
 
   currentnumber = 0
 
@@ -135,7 +136,9 @@ def struct_pack(formatstring, *args):
 
       # it's a string!   Must not have endianness!!!
       if typetopack == 's':
-        assert(endianness == "none")
+        if endianness != "none":
+          raise TypeError("String must not have endianness")
+
         if type(thisarg) != str:
           raise TypeError("String format argument not a string")
 
@@ -148,16 +151,19 @@ def struct_pack(formatstring, *args):
 
       # it's a signed or unsigned integer (4 byte)!   Must have endianness!!!
       elif typetopack == 'i' or typetopack == 'I':
-        assert(endianness != "none")
+        if endianness == "none":
+          raise TypeError("Integer must have endianness")
 
         if type(thisarg) != int and type(thisarg) != long:
           raise TypeError("4-byte int format argument not a long or int")
   
         # let's check the ranges
         if typetopack == 'i':
-          assert(thisarg >= -(2**31) and thisarg < 2**31)
+          if not (thisarg >= -(2**31) and thisarg < 2**31):
+            raise ValueError("Integer "+str(thisarg)+" out of range for type 'i'")
         else:
-          assert(thisarg >= 0 and thisarg < 2**32)
+          if not (thisarg >= 0 and thisarg < 2**32):
+            raise ValueError("Integer "+str(thisarg)+" out of range for type 'I'")
 
         if typetopack == 'i' and thisarg < 0:
           # if signed let's do a conversion to an unsigned!
@@ -229,6 +235,14 @@ def struct_unpack(formatstring, packedstring):
   if type(packedstring) != str:
     raise TypeError("Packed string must have type str, not '"+str(type(packedstring))+"'")
 
+
+  # let's check the size and see if this matches.   We also check the format
+  # and endianness at the same time.
+  expectedpackedstringlength = struct_calcsize(formatstring)
+
+  if expectedpackedstringlength != len(packedstring):
+    raise ValueError("Expected packed string of length "+str(expectedpackedstringlength)+", got "+str(len(packedstring)))
+
   # okay, let's iterate through these and remove stuff as we go!
   currentformatstring = formatstring
   currentpackedstring = packedstring
@@ -282,8 +296,8 @@ def struct_unpack(formatstring, packedstring):
 
       # it's a string!   Must not have endianness!!!
       if typetounpack == 's':
+        # shouldn't happen because we checked above
         assert(endianness == "none")
-
         assert(len(currentpackedstring) >= repeatcount)
 
         # strings should be reconstructed as a string, not a list of bytes...
@@ -295,8 +309,8 @@ def struct_unpack(formatstring, packedstring):
 
       # it's a signed or unsigned integer (4 byte)!   Must have endianness!!!
       elif typetounpack == 'i' or typetounpack == 'I':
+        # shouldn't happen because we checked above
         assert(endianness != "none")
-
         assert(len(currentpackedstring) >= 4)
   
         # flip the endianness to big (if applicable)
