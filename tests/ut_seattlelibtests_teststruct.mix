@@ -4,6 +4,74 @@ include struct.repy
 
 if callfunc == 'initialize':
 
+  #### GOOD Calcsize
+
+  # let's check the size of some strings...
+  assert(1 == struct_calcsize('s'))
+  assert(4 == struct_calcsize('>i'))
+  assert(4 == struct_calcsize('!I'))
+  assert(29 == struct_calcsize('1s>2i!5I'))
+  assert(123 == struct_calcsize('123s'))
+  assert(0 == struct_calcsize(''))
+  assert(0 == struct_calcsize('0s0s0s0s0s'))
+
+
+  #### BAD Calcsize
+
+  # okay time for a few invalid strings (reverse the endianness, repeatcount).
+  try:
+    bad = struct_calcsize('1s2>i5!I')
+  except TypeError, e:
+    pass
+  else:
+    print "bad calcsize 1:",bad
+
+  # multiple endiannesses
+  try:
+    bad = struct_calcsize('!!i')
+  except TypeError, e:
+    pass
+  else:
+    print "bad calcsize 2:",bad
+
+  # Not an integer
+  try:
+    bad = struct_calcsize(47)
+  except TypeError, e:
+    pass
+  else:
+    print "bad calcsize 3:",bad
+
+
+  # Integer, no endianness
+  try:
+    bad = struct_calcsize('I')
+  except ValueError, e:
+    pass
+  else:
+    print "bad calcsize 4:",bad
+
+  # string with endianness
+  try:
+    bad = struct_calcsize('!s')
+  except ValueError, e:
+    pass
+  else:
+    print "bad calcsize 5:",bad
+
+  # negative repeatcount
+  try:
+    bad = struct_calcsize('30s-2s')
+  except TypeError, e:
+    pass
+  else:
+    print "bad calcsize 6:",bad
+
+
+
+  #### GOOD pack / unpack
+
+
   # let's try some valid pack / unpack of things first
   a = struct_pack('0s!i!2I10s0s','',-1,2,123,'helloworld','')
 

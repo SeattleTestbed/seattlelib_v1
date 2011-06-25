@@ -343,5 +343,91 @@ def struct_unpack(formatstring, packedstring):
 
 
 
+def struct_calcsize(formatstring):
+  """
+   <Purpose>
+      Given a formatstring, indicates the correct packed string size.   
+
+   <Arguments>
+      formatstring: The format string (See the python docs).   Caveat, if 
+           integer, etc.  types are used they *must* contain an endianness 
+           character
+
+   <Exceptions>
+      ValueError, IndexError, TypeError, etc. if the args are malformed
+
+   <Side Effects>
+      None.
+
+   <Returns>
+      A numeric length (>=0)
+  """
+
+  if type(formatstring) != str:
+    raise TypeError("Format string must have type str, not '"+str(type(formatstring))+"'")
+
+  
+  currentlength = 0
+
+  # this will hold the position inside of the formatstring.   It's what we 
+  # move along to make progress.
+  position = 0
+
+  # we'll move the position in the formatstring as we go...
+  while position < len(formatstring):
+
+    #### Do our limited endianness checking... ###
+
+    specifiesendianness = False
+    # We'll ignore endianness characters other than to check for existance
+    if formatstring[position] in ['>','!','<']:
+      position = position + 1
+
+      specifiesendianness = True
+
+    #### Get the repeatcount! ###
+
+    # now let's see if there is a repeatcount
+    repeatcount = 1
+    repeatcountstring = ""
+    while formatstring[position] in '1234567890':
+      repeatcountstring += formatstring[position]
+      position = position + 1
+    
+    # there is!   Let's set it...
+    if repeatcountstring:
+      repeatcount = int(repeatcountstring)
+    
+
+
+    #### Handle the type! ###
+
+    # figure out the type of this...
+    typetounpack = formatstring[position]
+    position = position + 1
+
+    # it's a string!   Must not have endianness!!!
+    if typetounpack == 's':
+
+      if specifiesendianness:
+        raise ValueError("A string cannot have endianness specified! (position "+str(position)+" of '"+formatstring+"')")
+
+      # add the size of a char + the number of chars
+      currentlength += 1 * repeatcount
+
+    # it's a signed or unsigned integer (4 byte)!   Must have endianness!!!
+    elif typetounpack == 'i' or typetounpack == 'I':
+
+      if not specifiesendianness:
+        raise ValueError("An integer must have endianness specified! (position "+str(position)+" of '"+formatstring+"')")
+
+
+      # add the size of an integer + the number of integers
+      currentlength += 4 * repeatcount
+  
+    else:
+      raise TypeError("Unknown format type '"+typetounpack+"' at (position "+str(position)+" of '"+formatstring+"')")
+    
+  return currentlength
 
 
