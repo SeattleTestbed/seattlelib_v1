@@ -874,14 +874,7 @@ def convert_dictionary_to_packet(dns_dictionary):
         'type'                  string (formatted unicode, eg A, AAAA, MX)
         'class'                 string (formatted unicode, eg IN, HE, CH)
         'time_to_live'          integer (seconds, 32 bit)
-        'answer_data'           string (formatted unicode, RR format)
-                                                   Note that the length and
-                                                   format of this field
-                                                   will vary based on the
-                                                   type of the answer RR.
-                                                   This will be *exactly*
-                                                   the return data from
-                                                   the DHT server.
+        'answer_data'           string (Dictionary, content based on type.)
   }
 
   <Exceptions>
