@@ -37,6 +37,30 @@ _REFUSED_CODE = 5
 
 
 
+# The following flag set is used to simplify packet construction from scratch.
+# Users may want to deviate from the default flags, and if so it's easy for 
+# them to modify this directly.
+default_flags = {
+                 'communication_id': 'a7',
+                 'query_response': False,
+                 'operation_code': 0,
+                 'authority_advisory': False,
+                 'truncation': False,
+                 'recursion_desired': True,
+                 'recursion_accepted': False,
+                 'z': False,
+                 'authentic_data': False,
+                 'checking_disabled': False,
+                 'error_code': 0,
+                 'answer_count': 0,
+                 'authority_record_count': 0,
+                 'additional_record_count': 0,
+                 'answers': []
+                }
+
+
+
+
 # These exceptions are used for packet flagging in dnsserver, and might see 
 # other utility in the future. Note that there is no corresponding exception 
 # for RCODE = 4, as we will simply use a NotImplementedError in that case.
@@ -139,6 +163,9 @@ def convert_packet_to_dictionary(dns_packet_data):
     This method takes a raw UDP packet and parses it in to a dictionary with 
     useful information.
 
+    Hypothetically this could be used with custom-generated packet strings, 
+    but it is intended for parsing data after receiving it from the network.
+
   <Arguments>
     dns_packet_string
       A raw packet received from a listen port in string form. We assume that 
@@ -149,6 +176,9 @@ def convert_packet_to_dictionary(dns_packet_data):
     correctly formatted. Use this as a feature: If there's something 
     physically wrong with the packet, this method will crash. If it's fine,
     it won't crash.
+
+    While I have attempted to give some measure of sensibility to how this 
+    can fail, the permutations of malformed packets are virtually endless.
 
   <Side Effects>
     None
@@ -188,20 +218,20 @@ def convert_packet_to_dictionary(dns_packet_data):
 
   }
 
-  # The 'answer_data' dictionary field can have various formats. Here are the
-  # three which are currently supported:
+    The 'answer_data' dictionary field can have various formats. Here are the
+    three which are currently supported:
     SOA:
-  'mname' <IP>
-  'rname' <IP>
-  'serial' <32 bit int>
-  'refresh' <32 bit int>
-  'retry' <32 bit int>
-  'expire' <32 bit int>
-  'minimum' <32 bit int>
+      'mname' <IP>
+      'rname' <IP>
+      'serial' <32 bit int>
+      'refresh' <32 bit int>
+      'retry' <32 bit int>
+      'expire' <32 bit int>
+      'minimum' <32 bit int>
     NS:
-  'address' <Domain Name>
+      'address' <Domain Name>
     A:
-  'address' <IP>
+      'address' <IP>
 
   """
   # Initialize the dictionary which will contain the packet data.
@@ -874,7 +904,14 @@ def convert_dictionary_to_packet(dns_dictionary):
         'type'                  string (formatted unicode, eg A, AAAA, MX)
         'class'                 string (formatted unicode, eg IN, HE, CH)
         'time_to_live'          integer (seconds, 32 bit)
-        'answer_data'           string (Dictionary, content based on type.)
+        'answer_data'           string (formatted unicode, RR format)
+                                                   Note that the length and
+                                                   format of this field
+                                                   will vary based on the
+                                                   type of the answer RR.
+                                                   This will be *exactly*
+                                                   the return data from
+                                                   the DHT server.
   }
 
   <Exceptions>
@@ -886,9 +923,7 @@ def convert_dictionary_to_packet(dns_dictionary):
   <Returns>
     A valid DNS packet corresponding to the dictionary, in string form.
   """
-  # First, we need something to store our packet in as we construct it. Since 
-  # we have to send data through the network as a string, we may as well use 
-  # one.
+  # Temp variable to contain the packet as we construct it.
   converted_packet = ""
 
   # We can append the communication ID in a straightforward way, since it's a 
@@ -903,7 +938,7 @@ def convert_dictionary_to_packet(dns_dictionary):
   if dns_dictionary['query_response']:
     two_byte += 128
 
-  two_byte += dns_dictionary['operation_code'] * (2 ** 3) # I think this works.
+  two_byte += dns_dictionary['operation_code'] * (2 ** 3)
 
   if dns_dictionary['authority_advisory']:
     two_byte += 4
@@ -946,11 +981,33 @@ def convert_dictionary_to_packet(dns_dictionary):
 
   converted_packet += _int16_to_charpair(dns_dictionary['additional_record_count'])
 
+  # Append question section
+  for question in dns_dictionary['questions']:
+    # Create a holder variable so that we can conduct length comparisons at the end 
+    # of the loop.
+    question_holder = ""
 
-  # The question section is straightforward; the server cannot change it 
-  # within DNS spec, so we'll just copy the one we received from the client.
-  # We use the index 12 to copy all data after the header.
-  converted_packet += dns_dictionary['raw_data'][12:]
+    # Use compression if possible. Won't be possible if there's only one question.
+    address_name = ""
+    temp_name = question['name']
+    split_name = temp_name.split('.')
+    for element in split_name:
+      address_name += chr(len(element))
+      address_name += element
+
+    prev_location = converted_packet.find(address_name) # -1 if fails.
+    if prev_location > 0:
+      question_holder += _int16_to_charpair(49152 + prev_location)
+    else:
+      question_holder += address_name
+      question_holder += chr(0)
+
+    converted_packet += question_holder
+
+    converted_packet += _int16_to_charpair(_type_lookup_table[question['type']])
+
+    converted_packet += _int16_to_charpair(_class_lookup_table[question['class']])
+
 
   # Next we append the answers.
   for answer in dns_dictionary['answers']:
@@ -1147,3 +1204,40 @@ def _remove_last(data_string):
     A string with its last character removed.
   """
   return data_string[0:len(data_string) - 1]
+
+
+
+
+def generate_packet(questions, flags=default_flags):
+  """
+  <Purpose>
+    Allows the user to construct a DNS-formatted packet from scratch. 
+
+    Does not currently support including answers in queries.
+
+  <Arguments>
+    questions
+      An array of dictionaries, one dictionary per question. Format is:
+       {'name', 'type', 'class'}
+
+    flags
+      Contains all necessary data for packet construction. If you wish 
+      to alter the details in here, you can override the argument or 
+      modify default_flags.
+
+  <Exceptions>
+    A Exception will be raised if the input arguments are incorrect.
+
+    A KeyError will be raised if the flags argument is missing something.
+
+  <Returns>
+    A formatted packet in string form, ready to be sent.
+  """
+
+  # Construct dictionary.
+  packet_dict = dict({ 'questions': questions }, **flags)
+  packet_dict.update({'question_count': len(questions)})
+
+  packet_string = convert_dictionary_to_packet(packet_dict)
+
+  return packet_string
