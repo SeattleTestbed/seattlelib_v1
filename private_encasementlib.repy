@@ -81,7 +81,7 @@ def _layer_code(layer):
   code = fileh.read(MAX_FILE_SIZE)
   fileh.close()
   if len(code) == MAX_FILE_SIZE:
-    log("Failed to read all of security layer '"+layer+"'! File size exceeds 100K bytes!")
+    print "Failed to read all of security layer '"+layer+"'! File size exceeds 100K bytes!"
 
   # Create a new virtual namespace
   try:

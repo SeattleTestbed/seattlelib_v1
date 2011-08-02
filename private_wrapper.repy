@@ -541,7 +541,7 @@ def _check_func_return(name, return_definition, retval):
 # Called on a fatal error 
 def fatal_error(message):
   # Log the error message
-  log("---\n", getruntime(), "Fatal Error:", message, "\n---\n")
+  print "---\n", getruntime(), "Fatal Error:", message, "\n---\n"
 
   # Terminate program execution
   exitall()
