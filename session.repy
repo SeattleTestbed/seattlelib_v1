@@ -39,7 +39,10 @@ def session_recvmessage(socketobj):
     # too large
     raise ValueError, "Bad message size"
 
-  messagesize = int(messagesizestring)
+  try:
+    messagesize = int(messagesizestring)
+  except ValueError:
+    raise ValueError, "Bad message size"
   
   # nothing to read...
   if messagesize == 0:
