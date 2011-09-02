@@ -169,6 +169,12 @@ def nmclient_signedcommunicate(nmhandle, *args):
     datatosend = datatosend + '|' + str(arg)
   
 
+  # Sign first before opening the connection to prevent connections from idling
+  try:
+    signeddata = fastsigneddata.signeddata_signdata(datatosend, privatekey, publickey, timestamp, expirationtime, sequenceid, identity)
+  except ValueError, e:
+    raise NMClientException, str(e)
+
 
   # the node is behind a nat
   if 'natlayermac' in nmclient_handledict[nmhandle]:
@@ -189,11 +195,6 @@ def nmclient_signedcommunicate(nmhandle, *args):
   
   # always close the connobject afterwards...
   try:
-    try:
-      signeddata = fastsigneddata.signeddata_signdata(datatosend, privatekey, publickey, timestamp, expirationtime, sequenceid, identity)
-    except ValueError, e:
-      raise NMClientException, str(e)
-
     try:
       session_sendmessage(thisconnobject, signeddata)
     except Exception, e:
