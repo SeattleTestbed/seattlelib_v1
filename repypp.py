@@ -61,7 +61,11 @@ def processfiledata(stringlist):
     # it's an include line... pretty simple to handle, just add the rest of the
     # line to the includelist after stripping off whitespace
     if line.startswith('include '):
-      includelist.append(line[len('include '):].strip())
+      # Strip out the include...
+      sanitized_line = line[len('include '):].strip()
+      # JAC: Fix for #1017.   Let's remove everything after a '#' symbol
+      sanitized_line = sanitized_line.split('#')[0].strip()
+      includelist.append(sanitized_line)
       outdata.append(line)
       continue
 
