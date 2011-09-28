@@ -78,9 +78,14 @@ def session_sendhelper(socketobj,data):
 # send the message 
 def session_sendmessage(socketobj,data):
   header = str(len(data)) + '\n'
-  session_sendhelper(socketobj,header)
+  # Sending these piecemeal does not accomplish anything, and can contribute 
+  # to timeout issues when run by constantly overloaded machines.
+  # session_sendhelper(socketobj,header)
 
-  session_sendhelper(socketobj,data)
+  # Concatenate the header and data, rather than sending both separately.
+  complete_packet = header + data
 
+  # session_sendhelper(socketobj,data)
 
+  session_sendhelper(socketobj, complete_packet)
 
