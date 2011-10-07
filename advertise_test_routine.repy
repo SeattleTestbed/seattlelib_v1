@@ -241,7 +241,7 @@ def run_control_thread():
         total_failures += 1
         reported_failures += 1
         get_failures += 1
-        mycontext['failure_distribution'][reason] += 1
+        mycontext['failure_distribution'][extra] += 1
 
   mycontext['tick_data'] = []
 
