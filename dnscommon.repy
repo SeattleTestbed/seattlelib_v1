@@ -16,8 +16,8 @@
   functionality in dnsserver that it still needs.
 
   There is no outward change from this for clients writing DNS-based 
-  applications with dnsserver.repy, zenodotus.repy, or dnsclient.repy. 
-  dnscommon is an internal incapsulation in this respect. Since the packet-
+  applications with dnsserver.repy or zenodotus.repy. dnscommon is an 
+  internal incapsulation in this respect. Since the packet-
   dictionary conversion methods have been migrated, those methods are now 
   public. This is the only big change for external applications.
 """
