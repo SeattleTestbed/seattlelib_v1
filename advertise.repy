@@ -20,7 +20,7 @@ include parallelize.repy
 
 
 # All the names of services we can support.
-_advertise_all_services = ("central", "DHT", "DOR")
+_advertise_all_services = ("central", "DHT", "DOR", "central_v2")
 
 
 nodemanager_announce_context = {}
@@ -47,6 +47,10 @@ def _try_advertise_announce(args):
 
   try:
     if which_service == "central":
+      servername = "satya.cs.washington.edu"
+      centralizedadvertise_announce(key, value, ttlval)
+    elif which_service == "central_v2":
+      servername = "betabox.cs.washington.edu"
       centralizedadvertise_announce(key, value, ttlval)
     elif which_service == "DOR":
       DORadvertise_announce(key, value, ttlval)
@@ -176,6 +180,10 @@ def _try_advertise_lookup(args):
 
   try:
     if which_service == "central":
+      servername = "satya.cs.washington.edu"
+      results = centralizedadvertise_lookup(key, maxvals)
+    elif which_service == "central_v2":
+      servername = "betabox.cs.washington.edu"
       results = centralizedadvertise_lookup(key, maxvals)
     elif which_service == "DOR":
       results = DORadvertise_lookup(key, maxvals=maxvals)
@@ -233,22 +241,24 @@ def advertise_lookup(key, maxvals=100, lookuptype=None, \
   key = str(key)
 
   if lookuptype is None:
-    lookuptype = ['central','opendht','DOR']
+    lookuptype = ['central','opendht','DOR', 'central_v2']
 
   parallel_worksets = []
   start_time = getruntime()
 
   onefinished = [False]
 
-  for type in lookuptype:
-    if type == "central":
+  for servicetype in lookuptype:
+    if servicetype == "central":
       parallel_worksets.append(("central", key, maxvals, onefinished))
-    elif type == "DOR":
+    elif servicetype == "central_v2":
+      parallel_worksets.append(("central_v2", key, maxvals, onefinished))
+    elif servicetype == "DOR":
       parallel_worksets.append(("DOR", key, maxvals, onefinished))
-    elif type == "opendht":
+    elif servicetype == "opendht":
       parallel_worksets.append(("DHT", key, maxvals, onefinished))
     else:
-      raise AdvertiseError("Incorrect service type '" + type + "' passed to advertise_lookup().")
+      raise AdvertiseError("Incorrect service type '" + servicetype + "' passed to advertise_lookup().")
 
   ph = parallelize_initfunction(parallel_worksets, _try_advertise_lookup, \
       concurrentevents=concurrentevents)
