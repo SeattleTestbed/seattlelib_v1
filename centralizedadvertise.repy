@@ -22,6 +22,11 @@ servername = "satya.cs.washington.edu"
 serverport = 10102
 
 
+# These are being used while the new advertise server is being tested.
+mycontext["servername"] = "satya.cs.washington.edu"
+mycontext["serverport"] = 10102
+
+
 
 class CentralAdvertiseError(Exception):
   """Error when advertising a value to the central advertise service."""
@@ -73,7 +78,7 @@ def centralizedadvertise_announce(key, value, ttlval):
   
   # send the data over a timeout socket using the session library, then
   # get a response from the server.
-  sockobj = timeout_openconn(servername,serverport, timeout=10)
+  sockobj = timeout_openconn(mycontext["servername"],mycontext["serverport"], timeout=10)
   try:
     session_sendmessage(sockobj, datastringtosend)
     rawresponse = session_recvmessage(sockobj)
@@ -135,7 +140,7 @@ def centralizedadvertise_lookup(key, maxvals=100):
   messagestringtosend = serialize_serializedata(messagetosend)
 
 
-  sockobj = timeout_openconn(servername,serverport, timeout=10)
+  sockobj = timeout_openconn(mycontext["servername"],mycontext["serverport"], timeout=10)
   try:
     session_sendmessage(sockobj, messagestringtosend)
     rawreceiveddata = session_recvmessage(sockobj)

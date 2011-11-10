@@ -47,10 +47,10 @@ def _try_advertise_announce(args):
 
   try:
     if which_service == "central":
-      servername = "satya.cs.washington.edu"
+      mycontext["servername"] = "satya.cs.washington.edu"
       centralizedadvertise_announce(key, value, ttlval)
     elif which_service == "central_v2":
-      servername = "betabox.cs.washington.edu"
+      mycontext["servername"] = "betabox.cs.washington.edu"
       centralizedadvertise_announce(key, value, ttlval)
     elif which_service == "DOR":
       DORadvertise_announce(key, value, ttlval)
