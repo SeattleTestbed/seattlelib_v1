@@ -26,7 +26,7 @@ v2serverport = 10102
 class CentralAdvertiseError(Exception):
   """Error when advertising a value to the central advertise service."""
 
-def centralizedadvertise_announce(key, value, ttlval):
+def v2centralizedadvertise_announce(key, value, ttlval):
   """
    <Purpose>
      Announce a key / value pair into the CHT.
@@ -93,7 +93,7 @@ def centralizedadvertise_announce(key, value, ttlval):
 
 
 
-def centralizedadvertise_lookup(key, maxvals=100):
+def v2centralizedadvertise_lookup(key, maxvals=100):
   """
    <Purpose>
      Returns a list of valid values stored under a key

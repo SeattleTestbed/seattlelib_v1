@@ -15,6 +15,7 @@ Raises an AdvertiseError exception if there is a problem advertising with either
 include listops.repy
 include openDHTadvertise.repy
 include centralizedadvertise.repy
+include centralizedadvertise_v2.repy
 include DORadvertise.repy
 include parallelize.repy
 
@@ -47,11 +48,9 @@ def _try_advertise_announce(args):
 
   try:
     if which_service == "central":
-      mycontext["servername"] = "satya.cs.washington.edu"
       centralizedadvertise_announce(key, value, ttlval)
     elif which_service == "central_v2":
-      mycontext["servername"] = "betabox.cs.washington.edu"
-      centralizedadvertise_announce(key, value, ttlval)
+      v2centralizedadvertise_announce(key, value, ttlval)
     elif which_service == "DOR":
       DORadvertise_announce(key, value, ttlval)
     else:
@@ -180,11 +179,9 @@ def _try_advertise_lookup(args):
 
   try:
     if which_service == "central":
-      servername = "satya.cs.washington.edu"
       results = centralizedadvertise_lookup(key, maxvals)
     elif which_service == "central_v2":
-      servername = "betabox.cs.washington.edu"
-      results = centralizedadvertise_lookup(key, maxvals)
+      results = v2centralizedadvertise_lookup(key, maxvals)
     elif which_service == "DOR":
       results = DORadvertise_lookup(key, maxvals=maxvals)
     else:
