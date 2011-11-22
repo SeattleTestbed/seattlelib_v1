@@ -18,10 +18,11 @@ include centralizedadvertise.repy
 include centralizedadvertise_v2.repy
 include DORadvertise.repy
 include parallelize.repy
+include udpcentralizedadvertise.repy
 
 
 # All the names of services we can support.
-_advertise_all_services = ("central", "DHT", "DOR", "central_v2")
+_advertise_all_services = ("central", "DHT", "DOR", "central_v2", "UDP")
 
 
 nodemanager_announce_context = {}
@@ -53,6 +54,8 @@ def _try_advertise_announce(args):
       v2centralizedadvertise_announce(key, value, ttlval)
     elif which_service == "DOR":
       DORadvertise_announce(key, value, ttlval)
+    elif which_service == "UDP":
+      udpcentralizedadvertise_announce(key, value, ttlval)
     else:
       openDHTadvertise_announce(key, value, ttlval)
 
@@ -184,6 +187,8 @@ def _try_advertise_lookup(args):
       results = v2centralizedadvertise_lookup(key, maxvals)
     elif which_service == "DOR":
       results = DORadvertise_lookup(key, maxvals=maxvals)
+    elif which_service == "UDP":
+      results = udpcentralizedadvertise_lookup(key, maxvals)
     else:
       results = openDHTadvertise_lookup(key, maxvals)
 
@@ -238,7 +243,7 @@ def advertise_lookup(key, maxvals=100, lookuptype=None, \
   key = str(key)
 
   if lookuptype is None:
-    lookuptype = ['central','opendht','DOR', 'central_v2']
+    lookuptype = ['central','opendht','DOR', 'central_v2', 'UDP']
 
   parallel_worksets = []
   start_time = getruntime()
@@ -254,6 +259,8 @@ def advertise_lookup(key, maxvals=100, lookuptype=None, \
       parallel_worksets.append(("DOR", key, maxvals, onefinished))
     elif servicetype == "opendht":
       parallel_worksets.append(("DHT", key, maxvals, onefinished))
+    elif servicetype == "UDP":
+      parallel_worksets.append(("UDP", key, maxvals, onefinished))
     else:
       raise AdvertiseError("Incorrect service type '" + servicetype + "' passed to advertise_lookup().")
 
