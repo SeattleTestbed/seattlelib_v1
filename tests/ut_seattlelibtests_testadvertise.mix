@@ -1,4 +1,8 @@
-#pragma repy
+#pragma repy restrictions.advertise
+
+# restrictions.advertise is identical to restrictions.default save for two 
+# altered lines allowing sending and receiving over port 63100. This 
+# allowance is necessary for testing the UDP client.
 
 include advertise.repy
 

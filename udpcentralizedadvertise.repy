@@ -1,8 +1,6 @@
 """ 
 Author: Justin Cappos
 
-Edited by Sebastian Morgan
-
 Start Date: Oct 30, 2011
 
 Description:
@@ -24,9 +22,13 @@ udpserverport = 10102
 # how long to wait for timeouts...
 udpcentralizedservertimeouts = [1,2,4,8]
 
+# If a query times out or if we decide to abandon it, put the ID here. That way, 
+# the communicate function can reject it if the server responds belatedly.
+failed_querylist = []
+
 # Need this for receiving over UDP. The Repy v1 API forces us to use 
 # a callback, which requires this roundabout solution.
-mycontext['advertise_response'] = None
+mycontext['advertise_response'] = []
 
 mycontext['udprequestport'] = 0
 
@@ -48,7 +50,7 @@ def _getusableport():
     None
 
   <Exceptions>
-    Exception - Unable to find a port within the range port_min - port_max
+    None
 
   <Side Effects>
     None
@@ -57,8 +59,8 @@ def _getusableport():
     An integer port
   """
   port_found = False
-  port_min = 63000 # This range is intended for Seattle nodes, but can be 
-  port_max = 63150 # customized as needed.
+  port_min = 63000
+  port_max = 63150
   port_iter = port_min
   local_addr = getmyip()
 
@@ -78,7 +80,7 @@ def _getusableport():
 
 
 # This helper function handles communications with the server
-def _udpcentralizedadvertise_communicate(datastringtosend, timeout):
+def _udpcentralizedadvertise_communicate(datastringtosend, timeout, queryid):
   if mycontext['udprequestport'] == 0:
     mycontext['udprequestport'] = _getusableport()
 
@@ -101,13 +103,20 @@ def _udpcentralizedadvertise_communicate(datastringtosend, timeout):
     sendmess(udpservername, udpserverport, datastringtosend, getmyip(), udprequestport)
 
     while getruntime() < starttime + timeout:
-      if not mycontext['advertise_response'] is None:
-        return_value = mycontext['advertise_response']
-        mycontext['advertise_response'] = None
-        return return_value
-      else:
-        sleep(0.01)
 
+      for entry in mycontext['advertise_response']:
+        if entry[len(entry) - 1] == queryid:
+          return_value = mycontext['advertise_response'].pop(mycontext['advertise_response'].index(entry))
+          return return_value
+
+      # Since there's nothing here for us, why not do some spring cleaning?
+      for entry in mycontext['advertise_response']:
+        if queryid - entry[len(entry) - 1] > 100:
+          mycontext['advertise_response'].pop(mycontext['advertise_response'].index(entry))
+
+      # Already done? Let's play nice with the other threads.
+      sleep(0.01) # Strongly recommend NOT to set this any higher.
+      
     raise UDPNoResponseError("Did not receive a response from UDP advertise server")
 
   finally:
@@ -118,8 +127,9 @@ def _udpcentralizedadvertise_communicate(datastringtosend, timeout):
 
 
 # This is our roundabout solution for a UDP callback.
+# Could crash. Probably should if something bad happens.
 def _listenformessage(remoteIP, remoteport, message, commhandle):
-  mycontext['advertise_response'] = serialize_deserializedata(message)
+  mycontext['advertise_response'].append(serialize_deserializedata(message))
 
   stopcomm(commhandle)
   return
@@ -173,13 +183,11 @@ def udpcentralizedadvertise_announce(key, value, ttlval):
 
   # myrequestport = getusableport()
 
-  # By shifting this out of the loop, we avoid false alarm issues that arise 
-  # if the server is too busy to respond in a timely manner.
   unique_request_id = uniqueid_getid()
 
   # We'll loop through and send a request, increasing the timeout upon failure
   for thistimeout in udpcentralizedservertimeouts:
-  
+
     # build the tuple to send, then convert to a string because only strings
     # (bytes) can be transmitted over the network...
     datatosend = ('PUT',key,value,ttlval, unique_request_id)
@@ -189,7 +197,7 @@ def udpcentralizedadvertise_announce(key, value, ttlval):
 
     try:
     # send the request over UDP...
-      rawresponse = _udpcentralizedadvertise_communicate(datastringtosend, thistimeout)
+      rawresponse = _udpcentralizedadvertise_communicate(datastringtosend, thistimeout, unique_request_id)
 
     except UDPNoResponseError:
       # let's increase the timeout...
@@ -217,6 +225,8 @@ def udpcentralizedadvertise_announce(key, value, ttlval):
         # else all is well!   Let's return success
         return
       
+  failed_querylist.append(unique_request_id)
+
   # fell through all of the timeout values...
   raise UDPCentralAdvertiseError("UDP Centralized announce timed out!")
 
@@ -273,7 +283,7 @@ def udpcentralizedadvertise_lookup(key, maxvals=100):
   
     try:
     # send the request over UDP...
-      responsetuple = _udpcentralizedadvertise_communicate(messagestringtosend, thistimeout)
+      responsetuple = _udpcentralizedadvertise_communicate(messagestringtosend, thistimeout, unique_request_id)
 
     except UDPNoResponseError:
       # let's increase the timeout...
