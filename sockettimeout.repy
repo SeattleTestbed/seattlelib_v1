@@ -25,7 +25,7 @@ class _timeout_socket():
   """
 
   # Initialize with the socket object and a default timeout
-  def __init__(self,socket,timeout=10, checkintv=0.1):
+  def __init__(self,socket,timeout=10, checkintv='fibonacci'):
     """
     <Purpose>
       Initializes a timeout socket object.
@@ -102,6 +102,22 @@ class _timeout_socket():
     <Returns>
       The data received from the socket.
     """
+
+    # It's worth noting that this fibonacci backoff begins with a 2ms poll rate, and 
+    # provides a simple exponential backoff scheme.
+
+    fibonacci_backoff = False
+    backoff_cap = 100 # Never use more than 100ms poll rate.
+
+    pre_value = 1.0     # Our iterators for Fibonacci sequence.
+    pre_pre_value = 1.0 # 
+
+    # Since we want to be able to initialize with static poll rates (backwards 
+    # compatibility) we specify a string if we're using the fibonacci backoff.
+    if type(self.checkintv) is str:
+      if self.checkintv == 'fibonacci':
+        fibonacci_backoff = True
+
     # Set the timeout if None
     if timeout is None:
       timeout = self.timeout
@@ -121,8 +137,27 @@ class _timeout_socket():
         if diff > timeout:
           raise SocketTimeoutError,"recv() timed out!"
 
-      # Sleep
-      sleep(self.checkintv)
+      if fibonacci_backoff:
+        # Iterate the sequence once
+        sleep_length = pre_value + pre_pre_value
+        pre_pre_value = pre_value
+        pre_value = sleep_length
+
+        # Make sure we don't exceed maximum backoff.
+        if sleep_length > backoff_cap:
+          sleep_length = backoff_cap
+
+        # Unit conversion to seconds
+        sleep_length = sleep_length / 1000.0
+
+        # Sleep
+        sleep(sleep_length)
+      else: # Classic functionality.
+        # Sleep
+        sleep(self.checkintv)
+
+      # If available, move to the next value of checkintv.
+      
 
       # Update rblock
       rblock, wblock = self.socket.willblock()
