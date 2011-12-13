@@ -21,23 +21,61 @@ sessionmaxdigits = 20
 # get the next message off of the socket...
 def session_recvmessage(socketobj):
 
+  # This is our length header.
   messagesizestring = ''
+  
+  # This is our read overflow buffer.
+  readoverflow = ''
+
+  # Flag
+  runloop = True
+
   # first, read the number of characters...
   for junkcount in range(sessionmaxdigits):
-    currentbyte = socketobj.recv(1)
+    # There is a less naive way of doing this. If we assume that the sender is
+    # also using session.repy, we are guaranteed packets of minimum size 3.
+    # This is because the packet must contain a length header of at least one 
+    # byte, a '\n' delimiter, and at least one byte of packet data. We can 
+    # account for edge cases where we read too much data with ease as well.
+    # currentbyte = socketobj.recv(1)  # Updated 12/12/11
+    currentbytes = socketobj.recv(3)
 
-    if currentbyte == '\n':
+    if '\n'in currentbytes:
+      # We cannot use split for this. If a user has placed a \n character in 
+      # their packet for whatever reason, using split will lead to strange 
+      # errors. We have to parse by hand.
+
+      runloop = False
+      delimiter_found = False
+      
+      if currentbytes[0] == '\n':
+        readoverflow += currentbytes[1:]
+        delimiter_found = True
+      else:
+        messagesizestring += currentbytes[0]
+      if currentbytes[1] == '\n':
+        readoverflow += currentbytes[2]
+      else:
+        # Guard against an edge case.
+        if not delimiter_found:
+          messagesizestring += currentbytes[1]
+
+    else:
+      messagesizestring += currentbytes
+      
+
+    if not runloop:
       break
-    
-    # not a valid digit
-    if currentbyte not in '0123456789' and messagesizestring != '' and currentbyte != '-':
-      raise ValueError, "Bad message size"
-     
-    messagesizestring = messagesizestring + currentbyte
 
-  else:
-    # too large
-    raise ValueError, "Bad message size"
+    # 12/12/11 - Since we aren't reading these values in bytewise anymore, 
+    #            this check no longer makes sense.
+    # not a valid digit
+    # if currentbyte not in '0123456789' and messagesizestring != '' and currentbyte != '-':
+    #   raise ValueError, "Bad message size"
+
+  if runloop:
+    # Then we hit sessionmaxdigits.
+    raise Exception("Could not discern length of packet header!")
 
   try:
     messagesize = int(messagesizestring)
@@ -55,7 +93,7 @@ def session_recvmessage(socketobj):
   if messagesize < 0:
     raise ValueError, "Bad message size"
 
-  data = ''
+  data = readoverflow
   while len(data) < messagesize:
     chunk =  socketobj.recv(messagesize-len(data))
     if chunk == '': 
