@@ -208,7 +208,11 @@ class _timeout_socket():
           raise SocketTimeoutError,"send() timed out!"
 
       # Sleep
-      sleep(self.checkintv)
+      # Since switching to the fibonacci backoff, the nature of 
+      # this field has changed. Rather than implement the backoff 
+      # for checking block status (seems wasteful) we'll just use 
+      # a constant value. Ten ms seems appropriate.
+      sleep(0.010)
 
       # Update rblock
       rblock, wblock = self.socket.willblock()
