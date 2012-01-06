@@ -149,6 +149,41 @@ def struct_pack(formatstring, *args):
         # add the string all at once...
         break
 
+
+
+      # it's a signed or unsigned integer (2 byte)!   Must have endianness!!!
+      elif typetopack == 'h' or typetopack == 'H':
+        if endianness == "none":
+          raise TypeError("short must have endianness")
+
+        if type(thisarg) != int and type(thisarg) != long:
+          raise TypeError("2-byte int format argument not a long or int")
+  
+        # let's check the ranges
+        if typetopack == 'h':
+          if not (thisarg >= -(2**63) and thisarg < 2**63):
+            raise ValueError("Integer "+str(thisarg)+" out of range for type 'h'")
+        else:
+          if not (thisarg >= 0 and thisarg < 2**64):
+            raise ValueError("Integer "+str(thisarg)+" out of range for type 'H'")
+
+        if typetopack == 'h' and thisarg < 0:
+          # if signed let's do a conversion to an unsigned!
+          # Magic code!   Add SHORT_MAX + 1!
+          thisarg = thisarg + 2**16
+
+        # okay, so now we have the big-endian description...
+        thisargstring = _convert_number_to_big_endian_string(thisarg,8)
+ 
+        # if it's little-endian, let's reverse it!
+        if endianness == "little":
+          thisargstring = thisargstring[::-1]
+          
+        # and append it.
+        retstring += thisargstring
+
+
+
       # it's a signed or unsigned integer (4 byte)!   Must have endianness!!!
       elif typetopack == 'i' or typetopack == 'I':
         if endianness == "none":
@@ -180,6 +215,9 @@ def struct_pack(formatstring, *args):
         # and append it.
         retstring += thisargstring
         
+
+
+
       # it's a signed or unsigned integer (8 byte)!   Must have endianness!!!
       elif typetopack == 'q' or typetopack == 'Q':
         if endianness == "none":
@@ -338,6 +376,35 @@ def struct_unpack(formatstring, packedstring):
         # ... so exit!
         break
 
+
+
+      # it's a signed or unsigned short (2 byte)!   Must have endianness!!!
+      elif typetounpack == 'h' or typetounpack == 'H':
+        # shouldn't happen because we checked above
+        assert(endianness != "none")
+        assert(len(currentpackedstring) >= 2)
+  
+        # flip the endianness to big (if applicable)
+        thisnumberstring = currentpackedstring[:2]
+        if endianness == "little":
+          thisnumberstring = thisnumberstring[::-1]
+
+        currentpackedstring = currentpackedstring[2:]
+
+        # okay, so now we have the big-endian description...
+        thisnumber = _convert_big_endian_string_to_number(thisnumberstring)
+ 
+
+        if typetounpack == 'h' and thisnumber >= 2**15:
+          # if signed let's do a conversion to an unsigned!
+          # Magic code!   Subtract USHORT_MAX - 1!
+          thisnumber = thisnumber - 2**16
+
+        # and append it.
+        retlist.append(thisnumber)
+        
+
+
       # it's a signed or unsigned integer (4 byte)!   Must have endianness!!!
       elif typetounpack == 'i' or typetounpack == 'I':
         # shouldn't happen because we checked above
@@ -485,6 +552,17 @@ def struct_calcsize(formatstring):
       currentlength += 1 * repeatcount
       #account for null terminator
       currentlength += 1
+
+
+    # it's a signed or unsigned integer (2 byte)!   Must have endianness!!!
+    elif typetounpack == 'h' or typetounpack == 'H':
+
+      if not specifiesendianness:
+        raise ValueError("A short must have endianness specified! (position "+str(position)+" of '"+formatstring+"')")
+
+      # add the size of a short + the number of shorts
+      currentlength += 2 * repeatcount
+
 
     # it's a signed or unsigned integer (4 byte)!   Must have endianness!!!
     elif typetounpack == 'i' or typetounpack == 'I':
