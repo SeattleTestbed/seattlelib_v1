@@ -22,7 +22,7 @@ include udpcentralizedadvertise.repy
 
 
 # All the names of services we can support.
-_advertise_all_services = ("central", "DHT", "DOR", "central_v2", "UDP")
+_advertise_all_services = ("central", "DOR", "central_v2", "UDP")
 
 
 nodemanager_announce_context = {}
@@ -149,7 +149,7 @@ def advertise_announce(key, value, ttlval, concurrentevents=2, \
       concurrentevents=concurrentevents)
 
   while not parallelize_isfunctionfinished(ph):
-    sleep(0.1)
+    sleep(0.015)
     if getruntime() - start_time > timeout or \
         (getruntime() - start_time > graceperiod and onefinished[0]):
       parallelize_abortfunction(ph)
@@ -243,7 +243,7 @@ def advertise_lookup(key, maxvals=100, lookuptype=None, \
   key = str(key)
 
   if lookuptype is None:
-    lookuptype = ['central','opendht','DOR', 'central_v2', 'UDP']
+    lookuptype = ['central','DOR', 'central_v2', 'UDP']
 
   parallel_worksets = []
   start_time = getruntime()
@@ -268,7 +268,7 @@ def advertise_lookup(key, maxvals=100, lookuptype=None, \
       concurrentevents=concurrentevents)
 
   while not parallelize_isfunctionfinished(ph):
-    sleep(0.1)
+    sleep(0.015)
     if getruntime() - start_time > timeout or \
         (getruntime() - start_time > graceperiod and onefinished[0]):
       parallelize_abortfunction(ph)
