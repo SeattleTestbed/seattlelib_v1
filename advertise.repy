@@ -13,7 +13,6 @@
 """
 
 include listops.repy
-include openDHTadvertise.repy
 include centralizedadvertise.repy
 include centralizedadvertise_v2.repy
 include DORadvertise.repy
@@ -100,8 +99,6 @@ def _try_advertise_announce(args):
       DORadvertise_announce(key, value, ttlval)
     elif which_service == "UDP":
       udpcentralizedadvertise_announce(key, value, ttlval)
-    elif which_service == "DHT":
-      openDHTadvertise_announce(key, value, ttlval)
     else:
       # This should be redundant with the previous explicit AdvertiseError.
       # One cannot (usually) be too careful.
@@ -270,8 +267,6 @@ def _try_advertise_lookup(args):
       results = DORadvertise_lookup(key, maxvals=maxvals)
     elif which_service == "UDP":
       results = udpcentralizedadvertise_lookup(key, maxvals)
-    elif which_service == "DHT":
-      results = openDHTadvertise_lookup(key, maxvals)
     else:
       raise AdvertiseError("Did not understand service type!")
 
@@ -289,7 +284,7 @@ def advertise_lookup(key, maxvals=100, lookuptype=None, \
   """
   <Purpose>
     Lookup (GET) (a) value(s) stored at the given key in the central advertise
-    server, openDHT, or both.
+    server, central advertise server V2, DOR, UDP, or all.
 
   <Arguments>
     key
@@ -298,7 +293,7 @@ def advertise_lookup(key, maxvals=100, lookuptype=None, \
     maxvals (optional, defaults to 100):
       Maximum number of values to return.
 
-    lookuptype (optional, defaults to ['central', 'opendht', 'DOR']):
+    lookuptype (optional, defaults to ['central', 'central_v2', 'DOR', 'UDP']):
       Which services to employ looking up values.
     
     concurrentevents (optional, defaults to 2):
@@ -341,8 +336,6 @@ def advertise_lookup(key, maxvals=100, lookuptype=None, \
       parallel_worksets.append(("central_v2", key, maxvals, onefinished))
     elif servicetype == "DOR":
       parallel_worksets.append(("DOR", key, maxvals, onefinished))
-    elif servicetype == "opendht":
-      parallel_worksets.append(("DHT", key, maxvals, onefinished))
     elif servicetype == "UDP":
       parallel_worksets.append(("UDP", key, maxvals, onefinished))
     else:
