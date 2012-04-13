@@ -154,7 +154,10 @@ class _timeout_socket():
         sleep(sleep_length)
       else: # Classic functionality.
         # Sleep
-        sleep(self.checkintv)
+	try:
+	  sleep(float(self.checkintv))
+        except:
+	  sleep(0.1)
 
       # If available, move to the next value of checkintv.
       

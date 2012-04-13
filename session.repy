@@ -21,81 +21,23 @@ sessionmaxdigits = 20
 # get the next message off of the socket...
 def session_recvmessage(socketobj):
 
-  # This is our length header.
   messagesizestring = ''
-  
-  # This is our read overflow buffer.
-  readoverflow = ''
-
-  # Length of fixed header, if used.
-  FIXED_HEADER_LENGTH = 10
-
-  # Flag
-  runloop = True
-
-  use_fixed = False
-  first_iteration = True
-
   # first, read the number of characters...
   for junkcount in range(sessionmaxdigits):
-    # There is a less naive way of doing this. If we assume that the sender is
-    # also using session.repy, we are guaranteed packets of minimum size 3.
-    # This is because the packet must contain a length header of at least one 
-    # byte, a '\n' delimiter, and at least one byte of packet data. We can 
-    # account for edge cases where we read too much data with ease as well.
-    # currentbyte = socketobj.recv(1)  # Updated 12/12/11
-    currentbytes = socketobj.recv(2)
+    currentbyte = socketobj.recv(1)
 
-    if currentbytes == '00':
-      # Assume a fixed-length header to save time.
-      # Header length, if fixed, is assumed to be ten (10) bytes.
-      if first_iteration:
-        use_fixed = True
-        runloop = False
-        break
-
-    first_iteration = False
-
-    if '\n' in currentbytes:
-      # We cannot use split for this. If a user has placed a \n character in 
-      # their packet for whatever reason, using split will lead to strange 
-      # errors. We have to parse by hand.
-
-      runloop = False
-      
-      if currentbytes[0] == '\n':
-        readoverflow += currentbytes[1]
-      else:
-        messagesizestring += currentbytes[0]
-
-    else:
-      messagesizestring += currentbytes
-      
-
-    if not runloop:
+    if currentbyte == '\n':
       break
-
-  if use_fixed:
-    # We know that two of the initial bytes were zeros, per the requirement. 
-    # Compensate for those. Also, read in the delimiter.
-    buffer_string = socketobj.recv(FIXED_HEADER_LENGTH - 1)
     
-    # Confirm presence of the delimiter, and if it is there, accept the header.
-    if buffer_string[len(buffer_string) - 1] == '\n':
-      messagesizestring = buffer_string[:-1]
-    else:
-      raise Exception("Packet was incorrectly formatted!")
-
-
-    # 12/12/11 - Since we aren't reading these values in bytewise anymore, 
-    #            this check no longer makes sense.
     # not a valid digit
-    # if currentbyte not in '0123456789' and messagesizestring != '' and currentbyte != '-':
-    #   raise ValueError, "Bad message size"
+    if currentbyte not in '0123456789' and messagesizestring != '' and currentbyte != '-':
+      raise ValueError, "Bad message size"
+     
+    messagesizestring = messagesizestring + currentbyte
 
-  if runloop:
-    # Then we hit sessionmaxdigits.
-    raise Exception("Could not discern length of packet header!")
+  else:
+    # too large
+    raise ValueError, "Bad message size"
 
   try:
     messagesize = int(messagesizestring)
@@ -113,7 +55,7 @@ def session_recvmessage(socketobj):
   if messagesize < 0:
     raise ValueError, "Bad message size"
 
-  data = readoverflow
+  data = ''
   while len(data) < messagesize:
     chunk =  socketobj.recv(messagesize-len(data))
     if chunk == '': 
@@ -139,11 +81,6 @@ def session_sendmessage(socketobj,data):
   # Sending these piecemeal does not accomplish anything, and can contribute 
   # to timeout issues when run by constantly overloaded machines.
   # session_sendhelper(socketobj,header)
-
-  if len(header) > 4:
-    # We should use a fixed-length ten byte header, because it will be faster.
-    while len(header) < 11:
-      header = "0" + header
 
   # Concatenate the header and data, rather than sending both separately.
   complete_packet = header + data
