@@ -17,7 +17,7 @@ include serialize.repy
 
 # Hmm, perhaps I should make an initialization call instead of hardcoding this?
 # I suppose it doesn't matter since one can always override these values
-v2servername = "betabox.cs.washington.edu"
+v2servername = "betaseattleclearinghouse.poly.edu"
 # This port is updated to use the new port (legacy port is 10101)
 v2serverport = 10102
 
