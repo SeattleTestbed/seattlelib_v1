@@ -19,7 +19,7 @@
 include geoip_client.repy
 
 if callfunc == 'initialize':
-  geoip_init_client('http://geoip.cs.washington.edu:12679')
+  geoip_init_client(['http://betaseattleclearinghouse.poly.edu:12679', 'http://geoip.cs.washington.edu:12679'])
 
   # Test geoip_record_by_name method by verifying location info of google.com
   location_dict = geoip_record_by_name('poly.edu')
@@ -39,10 +39,10 @@ if callfunc == 'initialize':
   assert(geoip_location_str(location_dict) == "Seattle, WA, United States")
   
   # Try to connect to an invalid ip:port
-  geoip_init_client('http://geoip.cs.washington.edu:1010')
+  geoip_init_client(['http://geoip.cs.washington.edu:1010'])
   try:
     location_dict = geoip_record_by_name('amazon.com')
   except Exception, e:
     pass
   else:
-    raise Exception
+    raise Exception("geoip_record_by_name was supposed to raise an error, but didn't!")
