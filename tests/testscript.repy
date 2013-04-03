@@ -1,0 +1,5 @@
+if callfunc == 'initialize':
+  # This is a test script for embedding bundled data.
+  for filename in callargs:
+    if open(filename+'copy', 'rb').read() != open(filename, 'rb').read():
+      print filename, "doesn't match!"
