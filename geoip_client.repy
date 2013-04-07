@@ -15,7 +15,9 @@
   Where server_address is the ip address of a remote GeoIP XMl-RPC server.
 """
 
+include parallelize.repy
 include xmlrpc_client.repy
+
 
 """
 Initialize global GeoIP XML-RPC client object to None
@@ -54,7 +56,7 @@ def geoip_init_client(url=["http://geoip.cs.washington.edu:12679", "http://betas
 
   
 
-def geoip_record_by_addr(addr, timeout=5):
+def geoip_record_by_addr(addr, graceperiod=2, timeout=5):
   """
   <Purpose>
     Request location data of provided IP address from GeoIP XML-RPC server
@@ -75,19 +77,56 @@ def geoip_record_by_addr(addr, timeout=5):
     Dictionary of location data of provided IP address.
   """
   
-  for geoip_client in geoip_clientlist:
-    try:
-      return geoip_client.send_request("record_by_addr", (addr,), timeout)
-    except:
-      pass
-  else:
+  # Keep track of when we started.
+  start_time = getruntime()
+
+  # A list that keeps track of whether at least one of the geoip servers have
+  # returned the result.
+  one_finished_instance=[False]
+
+  parallel_handle = parallelize_initfunction(geoip_clientlist, _try_geoip_addr_lookup, 5, addr, timeout, one_finished_instance)
+
+  while not parallelize_isfunctionfinished(parallel_handle):
+    sleep(0.01)
+    if (getruntime() - start_time > graceperiod) and one_finished_instance:
+      parallelize_abortfunction(parallel_handle)
+      break  
+
+  # If we did not get any successful lookup, then raise error.
+  if not one_finished_instance[0]:
     raise Exception("Unable to contact the geoip server.")
 
+  # Lookup the results for geoip.
+  junk, result = parallelize_getresults(parallel_handle)['returned'][0]
+
+  # This does not terminate all parallel threads; do not assume it does.
+  parallelize_closefunction(parallel_handle)
+
+  return result
 
 
 
 
-def geoip_record_by_name(name, timeout=5):
+
+
+def _try_geoip_addr_lookup(geoip_client, addr, timeout, one_finished_instance):
+  """
+  <Purpose>
+    The purpose of this function is to try and do a geoip lookup
+    by address.
+  """
+
+  # Lookup the request and update the one_finished_instance, indicating
+  # that at least one lookup was successful.
+  result = geoip_client.send_request("record_by_addr", (addr, ), timeout)
+  one_finished_instance[0] = True
+  return result
+
+
+
+
+
+def geoip_record_by_name(name, graceperiod=2, timeout=5):
   """
   <Purpose>
     Request location data of provided hostname from GeoIP XML-RPC server
@@ -108,13 +147,48 @@ def geoip_record_by_name(name, timeout=5):
     Dictionary of location data of provided hostname.
   """
 
-  for geoip_client in geoip_clientlist:
-    try:
-      return geoip_client.send_request("record_by_name", (name,), timeout)
-    except:
-      pass
-  else:
+  # Keep track of when we started.
+  start_time = getruntime()
+
+  # A list that keeps track of whether at least one of the geoip servers have
+  # returned the result.
+  one_finished_instance=[False]
+
+  parallel_handle = parallelize_initfunction(geoip_clientlist, _try_geoip_name_lookup, 5, name, timeout, one_finished_instance)
+
+  while not parallelize_isfunctionfinished(parallel_handle):
+    sleep(0.01)
+    if (getruntime() - start_time > graceperiod) and one_finished_instance:
+      parallelize_abortfunction(parallel_handle)
+      break  
+
+  # If we did not get any successful lookup, then raise error.
+  if not one_finished_instance[0]:
     raise Exception("Unable to contact the geoip server.")
+
+  # Lookup the results for geoip.
+  junk, result = parallelize_getresults(parallel_handle)['returned'][0]
+
+  # This does not terminate all parallel threads; do not assume it does.
+  parallelize_closefunction(parallel_handle)
+
+  return result
+
+  
+
+
+def _try_geoip_name_lookup(geoip_client, name, timeout, one_finished_instance):
+  """
+  <Purpose>
+    The purpose of this function is to try and do a geoip lookup
+    by record.
+  """
+
+  # Lookup the request and update the one_finished_instance, indicating
+  # that at least one lookup was successful.
+  result = geoip_client.send_request("record_by_name", (name, ), timeout)
+  one_finished_instance[0] = True
+  return result
 
 
 
