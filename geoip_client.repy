@@ -102,6 +102,10 @@ def geoip_record_by_addr(addr, graceperiod=2, timeout=5):
   # This does not terminate all parallel threads; do not assume it does.
   parallelize_closefunction(parallel_handle)
 
+  # If we found no suitable result.
+  if not result:
+    raise Exception("Unable to contact the geoip server.")
+
   return result
 
 
@@ -171,6 +175,10 @@ def geoip_record_by_name(name, graceperiod=2, timeout=5):
 
   # This does not terminate all parallel threads; do not assume it does.
   parallelize_closefunction(parallel_handle)
+
+  # If we found no suitable result.
+  if not result:
+    raise Exception("Unable to contact the geoip server.")
 
   return result
 
