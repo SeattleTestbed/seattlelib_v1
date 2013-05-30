@@ -27,7 +27,7 @@ geoip_clientlist = []
 
 
 
-def geoip_init_client(url=["http://geoip.cs.washington.edu:12679", "http://betaseattleclearinghouse.poly.edu:12679"]):
+def geoip_init_client(url=["http://geoipserver.poly.edu:12679", "http://geoipserver2.poly.edu:12679"]):
   """
   <Purpose>
     Create a new GeoIP XML-RPC client object.
