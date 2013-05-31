@@ -16,7 +16,7 @@ include uniqueid.repy
 
 # Hmm, perhaps I should make an initialization call instead of hardcoding this?
 # I suppose it doesn't matter since one can always override these values
-udpservername = "blackbox.cs.washington.edu"
+udpservername = "udpadvertiseserver.poly.edu"
 udpserverport = 10102
 
 # how long to wait for timeouts...
