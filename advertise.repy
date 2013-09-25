@@ -22,7 +22,7 @@ include udpcentralizedadvertise.repy
 
 # All the names of services we can support.
 # As of January 2012, openDHT is no longer a default service.
-_advertise_all_services = ("central", "central_v2", "DOR")
+_advertise_all_services = ("central", "central_v2", "UDP")
 
 
 nodemanager_announce_context = {}
@@ -127,7 +127,7 @@ def _try_advertise_announce(args):
 
 
 
-def advertise_announce(key, value, ttlval, concurrentevents=2, \
+def advertise_announce(key, value, ttlval, concurrentevents=4, \
     graceperiod=10, timeout=60):
   """
   <Purpose>
@@ -280,7 +280,7 @@ def _try_advertise_lookup(args):
 
 
 def advertise_lookup(key, maxvals=100, lookuptype=None, \
-    concurrentevents=2, graceperiod=10, timeout=60):
+    concurrentevents=4, graceperiod=10, timeout=60):
   """
   <Purpose>
     Lookup (GET) (a) value(s) stored at the given key in the central advertise
@@ -321,7 +321,7 @@ def advertise_lookup(key, maxvals=100, lookuptype=None, \
 
   # As of January 2012, DHT is no longer a default service.
   if lookuptype is None:
-    lookuptype = ['central','DOR', 'central_v2', 'UDP']
+    lookuptype = _advertise_all_services
 
   parallel_worksets = []
   start_time = getruntime()
