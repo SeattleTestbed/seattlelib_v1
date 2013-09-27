@@ -54,7 +54,37 @@ def geoip_init_client(url=["http://geoipserver.poly.edu:12679", "http://geoipser
   for cururl in url:
     geoip_clientlist.append(xmlrpc_client_Client(cururl))
 
-  
+
+def _isvalid_IP(addr):
+  # Helper method that is used to validate IPv4 addresses for thier correct
+  # format. The only accepted format is the dotted decimal,i.e. 'x.x.x.x'.
+  # This is because the backend GeoIP server only accepts this format.
+  # This method returns a Bool for validated IP address.
+
+  # split the IP address, so that I can check for each number if it falls
+  # within the range of 0-255.
+  decimallist = addr.split('.')
+
+  # First, I need to check if there are 4 decimal numbers for IP address.
+  if len(decimallist) != 4:
+    return False
+
+  # Make sure the numbers in IP address are sent as decimals that fall in the
+  # range of 0-255.
+  try:
+    # If any of the decimal is not within the range, return False.
+    for eachdecimal in decimallist:
+      if not (0 <= int(eachdecimal) < 256):
+        return False
+
+  # This is used to catch any values sent other than numbers to base 10
+  # to int().
+  except ValueError:
+    return False
+
+  # finally, return the result.
+  return True
+
 
 def geoip_record_by_addr(addr, graceperiod=2, timeout=5):
   """
@@ -83,6 +113,11 @@ def geoip_record_by_addr(addr, graceperiod=2, timeout=5):
   # A list that keeps track of whether at least one of the geoip servers have
   # returned the result.
   one_finished_instance=[False]
+
+  # a client-side check to validate IP, before sending to PyGeoIP server.
+  # Not doing this check, will return bogus information from server.
+  if not _isvalid_IP(addr):
+    raise ValueError('Not a valid IPv4 address.')
 
   parallel_handle = parallelize_initfunction(geoip_clientlist, _try_geoip_addr_lookup, 5, addr, timeout, one_finished_instance)
 
@@ -122,6 +157,12 @@ def _try_geoip_addr_lookup(geoip_client, addr, timeout, one_finished_instance):
 
   # Lookup the request and update the one_finished_instance, indicating
   # that at least one lookup was successful.
+
+  # a client-side check to validate IP, before sending to PyGeoIP server.
+  # Not doing this check, will return bogus information from server.
+  if not _isvalid_IP(addr):
+    raise ValueError('Not a valid IPv4 address.')
+
   result = geoip_client.send_request("record_by_addr", (addr, ), timeout)
   one_finished_instance[0] = True
   return result
