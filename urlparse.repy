@@ -70,6 +70,9 @@ def urlparse_urlsplit(urlstring, default_scheme="", allow_fragments=True):
   if rpart.startswith("//"):
     (lpart, rpart) = _urlparse_splitnetloc(rpart, 2)
     components["netloc"] = lpart
+    # Adds a trailing slash to the URL if no path exists. 
+    if rpart == "":
+      rpart = "/"
 
     (components["username"], components["password"], components["hostname"],
       components["port"]) = _urlparse_splitauthority(lpart)

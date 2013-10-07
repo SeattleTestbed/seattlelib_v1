@@ -1,0 +1,15 @@
+#pragma repy
+
+# Fix for the bug in urlparse.repy -- if no path is specified after 
+# the network location, then a trailing slash is required. If the
+# trailing slash was missing, an empty string was being returned.
+
+include httpretrieve.repy
+
+def test_get_string():
+  httpretrieve_get_string("http://univie.ac.at/")
+  httpretrieve_get_string("http://univie.ac.at")
+  httpretrieve_get_string("http://www.google.com/")
+  httpretrieve_get_string("http://www.google.com")
+
+test_get_string()
