@@ -9,7 +9,11 @@ Advertisements to a central server (similar to openDHT)
 
 """
 
-include centralizedadvertise_base.repy
+include session.repy
+# I'll use socket timeout to prevent hanging when it takes a long time...
+include sockettimeout.repy
+include serialize.repy
+
 
 # Hmm, perhaps I should make an initialization call instead of hardcoding this?
 # I suppose it doesn't matter since one can always override these values
@@ -17,6 +21,11 @@ servername = "advertiseserver.poly.edu"
 # This port is updated to use the new port (legacy port is 10101)
 serverport = 10102
 
+
+
+
+class CentralAdvertiseError(Exception):
+  """Error when advertising a value to the central advertise service."""
 
 def centralizedadvertise_announce(key, value, ttlval):
   """
@@ -46,7 +55,43 @@ def centralizedadvertise_announce(key, value, ttlval):
    <Returns>
      None
   """
-  return centralizedadvertisebase_announce(v2servername, v2serverport, key, value, ttlval)
+  # do basic argument checking / munging
+  key = str(key)
+  value = str(value)
+
+  if not type(ttlval) is int and not type(ttlval) is long:
+    raise TypeError("Invalid type '"+str(type(ttlval))+"' for ttlval.")
+
+  if ttlval < 1:
+    raise ValueError("The argument ttlval must be positive, not '"+str(ttlval)+"'")
+
+  
+  # build the tuple to send, then convert to a string because only strings
+  # (bytes) can be transmitted over the network...
+  datatosend = ('PUT',key,value,ttlval)
+  datastringtosend = serialize_serializedata(datatosend)
+
+  
+  # send the data over a timeout socket using the session library, then
+  # get a response from the server.
+  sockobj = timeout_openconn(servername,serverport, timeout=10)
+  try:
+    session_sendmessage(sockobj, datastringtosend)
+    rawresponse = session_recvmessage(sockobj)
+  finally:
+    # BUG: This raises an error right now if the call times out ( #260 )
+    # This isn't a big problem, but it is the "wrong" exception
+    sockobj.close()
+  
+  # We should check that the response is 'OK'
+  try:
+    response = serialize_deserializedata(rawresponse)
+    if response != 'OK':
+      raise CentralAdvertiseError("Centralized announce failed with '"+response+"'")
+  except ValueError, e:
+    raise CentralAdvertiseError("Received unknown response from server '"+rawresponse+"'")
+      
+
 
 
 def centralizedadvertise_lookup(key, maxvals=100):
@@ -75,4 +120,57 @@ def centralizedadvertise_lookup(key, maxvals=100):
    <Returns>
      The list of values
   """
-  return centralizedadvertisebase_lookup(v2servername, v2serverport, key, maxvals)
+
+  # do basic argument checking / munging
+  key = str(key)
+
+  if not type(maxvals) is int and not type(maxvals) is long:
+    raise TypeError("Invalid type '"+str(type(maxvals))+"' for ttlval.")
+
+  if maxvals < 1:
+    raise ValueError("The argument ttlval must be positive, not '"+str(ttlval)+"'")
+
+  # build the tuple to send, then convert to a string because only strings
+  # (bytes) can be transmitted over the network...
+  messagetosend = ('GET',key,maxvals)
+  messagestringtosend = serialize_serializedata(messagetosend)
+
+
+  sockobj = timeout_openconn(servername,serverport, timeout=10)
+  try:
+    session_sendmessage(sockobj, messagestringtosend)
+    rawreceiveddata = session_recvmessage(sockobj)
+  finally:
+    # BUG: This raises an error right now if the call times out ( #260 )
+    # This isn't a big problem, but it is the "wrong" exception
+    sockobj.close()
+
+
+  try:
+    responsetuple = serialize_deserializedata(rawreceiveddata)
+  except ValueError, e:
+    raise CentralAdvertiseError("Received unknown response from server '"+rawresponse+"'")
+
+  # For a set of values, 'a','b','c',  I should see the response: 
+  # ('OK', ['a','b','c'])    Anything else is WRONG!!!
+  
+  if not type(responsetuple) is tuple:
+    raise CentralAdvertiseError("Received data is not a tuple '"+rawresponse+"'")
+
+  if len(responsetuple) != 2:
+    raise CentralAdvertiseError("Response tuple did not have exactly two elements '"+rawresponse+"'")
+  if responsetuple[0] != 'OK':
+    raise CentralAdvertiseError("Central server returns error '"+str(responsetuple)+"'")
+
+  
+  if not type(responsetuple[1]) is list:
+    raise CentralAdvertiseError("Received item is not a list '"+rawresponse+"'")
+
+  for responseitem in responsetuple[1]:
+    if not type(responseitem) is str:
+      raise CentralAdvertiseError("Received item '"+str(responseitem)+"' is not a string in '"+rawresponse+"'")
+
+  # okay, we *finally* seem to have what we expect...
+
+  return responsetuple[1]
+      
