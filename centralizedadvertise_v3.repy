@@ -13,12 +13,13 @@ include centralizedadvertise_base.repy
 
 # Hmm, perhaps I should make an initialization call instead of hardcoding this?
 # I suppose it doesn't matter since one can always override these values
-servername = "advertiseserver.poly.edu"
+v3servername = "advertiseserver_v3.poly.edu"
+
 # This port is updated to use the new port (legacy port is 10101)
-serverport = 10102
+v3serverport = 10102
 
 
-def centralizedadvertise_announce(key, value, ttlval):
+def v3centralizedadvertise_announce(key, value, ttlval):
   """
    <Purpose>
      Announce a key / value pair into the CHT.
@@ -46,10 +47,10 @@ def centralizedadvertise_announce(key, value, ttlval):
    <Returns>
      None
   """
-  return centralizedadvertisebase_announce(servername, serverport, key, value, ttlval)
+  return centralizedadvertisebase_announce(v3servername, v3serverport, key, value, ttlval)
 
 
-def centralizedadvertise_lookup(key, maxvals=100):
+def v3centralizedadvertise_lookup(key, maxvals=100):
   """
    <Purpose>
      Returns a list of valid values stored under a key
@@ -75,4 +76,4 @@ def centralizedadvertise_lookup(key, maxvals=100):
    <Returns>
      The list of values
   """
-  return centralizedadvertisebase_lookup(servername, serverport, key, maxvals)
+  return centralizedadvertisebase_lookup(v3servername, v3serverport, key, maxvals)
