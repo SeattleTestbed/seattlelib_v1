@@ -20,21 +20,12 @@ include uniqueid.repy
 udpservername = "udpadvertiseserver.poly.edu"
 udpserverport = 10102
 
-mycontext['udpadvertiseserver_current_ip'] = []
-
 # how long to wait for timeouts...
 udpcentralizedservertimeouts = [1,2,4,8]
 
 # If a query times out or if we decide to abandon it, put the ID here. That way, 
 # the communicate function can reject it if the server responds belatedly.
 failed_querylist = []
-
-# Need this for receiving over UDP. The Repy v1 API forces us to use 
-# a callback, which requires this roundabout solution.
-mycontext['advertise_response'] = []
-# This will contain any exceptions from the UDP recvmess callback, if
-# they arise...
-mycontext['advertise_errors'] = []
 
 mycontext['udprequestport'] = 0
 
@@ -102,9 +93,37 @@ def _udpcentralizedadvertise_communicate(datastringtosend, timeout, queryid):
   (hostname, aliaslist, ipaddresslist) = gethostbyname_ex(udpservername)
 
   current_server_ip = random_sample(ipaddresslist, 1)[0]
-  mycontext['udpadvertiseserver_current_ip'] = [current_server_ip]
 
   starttime = getruntime()
+
+  # Need this for receiving over UDP. The Repy v1 API forces us to use
+  # a callback, which requires this roundabout solution.
+  advertise_response = []
+
+  # This will contain any exceptions from the UDP recvmess callback, if
+  # they arise...
+  advertise_errors = []
+
+  # This is our roundabout solution for a UDP callback. Could crash.
+  # Probably should if something bad happens.
+
+  # Define the UDP callback as a closure so that the current
+  # server IP is available inside of it when it is called.
+  # We need this to ensure that we only accept messages from
+  # the server we actually queried (not any IP).
+  def _listenformessage(remoteIP, remoteport, message, commhandle):
+    # Its possible that someone tried to pretend to be the advertise
+    # server... Ignore their response if that's the case.
+    if remoteIP in current_server_ip:
+      try:
+        # While unlikely, we want to prevent handling a second request
+        # from the advertise server if we're in the middle of processing
+        # this one.
+        stopcomm(commhandle)
+        advertise_response.append(serialize_deserializedata(message))
+      except Exception, e:
+        advertise_errors.append(e)
+    return
 
   # Let's get ready to receive a response...
   # NOTE: This is a roundabout solution to deal with the fact that the 
@@ -117,18 +136,18 @@ def _udpcentralizedadvertise_communicate(datastringtosend, timeout, queryid):
     sendmess(current_server_ip, udpserverport, datastringtosend, getmyip(), udprequestport)
 
     while getruntime() < starttime + timeout:
-      if mycontext['advertise_errors']:
-        raise UDPCentralAdvertiseError("Advertising failed with error(s): " + str(mycontext['advertise_errors']))
+      if advertise_errors:
+        raise UDPCentralAdvertiseError("Advertising failed with error(s): " + str(advertise_errors))
 
-      for entry in mycontext['advertise_response']:
+      for entry in advertise_response:
         if entry[len(entry) - 1] == queryid:
-          return_value = mycontext['advertise_response'].pop(mycontext['advertise_response'].index(entry))
+          return_value = advertise_response.pop(advertise_response.index(entry))
           return return_value
 
       # Since there's nothing here for us, why not do some spring cleaning?
-      for entry in mycontext['advertise_response']:
+      for entry in advertise_response:
         if queryid - entry[len(entry) - 1] > 100:
-          mycontext['advertise_response'].pop(mycontext['advertise_response'].index(entry))
+          advertise_response.pop(advertise_response.index(entry))
 
       # Already done? Let's play nice with the other threads.
       sleep(0.01) # Strongly recommend NOT to set this any higher.
@@ -138,27 +157,6 @@ def _udpcentralizedadvertise_communicate(datastringtosend, timeout, queryid):
   finally:
     # always close the response socket...
     stopcomm(udpresponsesocket)
-
-
-
-
-# This is our roundabout solution for a UDP callback.
-# Could crash. Probably should if something bad happens.
-def _listenformessage(remoteIP, remoteport, message, commhandle):
-  # Its possible that someone tried to pretend to be the advertise
-  # server... Ignore their response if that's the case.
-  if remoteIP in mycontext['udpadvertiseserver_current_ip']:
-    try:
-      # While unlikely, we want to prevent handling a second request
-      # from the advertise server if we're in the middle of processing
-      # this one.
-      stopcomm(commhandle)
-      mycontext['advertise_response'].append(serialize_deserializedata(message))
-    except Exception, e:
-      mycontext['advertise_errors'].append(e)
-  return
-
-
 
 
 # A dummy function for getusableport.
