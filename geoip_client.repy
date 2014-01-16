@@ -141,6 +141,9 @@ def geoip_record_by_addr(addr, graceperiod=2, timeout=5):
   if not result:
     raise Exception("Unable to contact the geoip server.")
 
+  if 'faultCode' in result:
+    raise Exception(result['faultString'])
+
   return result
 
 
