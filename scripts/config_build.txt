@@ -1,0 +1,9 @@
+../*
+repy_v1/*
+portability/*
+common/*
+common/utf/*
+# Tests
+test ../tests/*
+test ../test/*
+test ../testlibrepy/*
