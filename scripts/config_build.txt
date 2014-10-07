@@ -6,3 +6,4 @@ DEPENDENCIES/common/utf/*
 # Tests
 test tests/*
 test test/*
+test DEPENDENCIES/nodemanager/servicelogger.py
